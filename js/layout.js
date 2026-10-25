@@ -1,4 +1,4 @@
-// Petalspire v0.2: world layout (lots, bed sites, obstacles). Deterministic, so saves only store ids.
+// Petalspire v0.3: world layout (lots, bed sites, obstacles). Deterministic, so saves only store ids.
 export const TILE = 1.08;          // tile spacing in a bed
 export const BED_N = 3;            // beds are 3x3 plots
 export const SITE_HALF = 2.0;      // half-size of a bed footprint used for clearing checks

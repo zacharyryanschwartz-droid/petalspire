@@ -8,12 +8,12 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="default" />
 <meta name="apple-mobile-web-app-title" content="Petalspire" />
 <meta name="theme-color" content="#F6E6CF" />
-<title>Petalspire · v0.2</title>
+<title>Petalspire · v0.3</title>
 <link rel="apple-touch-icon" href="assets/emblem.png" />
 <link rel="icon" href="assets/emblem.png" />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Nunito:wght@500;600;700;800&display=swap" rel="stylesheet" />
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Nunito:wght@500;600;700;800&display=swap" rel="stylesheet" />
 <link rel="stylesheet" href="style.css" />
 <script type="importmap">{ "imports": { "three": "./vendor/three.module.min.js" } }</script>
 </head>
@@ -26,6 +26,7 @@
       <div class="pill" id="pill-wood" title="Wood"><i data-icon="wood"></i><b id="wood-count">0</b></div>
       <div class="pill" id="pill-water" title="Water"><i data-icon="water"></i><b id="water-count">0</b></div>
       <div class="pill" id="pill-coins" title="Coins"><i data-icon="coin"></i><b id="coin-count">0</b></div>
+      <button class="pill jewel-pill" id="pill-jewels" title="Jewels · open the Jewel Shop" aria-label="Jewels"><i data-icon="jewel"></i><b id="jewel-count">0</b><em>+</em></button>
       <button class="icon-btn" id="btn-settings" aria-label="Settings"><i data-icon="gear"></i></button>
     </div>
   </header>
@@ -40,19 +41,14 @@
   </section>
   <div id="buildbar" class="buildbar hidden"><p id="buildbar-text"></p><button class="btn sm" id="buildbar-cancel">Cancel</button></div>
   <nav id="tabbar">
-    <button data-panel="bag"><i data-icon="bag"></i><span>Bag</span></button>
+    <button data-panel="bag" id="tab-bag"><i data-icon="bag"></i><span>Bag</span><em id="bag-badge" class="badge soft hidden"></em></button>
     <button data-panel="build" id="tab-build"><i data-icon="build"></i><span>Build</span></button>
     <button data-panel="stand" id="tab-stand" class="hidden"><i data-icon="stand"></i><span>Stand</span><em id="stand-badge" class="badge soft hidden"></em></button>
     <button data-panel="market" id="tab-market"><i data-icon="market"></i><span>Market</span><em class="lock-badge"><i data-icon="lock"></i></em></button>
     <button data-panel="rack" id="tab-rack" class="hidden"><i data-icon="rack"></i><span>Rack</span><em id="rack-badge" class="badge hidden"></em></button>
   </nav>
-  <div id="settings" class="menu hidden">
-    <h3>Settings</h3>
-    <button id="btn-tips">Show tips again</button>
-    <button id="btn-reset" class="danger">Reset garden…</button>
-    <p class="fine">Petalspire v0.2 prototype · progress autosaves on this device.</p>
-  </div>
   <div id="popups"></div>
+  <div id="confirm" class="confirm hidden" role="dialog" aria-modal="true"></div>
   <div id="story" class="story hidden"></div>
   <div id="fade" class="fade hidden"></div>
   <div id="reveal" class="reveal hidden"></div>
@@ -64,7 +60,7 @@
       <p class="tagline"><span>•</span> Flower Garden Game <span>•</span></p>
       <button id="btn-start" class="btn btn-primary big">Begin</button>
       <p class="title-hint">Clear · Grow · Sell</p>
-      <p class="version">v0.2 prototype</p>
+      <p class="version">v0.3 prototype</p>
     </div>
   </div>
 </div>

@@ -1,4 +1,4 @@
-// Petalspire v0.2 — game data
+// Petalspire v0.3 — game data
 export const SPECIES = {
   heartvine: {
     id: 'heartvine', name: 'Heartvine', rarity: 'common', type: 'Plant · Climbing vine',
@@ -72,24 +72,109 @@ export const SELL_ORDER = ['dried_heartvine', 'flower_moonflower', 'flower_sunpe
 export const WOOD = { tree: 3, stump: 1, bush: 0, rock: 0 };
 export const BED_COSTS = [12, 20, 28, 36, 44, 52];   // wood per raised bed, escalating
 export const STAND_CAP = 12;
-export const MARKET_GOAL = 100;                        // coins earned at the stand to reopen the Supply Market
+export const MARKET_GOAL = 100;                        // coins earned at the stand to unlock the Rebuild Market project
 export const WATER_REGEN_S = 20, WATER_REGEN_MAX = 10; // rain barrel by the stand
 export const STARTER = { seed_heartvine: 4, seed_sunpetal: 3, water: 10 };
+export const STARTER_JEWELS = 3;
+
+// ---------- v0.3: things you build ----------
+export const BUILDS = {
+  stand:  { name: 'Roadside Farm Stand', wood: 15, coins: 0, opt: { find: 'old_crate', label: 'Use an Old Crate as a display shelf (+4 shelf space)' } },
+  rack:   { name: 'Drying Rack', wood: 10, coins: 0 },
+  market: { name: 'Rebuild the Supply Market', wood: 30, coins: 60, s: 60, opt: { scrap: 3, save: 20, label: 'Patch the roof with 3 Scrap (save 20 coins)' }, hurryJewels: 2 },
+};
+export const BUILD_ANIM_MS = 2450;
+
+// ---------- v0.3: found items (seeded ~22% of trees, stumps, bushes and rocks hide one) ----------
+export const FIND_CHANCE = 0.22, SAPLING_CHANCE = 0.12;   // sapling chance applies to wild trees only
+export const FINDS = {
+  watering_can: { name: 'Rusty Watering Can', restore: { wood: 2, coins: 5, s: 30 }, recycle: { scrap: 2 },
+    into: { name: 'Brass Watering Can', bonus: 'can', blurb: 'Rain barrel refills twice as fast and holds 15' } },
+  wheelbarrow:  { name: 'Old Wheelbarrow', restore: { wood: 6, coins: 8, s: 45 }, recycle: { wood: 3, scrap: 1 },
+    into: { name: 'Trusty Wheelbarrow', bonus: 'barrow', blurb: '+1 Wood from every tree you chop' } },
+  old_crate:    { name: 'Old Crate', restore: { wood: 2, coins: 0, s: 20 }, recycle: { wood: 3 },
+    into: { name: 'Crate Shelf', bonus: 'crate', blurb: '+4 shelf space on your Farm Stand' } },
+  flower_pot:   { name: 'Cracked Flower Pot', restore: { wood: 0, coins: 4, s: 20 }, recycle: { coins: 3 },
+    into: { name: 'Blooming Planter', decor: 'planter', atm: 1 } },
+  lantern:      { name: 'Broken Lantern', restore: { wood: 1, coins: 6, scrap: 1, s: 30 }, recycle: { scrap: 1, coins: 2 },
+    into: { name: 'Garden Lantern', decor: 'lantern', atm: 2 } },
+  bench:        { name: 'Weathered Bench', restore: { wood: 5, coins: 4, s: 45 }, recycle: { wood: 5 },
+    into: { name: 'Garden Bench', decor: 'bench', atm: 3 } },
+  gnome:        { name: 'Old Garden Gnome', restore: { wood: 0, coins: 6, s: 25 }, recycle: { coins: 4 },
+    into: { name: 'Garden Gnome', decor: 'gnome', atm: 2 } },
+  fencing:      { name: 'Tangled Wire Fencing', restore: { wood: 3, coins: 0, s: 30 }, recycle: { scrap: 3 },
+    into: { name: 'Rose Trellis', decor: 'trellis', atm: 2 } },
+  bottles:      { name: 'Glass Bottles', restore: { wood: 1, coins: 2, s: 20 }, recycle: { coins: 4 },
+    into: { name: 'Bottle Chime', decor: 'chime', atm: 2 } },
+  scrap_metal:  { name: 'Scrap Metal', restore: { wood: 2, coins: 5, s: 35 }, recycle: { scrap: 4 },
+    into: { name: 'Copper Weathervane', decor: 'vane', atm: 2 } },
+};
+export const FIND_IDS = Object.keys(FINDS);
+export const FIND_COLORS = { watering_can: '#9FB0A8', wheelbarrow: '#8FA39A', old_crate: '#B9946A', flower_pot: '#C9876A', lantern: '#8A8F8A', bench: '#A89A86', gnome: '#8FAF86', fencing: '#8A8F8A', bottles: '#BFDCCF', scrap_metal: '#9AA3A6' };
+export const RESTORE_HURRY_JEWELS = 1;
+export const ATMOS_STEP = 0.04, ATMOS_MAX = 0.4;          // each atmosphere point: customers arrive 4% sooner (max 40%)
+
+// ---------- v0.3: trees you grow ----------
+// Real time to maturity. Keep it slow: this is a long-term Wood source. Override for testing with ?treeMin=1
+export const TREE = { growMin: 40, wood: 6, stump: 1, saplingBack: 0.5, stageAt: [0, 0.25, 0.6, 1], stageNames: ['Sapling', 'Young tree', 'Growing tree', 'Mature tree'], hurryJewels: 1 };
+export const SHOP = { wood5: { wood: 5, price: 12 }, sapling: { price: 20 } };
+
+// ---------- v0.3: Jewel Shop ----------
+// ONE flag: 'simulated' = prototype test purchases (no charge). Set to 'apple-iap' once a native StoreKit bridge exists (see js/payments.js).
+export const PAYMENTS_MODE = 'simulated';
+// 'No More Ads' package: removes every ad placeholder and adds 10 Jewels. Same simulated purchase path as Jewels.
+export const NO_ADS_BUNDLE = { id: 'no_ads', n: 10, price: '$8.99', productId: 'com.petalspire.noads', noAds: true };
+
+// Ads (v0.3 prototype). ADS_MODE is the single switch:
+//   'placeholder' -> house banner + brand-styled 'Partner ad' placeholders; no ad SDK, nothing is loaded from the network
+//   'sdk'         -> reserved for a real partner-network SDK bridge (see js/ads.js); until one exists no partner ads show
+//   'off'         -> no ads at all
+// Banners are HOUSE ADS only (they promote our own games, see OTHER_GAMES). Full-screen interstitials and the opt-in
+// rewarded ad come from an ad partner network: ADS.partner.network names the future SDK (null = placeholder).
+export const ADS_MODE = 'placeholder';
+export const ADS = {
+  banner: true,                 // small bottom house-ad banner under the tab bar (the UI is lifted so nothing is covered)
+  houseAds: ['market_plot'],    // which of OTHER_GAMES the banner promotes, in rotation
+  partner: { network: null, interstitialUnit: null, rewardedUnit: null },   // e.g. { network: 'admob', interstitialUnit: 'ca-app-pub-…' }
+  interstitialEverySales: 3,    // a full-screen ad break after every 3rd customer sale…
+  interstitialAfterPack: true,  // …and after opening a bought Card Pack
+  minGapMs: 90 * 1000,          // never more than one ad break per 90 s
+  skipAfterMs: 3000,            // ad breaks can be skipped after 3 s
+  rewarded: { coins: 10, cooldownMs: 3 * 60 * 1000, watchMs: 3000 },   // opt-in 'watch an ad' at the stand
+};
+
+// Settings → Play Other Games. Add more entries here; status 'soon' | 'live' (live entries need a url).
+export const OTHER_GAMES = [
+  { id: 'market_plot', name: 'Market Plot', status: 'soon', tagline: 'Invent it. Grow it. Sell it.',
+    blurb: 'A cozy invent-and-market farming game: dream up new crops and handmade goods, then run your own little market.', url: null },
+];
+
+export const JEWEL_BUNDLES = [
+  { id: 'jewels_1',  n: 1,  price: '$0.99',  productId: 'com.petalspire.jewels.1' },
+  { id: 'jewels_10', n: 10, price: '$6.99',  productId: 'com.petalspire.jewels.10' },
+  { id: 'jewels_50', n: 50, price: '$29.99', productId: 'com.petalspire.jewels.50', best: true },
+];
 
 export const TIPS = {
   chop: 'An old wooded lot. <b>Tap a tree</b> to chop it down — you’ll get <b>Wood</b>.',
   stump: 'Stumps stay behind. <b>Tap a stump</b> to dig it out and clear the ground.',
+  find: 'Something glints! <b>Tap the sparkle</b> to pick up what you found.',
+  finds: 'Found items go to <b>Bag → Finds</b>. <b>Restore</b> them into something useful, or <b>recycle</b> them.',
+  sapling: 'A <b>tree sapling</b>! Plant it on open ground (Bag or Build). Trees grow slowly but give lots of Wood.',
   build: 'Nice clearing! Tap <b>Build</b> and place a <b>raised bed</b> on a fully cleared patch.',
+  standbp: 'Next: build your <b>Farm Stand</b> by the road. Tap the glowing blueprint or open <b>Build</b>.',
   water: 'Seeds need a drink. <b>Tap the planted tile</b> and water it.',
-  growing: 'It’s growing! <b>Drag</b> to look around, <b>pinch</b> to zoom.',
+  growing: 'It’s growing! <b>Drag</b> to move around, <b>pinch</b> to zoom, <b>twist two fingers</b> to turn.',
   bloom: 'A bloom! <b>Tap the sparkling plant</b> to harvest it.',
   harvested: 'Harvests give flowers <i>and</i> seeds. Put spares on your <b>Farm Stand</b> by the road.',
-  stand: 'Your <b>Farm Stand</b> is open! Tap it to stock flowers — drivers will pull over to buy.',
-  barrel: 'The <b>rain barrel</b> by the stand slowly refills your watering can.',
+  stand: 'Your <b>Farm Stand</b> is built! Tap it to stock flowers — drivers will pull over to buy.',
+  barrel: 'The <b>rain barrel</b> by the road slowly refills your watering can.',
   customer: 'A customer! They’ll pick what they want from your stand and pay in coins.',
-  heartvine: 'A <b>Drying Rack</b> appeared! Dried Heartvine sells for almost 3× fresh.',
-  market: 'The <b>Supply Market</b> reopened — buy seeds, water and Card Packs there.',
+  heartvine: 'You can now build a <b>Drying Rack</b> (Build). Dried Heartvine sells for almost 3× fresh.',
+  rebuild: 'Your stand has earned enough to <b>rebuild the Supply Market</b>. Tap the old cottage or open Build.',
+  market: 'The <b>Supply Market</b> is open — seeds, water, <b>Wood bundles</b>, <b>saplings</b> and Card Packs.',
   pack: 'Discovered cards unlock new items in the Supply Market — buy them with coins.',
+  decor: 'Placed decor raises your garden’s <b>atmosphere</b> — customers stop by more often.',
   plot: 'The woods around you are <b>for sale</b>. Tap a <b>For Sale</b> sign to expand.',
   plotbought: 'New land! Clear its trees for Wood and room for more beds.',
 };
