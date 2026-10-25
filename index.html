@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="default" />
+<meta name="apple-mobile-web-app-title" content="Petalspire" />
+<meta name="theme-color" content="#F6E6CF" />
+<title>Petalspire · v0.1</title>
+<link rel="apple-touch-icon" href="assets/emblem.png" />
+<link rel="icon" href="assets/emblem.png" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Nunito:wght@500;600;700;800&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="style.css" />
+<script type="importmap">{ "imports": { "three": "./vendor/three.module.min.js" } }</script>
+</head>
+<body>
+<canvas id="scene"></canvas>
+<div id="ui">
+  <header id="hud">
+    <div class="wordmark-mini"><img src="assets/emblem.png" alt="" /><span>Petalspire</span></div>
+    <div class="hud-right">
+      <div class="pill" id="pill-water" title="Water"><i data-icon="water"></i><b id="water-count">0</b></div>
+      <div class="pill" id="pill-coins" title="Coins"><i data-icon="coin"></i><b id="coin-count">0</b></div>
+      <button class="icon-btn" id="btn-settings" aria-label="Settings"><i data-icon="gear"></i></button>
+    </div>
+  </header>
+  <div id="tip" class="tip hidden"><img src="assets/emblem.png" alt="" /><p id="tip-text"></p></div>
+  <div id="tile-sheet" class="sheet tile-sheet hidden"></div>
+  <section id="panel" class="panel hidden" aria-modal="true">
+    <div class="panel-card">
+      <div class="panel-head"><h2 id="panel-title">Market</h2><button class="close-btn" id="panel-close" aria-label="Close">×</button></div>
+      <div id="panel-body" class="panel-body"></div>
+    </div>
+  </section>
+  <nav id="tabbar">
+    <button data-panel="bag"><i data-icon="bag"></i><span>Bag</span></button>
+    <button data-panel="market"><i data-icon="market"></i><span>Market</span></button>
+    <button data-panel="packs"><i data-icon="pack"></i><span>Packs</span></button>
+    <button data-panel="rack"><i data-icon="rack"></i><span>Rack</span><em id="rack-badge" class="badge hidden"></em></button>
+  </nav>
+  <div id="settings" class="menu hidden">
+    <h3>Settings</h3>
+    <button id="btn-tips">Show tips again</button>
+    <button id="btn-reset" class="danger">Reset garden…</button>
+    <p class="fine">Petalspire v0.1 prototype · progress autosaves on this device.</p>
+  </div>
+  <div id="popups"></div>
+  <div id="reveal" class="reveal hidden"></div>
+  <div id="title" class="title-screen">
+    <div class="title-wash"></div>
+    <div class="title-inner">
+      <img class="title-emblem" src="assets/emblem.png" alt="" />
+      <h1 class="wordmark">Petalspire</h1>
+      <p class="tagline"><span>•</span> Flower Garden Game <span>•</span></p>
+      <button id="btn-start" class="btn btn-primary big">Begin</button>
+      <p class="title-hint">Plant · Discover · Bloom</p>
+      <p class="version">v0.1 prototype</p>
+    </div>
+  </div>
+</div>
+<script type="module" src="js/main.js"></script>
+</body>
+</html>
