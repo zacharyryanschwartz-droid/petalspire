@@ -489,3 +489,54 @@ body.ads-on{--sab:calc(env(safe-area-inset-bottom,0px) + 48px)}
 .irrig-line{display:flex;align-items:center;gap:6px;margin:-2px 0 8px;padding:5px 10px;border-radius:12px;font:700 12.5px/1.25 Nunito,sans-serif;color:#3D5A40;background:#EAF4F7;border:1px solid #C8E0E8}
 .irrig-line i{width:16px;height:16px;display:inline-flex}.irrig-line i svg{width:100%;height:100%}
 .irrig-line.paused{background:#FDEDED;border-color:#F7C5C5}
+
+/* v0.4: barrels, irrigation unhook, Tincture Stand */
+.irrig-line{align-items:center;gap:6px}
+.irrig-line span{flex:1}
+.irrig-line .btn.sm{padding:4px 10px;font-size:.78em}
+.barrel-line{display:flex;align-items:center;gap:8px;margin:2px 0 8px;padding:10px 12px;border-radius:14px;background:#FFF9F0;border:1px solid #E7D9C2;font-size:1.05em}
+.barrel-line.full{background:#EAF4F7;border-color:#C8E0E8}
+.barrel-line i{width:24px;height:24px;display:inline-flex}
+.barrel-beds{margin-bottom:6px}
+.base-seg button{display:inline-flex;align-items:center;justify-content:center;gap:6px}
+.base-seg button svg{width:24px;height:24px}
+.base-seg button[aria-disabled="true"]{opacity:.5}
+.need-base{margin:4px 0 8px;padding:10px 12px;border-radius:12px;background:#FDEDED;border:1px solid #F7C5C5;color:#8A4B4B;font-weight:700;text-align:center}
+.tslots{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:6px}
+.tslot{display:flex;align-items:center;gap:8px;min-height:62px;padding:8px 10px;border-radius:14px;background:#FFF9F0;border:1px solid #E7D9C2;font:inherit;text-align:left;color:inherit}
+.tslot svg{width:38px;height:38px;flex:none}
+.tslot span{display:flex;flex-direction:column;min-width:0}
+.tslot b{font-size:.82em;line-height:1.15}
+.tslot small{font-size:.75em;color:#7C6A5A}
+.tslot.empty{justify-content:center;color:#A8957E;font-size:.85em;border-style:dashed}
+.tslot.done{background:#FFF3D1;border-color:#E9B44C;cursor:pointer;box-shadow:0 0 0 3px rgba(233,180,76,.25)}
+.inv svg{max-width:38px;max-height:38px}
+
+/* v0.4: tool dock (Sickle / Plow), seed chips, flying items */
+.tooldock{position:absolute;left:10px;bottom:calc(86px + env(safe-area-inset-bottom));display:flex;flex-direction:column;gap:8px;z-index:6}
+.tooldock .tool{position:relative;width:58px;height:62px;border-radius:16px;border:2px solid #E7D9BE;background:rgba(255,251,242,.95);box-shadow:0 4px 12px rgba(61,90,64,.18);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:2px;color:#3D5A40}
+.tooldock .tool .tool-art{width:38px;height:40px;display:block}.tooldock .tool .tool-art svg{width:100%;height:100%}
+.tooldock .tool b{font-size:10px;line-height:1}
+.tooldock .tool.on{border-color:#7FA47D;background:#EEF6E8;box-shadow:0 0 0 3px rgba(127,164,125,.35)}
+.tooldock .tool.resting{opacity:.6}.tooldock .tool em{position:absolute;top:-6px;right:-6px;font-style:normal;font-size:10px;background:#3D5A40;color:#fff;border-radius:8px;padding:1px 5px}
+.tooldock .tool em:empty{display:none}
+.seed-chips{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
+.seed-chips .chip{display:flex;align-items:center;gap:4px;border:1.5px solid #E1D3B5;background:#fff;border-radius:14px;padding:3px 8px 3px 3px;font-size:12px;color:#3D5A40}
+.seed-chips .chip img{width:22px;height:22px;border-radius:50%;object-fit:cover}.seed-chips .chip.on{border-color:#7FA47D;background:#EEF6E8;font-weight:700}
+.item-fly{position:absolute;width:26px;height:26px;transform:translate(-50%,-50%);animation:coinfly .85s cubic-bezier(.5,0,.6,1) forwards;pointer-events:none}
+.item-fly svg{width:100%;height:100%}
+.bee-line{margin:6px 0 0;font-size:13px;color:#8A6416;background:#FFF4D6;border-radius:10px;padding:5px 9px}.bee-line small{color:#A58A4E}
+/* v0.4: card stacks & levels */
+.stack-badge{position:absolute;top:-.55em;left:-.45em;z-index:3;background:#3D5A40;color:#fff;font-weight:800;font-size:.7em;border-radius:1em;padding:.15em .55em;box-shadow:0 2px 6px rgba(0,0,0,.2)}
+.lv-badge{position:absolute;top:-.55em;right:-.45em;z-index:3;background:linear-gradient(#F6D77A,#E2B653);color:#5A4214;font-weight:800;font-size:.66em;border-radius:1em;padding:.15em .5em;box-shadow:0 2px 6px rgba(0,0,0,.2);font-style:normal}
+.lv-badge.inline{position:static;font-size:11px;vertical-align:middle;box-shadow:none}
+.card.can-up{box-shadow:0 0 0 3px rgba(246,215,122,.9),0 0 18px 4px rgba(246,198,78,.75);animation:upglow 1.6s ease-in-out infinite}
+@keyframes upglow{50%{box-shadow:0 0 0 3px rgba(246,215,122,.6),0 0 8px 2px rgba(246,198,78,.4)}}
+.stacks{display:flex;flex-direction:column;gap:12px}
+.stack-row{display:flex;gap:12px;align-items:center;background:rgba(255,251,242,.9);border:1.5px solid #E7D9BE;border-radius:16px;padding:10px 10px 10px 12px;--cw:84px}
+.stack-row .card{width:84px;flex:none}
+.stack-row.glow{border-color:#E2B653;background:#FFF8E4}
+.stack-row .meta{display:flex;flex-direction:column;gap:4px;min-width:0}.stack-row .meta small{color:#6C7A63;font-size:12px}
+.stack-row .btn{align-self:flex-start;margin-top:4px}
+.lv-prog{height:7px;border-radius:5px;background:#EFE6D6;overflow:hidden}.lv-prog b{display:block;height:100%;background:linear-gradient(90deg,#B7D4B5,#E2B653)}
+.lv-line{margin:6px 0 0;font-size:13px;color:#6B5418;background:#FBF1D2;border-radius:10px;padding:5px 9px}

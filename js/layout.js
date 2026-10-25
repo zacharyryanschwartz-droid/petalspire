@@ -1,9 +1,9 @@
-// Petalspire v0.31: world layout (lots, bed sites, obstacles). Deterministic, so saves only store ids.
+// Petalspire v0.4: world layout (lots, bed sites, obstacles). Deterministic, so saves only store ids.
 export const TILE = 1.08;          // tile spacing in a bed
 export const BED_N = 3;            // beds are 3x3 plots
 export const SITE_HALF = 2.0;      // half-size of a bed footprint used for clearing checks
 export const ROAD = { z0: 5.0, z1: 7.8, near: 5.72, far: 7.08 };
-export const SPOTS = { market: [-3.35, 3.75], stand: [0.75, 3.95], rack: [3.6, 3.8], barrel: [-1.15, 4.25] };
+export const SPOTS = { market: [-3.35, 3.75], stand: [0.75, 3.95], rack: [3.6, 3.8], barrel: [-1.15, 4.25], tincture: [3.25, 2.4] };
 
 export const LOTS = {
   home:      { name: 'Roadside Lot',   x0: -4.6,  x1: 4.6,  z0: -6.6,  z1: 4.6 },
@@ -19,6 +19,7 @@ export const SIGNS = {
   west: [-5.25, -1.7], east: [5.15, -1.9], north: [1.2, -7.4], northwest: [-5.4, -7.4], northeast: [5.4, -7.4],
 };
 
+export const BARREL_SPOT_HOME = [-1.15, 4.25];
 export const lotCenter = (id) => { const l = LOTS[id]; return [(l.x0 + l.x1) / 2, (l.z0 + l.z1) / 2]; };
 export function lotAt(x, z) { for (const [id, l] of Object.entries(LOTS)) if (x >= l.x0 && x < l.x1 && z >= l.z0 && z < l.z1) return id; return null; }
 

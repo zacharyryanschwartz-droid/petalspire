@@ -254,15 +254,98 @@ function heartvine(stage) {
   return g;
 }
 
+// ================= v0.4: real plants (no glows / motes) =================
+const spikeGeo = (() => { // a knobbly, tapering spike of florets (one mesh)
+  const g = new THREE.CylinderGeometry(0.018, 0.034, 0.26, 7, 10); const p = g.attributes.position;
+  for (let k = 0; k < p.count; k++) { const y = p.getY(k), x = p.getX(k), z = p.getZ(k), a = Math.atan2(z, x); const bump = 1 + 0.28 * Math.max(0, Math.sin(y * 70 + a * 3)); p.setX(k, x * bump); p.setZ(k, z * bump); }
+  g.computeVertexNormals(); return g; })();
+// ---------------- Lavender: a mound of narrow grey-green leaves with slender purple flower spikes ----------------
+function lavender(stage) {
+  const g = new THREE.Group();
+  if (stage === 1) return addTo(g, sprout('#A9BBA3', 0.2));
+  const big = stage === 3;
+  addLeaves(g, big ? 16 : 11, { len: big ? 0.42 : 0.32, wid: 0.045, tilt: 0.55, droop: 0.12, color: '#93A88E', jitter: 0.5 });
+  addLeaves(g, big ? 10 : 6, { len: big ? 0.3 : 0.24, wid: 0.04, tilt: 0.25, droop: 0.05, color: '#A3B59D', y: 0.05, phase: 0.3, jitter: 0.5 });
+  const n = big ? 9 : 6, stemM = mat('#7F9A72'), purple = [mat('#8E74C2', { roughness: 0.7 }), mat('#9C86C9', { roughness: 0.7 }), mat('#7D62B3', { roughness: 0.7 })], budM = mat('#A7A0B8', { roughness: 0.8 });
+  for (let i = 0; i < n; i++) {
+    const a = (i / n) * Math.PI * 2 + Math.random() * 0.4, lean = 0.12 + Math.random() * 0.2, h = (big ? 0.85 : 0.55) * (0.85 + Math.random() * 0.3);
+    const pv = new THREE.Group(); pv.rotation.y = a; pv.rotation.z = lean; g.add(pv);
+    const st = new THREE.Mesh(new THREE.CylinderGeometry(0.008, 0.012, h, 4), stemM); st.position.y = h / 2; pv.add(st);
+    const spikeLen = big ? 0.26 : 0.12;
+    const sp = new THREE.Mesh(spikeGeo, big ? purple[i % 3] : budM); sp.scale.set(1, spikeLen / 0.26, 1); sp.position.y = h - spikeLen / 2; pv.add(sp);
+  }
+  return g;
+}
+// daisy-type flower head (calendula & chamomile): one scalloped petal disc per row (cheap: 2–3 meshes per head), facing +Y
+const daisyGeoCache = new Map();
+function petalDiscGeo(petals, r) {
+  const key = petals + ':' + r; if (daisyGeoCache.has(key)) return daisyGeoCache.get(key);
+  const sh = new THREE.Shape(), N = petals * 8;
+  for (let k = 0; k <= N; k++) { const a = (k / N) * Math.PI * 2, ph = (k % 8) / 8, rr = r * (0.42 + 0.58 * Math.pow(Math.sin(ph * Math.PI), 0.6)); const x = Math.cos(a) * rr, y = Math.sin(a) * rr; if (k === 0) sh.moveTo(x, y); else sh.lineTo(x, y); }
+  const g = new THREE.ShapeGeometry(sh); g.rotateX(-Math.PI / 2);
+  const p = g.attributes.position; for (let k = 0; k < p.count; k++) { const d = Math.hypot(p.getX(k), p.getZ(k)) / r; p.setY(k, 0.02 * r * Math.sin(k) - d * d * r * 0.18); }
+  g.computeVertexNormals(); daisyGeoCache.set(key, g); return g;
+}
+function daisyHead({ r = 0.13, petals = 16, rows = 1, petal = '#F0A33A', petal2 = null, centre = '#B5651D', dome = 0.5 }) {
+  const head = new THREE.Group();
+  for (let row = 0; row < rows; row++) {
+    const d = shadowy(new THREE.Mesh(petalDiscGeo(petals, r * (1 - row * 0.25)), mat(row % 2 && petal2 ? petal2 : petal, { roughness: 0.65, side: THREE.DoubleSide })));
+    d.position.y = row * 0.014; d.rotation.y = row * 0.21; head.add(d);
+  }
+  const c = new THREE.Mesh(new THREE.SphereGeometry(r * 0.36, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2), mat(centre, { roughness: 0.9 })); c.scale.y = dome; c.position.y = 0.012; head.add(c);
+  return head;
+}
+// ---------------- Calendula: bushy, soft-green leaves and bright orange-gold double daisy blooms ----------------
+function calendula(stage) {
+  const g = new THREE.Group();
+  if (stage === 1) return addTo(g, sprout('#A7C99B'));
+  const big = stage === 3, H = big ? 0.62 : 0.45;
+  addLeaves(g, big ? 9 : 7, { len: big ? 0.36 : 0.3, wid: 0.1, tilt: 0.75, droop: 0.25, color: '#86AE72' });
+  addLeaves(g, 5, { len: 0.24, wid: 0.08, tilt: 0.5, droop: 0.15, color: '#97BC82', y: 0.12, phase: 0.6 });
+  const stems = big ? 4 : 3;
+  for (let i = 0; i < stems; i++) {
+    const a = (i / stems) * Math.PI * 2 + 0.3, h = H * (0.8 + Math.random() * 0.35);
+    const { g: sg, curve } = stemGeo(h, 0.02, 0.05, i * 1.7); const stem = shadowy(new THREE.Mesh(sg, mat('#6E9A62')));
+    const pv = new THREE.Group(); pv.rotation.y = a; pv.rotation.z = 0.25; g.add(pv); pv.add(stem);
+    const top = curve.getPoint(1);
+    if (!big) { const bud = new THREE.Mesh(new THREE.SphereGeometry(0.05, 8, 6), mat('#9DB86A')); bud.scale.y = 1.2; bud.position.copy(top).add(new THREE.Vector3(0, 0.03, 0)); pv.add(bud);
+      const tipc = new THREE.Mesh(new THREE.SphereGeometry(0.03, 8, 6), mat('#F0A33A')); tipc.position.copy(bud.position).add(new THREE.Vector3(0, 0.04, 0)); pv.add(tipc); continue; }
+    const head = daisyHead({ r: 0.14, petals: 15, rows: 2, petal: i % 2 ? '#F2A23A' : '#F5B83E', petal2: '#E8892A', centre: '#A65A1C', dome: 0.55 });
+    head.position.copy(top); head.rotation.z = -0.25; head.rotation.x = 0.1; pv.add(head);
+  }
+  return g;
+}
+// ---------------- Chamomile: feathery, fine leaves and many small white daisies with yellow domed centres ----------------
+function chamomile(stage) {
+  const g = new THREE.Group();
+  if (stage === 1) return addTo(g, sprout('#A9CBA6', 0.18));
+  const big = stage === 3, H = big ? 0.6 : 0.42, featherM = mat('#8DB37E');
+  for (let i = 0; i < (big ? 8 : 6); i++) {   // feathery foliage: thin sprigs with tiny needle leaflets
+    const pv = new THREE.Group(); pv.rotation.y = (i / 8) * Math.PI * 2 + Math.random(); pv.rotation.z = 0.5 + Math.random() * 0.5; g.add(pv);
+    const len = 0.22 + Math.random() * 0.12; const st = new THREE.Mesh(new THREE.CylinderGeometry(0.006, 0.009, len, 4), featherM); st.position.y = len / 2; pv.add(st);
+    for (let k = 1; k < 4; k++) for (const sgn of [-1, 1]) { const l = new THREE.Mesh(new THREE.CylinderGeometry(0.004, 0.006, 0.07, 3), featherM); l.position.set(sgn * 0.02, len * k / 4, 0); l.rotation.z = sgn * 0.9; pv.add(l); }
+  }
+  const n = big ? 8 : 6;
+  for (let i = 0; i < n; i++) {
+    const a = (i / n) * Math.PI * 2 + Math.random() * 0.5, h = H * (0.75 + Math.random() * 0.4);
+    const pv = new THREE.Group(); pv.rotation.y = a; pv.rotation.z = 0.12 + Math.random() * 0.25; g.add(pv);
+    const st = new THREE.Mesh(new THREE.CylinderGeometry(0.007, 0.01, h, 4), mat('#7FA46E')); st.position.y = h / 2; pv.add(st);
+    if (!big) { const b = new THREE.Mesh(new THREE.SphereGeometry(0.03, 8, 6), mat('#E9E3B0')); b.position.y = h + 0.01; pv.add(b); continue; }
+    const head = daisyHead({ r: 0.085, petals: 13, rows: 1, petal: '#FFFDF6', centre: '#F2C33E', dome: 1.0 });
+    head.position.y = h; head.rotation.z = -0.15; pv.add(head);
+  }
+  return g;
+}
+
 function addTo(g, c) { g.add(c); return g; }
 
-const SEED_COLORS = { heartvine: '#E9A7A0', sunpetal: '#E3B44E', moonflower: '#EDE9DD' };
+const SEED_COLORS = { lavender: '#8C7A5E', calendula: '#B08A4E', chamomile: '#D8CFA8', heartvine: '#E9A7A0', sunpetal: '#E3B44E', moonflower: '#EDE9DD' };
+// One builder per species id — add new real plants here. The fantasy builders stay for a future Ultra Rare tier (not used in v0.4).
+const BUILDERS = { lavender, calendula, chamomile, heartvine, sunpetal, moonflower };
 export function buildPlant(species, stage) {
   let g;
-  if (stage === 0) g = seedMound(SEED_COLORS[species]);
-  else if (species === 'moonflower') g = moonflower(stage);
-  else if (species === 'sunpetal') g = sunpetal(stage);
-  else g = heartvine(stage);
+  if (stage === 0) g = seedMound(SEED_COLORS[species] || '#B08A4E');
+  else g = (BUILDERS[species] || lavender)(stage);
   g.userData.phase = Math.random() * 10;
   return g;
 }

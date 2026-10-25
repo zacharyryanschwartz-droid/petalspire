@@ -1,33 +1,80 @@
-// Petalspire v0.31 — game data
+// Petalspire v0.4 — game data
+// v0.4: REAL PLANTS ONLY. Each species is one self-contained entry, so the full plant catalog can be added later.
+// v0.4 PLANT TIERS (data only for now — the full catalog comes later). Lowest → highest. Each higher tier = lower pack odds,
+// longer grow, higher cost and sell price. drop/grow/cost/sell are PLACEHOLDER multipliers applied to each plant's base numbers
+// (Basic = 1, so today's plants are unchanged). seeds: [min, max] seeds per harvest; bonus: chance of +1 seed (Other World).
+export const PLANT_TIERS = {
+  basic:      { label: 'Basic',       order: 1, drop: 1,    grow: 1,   cost: 1,   sell: 1,   seeds: [5, 5] },
+  epic:       { label: 'Epic',        order: 2, drop: 0.7,  grow: 1.3, cost: 1.4, sell: 1.4, seeds: [4, 5] },
+  legendary:  { label: 'Legendary',   order: 3, drop: 0.5,  grow: 1.6, cost: 2,   sell: 2,   seeds: [4, 4] },
+  rare:       { label: 'Rare',        order: 4, drop: 0.35, grow: 2,   cost: 2.8, sell: 2.8, seeds: [3, 4] },
+  superrare:  { label: 'Super Rare',  order: 5, drop: 0.2,  grow: 2.5, cost: 4,   sell: 4,   seeds: [2, 3] },
+  ultra:      { label: 'Ultra Rare',  order: 6, drop: 0.1,  grow: 3.2, cost: 6,   sell: 6,   seeds: [2, 2] },
+  otherworld: { label: 'Other World', order: 7, drop: 0.04, grow: 4,   cost: 10,  sell: 10,  seeds: [1, 1], bonus: 0.25 },
+};
+// Seeds from one harvest, by the plant's tier rule (Basic 5 · Epic 4–5 · Legendary 4 · Rare 3–4 · Super Rare 2–3 · Ultra Rare 2 · Other World 1, 25% → 2).
+export function rollSeeds(tier, rnd = Math.random) {
+  const t = PLANT_TIERS[tier] || PLANT_TIERS.basic; const [a, b] = t.seeds;
+  return a + Math.floor(rnd() * (b - a + 1)) + (t.bonus && rnd() < t.bonus ? 1 : 0);
+}
+// Fields: tier (key of PLANT_TIERS: seeds per harvest + multipliers), rarity (card-frame colour / pack pool, key of RARITY), growS, seedPrice, flowerSell, seedSell, yieldF [min, max] flowers (seeds come from the tier), color, img, stats, blurb,
+// dries (can go on the Drying Rack), tincture (see TINCTURE.recipes).
 export const SPECIES = {
+  lavender: {
+    id: 'lavender', tier: 'basic', name: 'Lavender', rarity: 'common', type: 'Plant · Aromatic herb',
+    growS: 35, seedPrice: 6, flowerSell: 5, seedSell: 3, yieldF: [2, 3],
+    color: '#9C86C9', img: 'assets/card-lavender.jpg', dries: true,
+    stats: { Growth: 4, Beauty: 3, Yield: 4, Atmosphere: 4 },
+    blurb: 'Silvery leaves and slender purple flower spikes. Smells wonderful and dries beautifully on the rack.',
+  },
+  calendula: {
+    id: 'calendula', tier: 'basic', name: 'Calendula', rarity: 'uncommon', type: 'Plant · Pot marigold',
+    growS: 50, seedPrice: 10, flowerSell: 9, seedSell: 5, yieldF: [2, 3],
+    color: '#F0A33A', img: 'assets/card-calendula.jpg',
+    stats: { Growth: 3, Beauty: 4, Yield: 3, Atmosphere: 3 },
+    blurb: 'Cheerful orange-gold, daisy-like blooms. A classic for soothing glycerites and salves.',
+  },
+  chamomile: {
+    id: 'chamomile', tier: 'basic', name: 'Chamomile', rarity: 'rare', type: 'Plant · Tea herb',
+    growS: 80, seedPrice: 18, flowerSell: 24, seedSell: 9, yieldF: [1, 2],
+    color: '#FFFDF4', img: 'assets/card-chamomile.jpg',
+    stats: { Growth: 2, Beauty: 4, Yield: 2, Atmosphere: 5 },
+    blurb: 'Tiny white daisies with sunny yellow centres and feathery leaves. Prized for calming tea.',
+  },
+};
+// v0.4: the original fantasy plants are kept (disabled) for a possible future Ultra Rare tier.
+// They are NOT in CARDS, packs, the Market or starter content. To re-enable one later: set enabled: true and add it to SPECIES/CARDS.
+export const FANTASY_SPECIES = {
+
   heartvine: {
-    id: 'heartvine', name: 'Heartvine', rarity: 'common', type: 'Plant · Climbing vine',
-    growS: 35, seedPrice: 6, flowerSell: 5, seedSell: 3, yieldF: [2, 3], yieldS: [1, 2],
+    id: 'heartvine', tier: 'ultra', name: 'Heartvine', rarity: 'ultra', enabled: false, type: 'Plant · Climbing vine',
+    growS: 35, seedPrice: 6, flowerSell: 5, seedSell: 3, yieldF: [2, 3],
     color: '#F7C5C5', img: 'assets/card-heartvine.jpg',
     stats: { Growth: 4, Beauty: 3, Yield: 4, Atmosphere: 2 },
     blurb: 'Blush, heart-shaped leaves on a twisting vine. Dries beautifully on the rack.',
   },
   sunpetal: {
-    id: 'sunpetal', name: 'Spiral Sunpetal', rarity: 'uncommon', type: 'Plant · Golden spire',
-    growS: 50, seedPrice: 10, flowerSell: 9, seedSell: 5, yieldF: [2, 3], yieldS: [1, 2],
+    id: 'sunpetal', tier: 'ultra', name: 'Spiral Sunpetal', rarity: 'ultra', enabled: false, type: 'Plant · Golden spire',
+    growS: 50, seedPrice: 10, flowerSell: 9, seedSell: 5, yieldF: [2, 3],
     color: '#F5D07A', img: 'assets/card-sunpetal.jpg',
     stats: { Growth: 3, Beauty: 4, Yield: 3, Atmosphere: 3 },
     blurb: 'Golden petals unfurl in a perfect spiral, catching the evening light.',
   },
   moonflower: {
-    id: 'moonflower', name: 'Moonflower', rarity: 'rare', type: 'Plant · Night-bloom',
-    growS: 80, seedPrice: 18, flowerSell: 24, seedSell: 9, yieldF: [1, 2], yieldS: [1, 1],
+    id: 'moonflower', tier: 'otherworld', name: 'Moonflower', rarity: 'ultra', enabled: false, type: 'Plant · Night-bloom',
+    growS: 80, seedPrice: 18, flowerSell: 24, seedSell: 9, yieldF: [1, 2],
     color: '#FFF6E6', img: 'assets/card-moonflower.jpg',
     stats: { Growth: 2, Beauty: 5, Yield: 2, Atmosphere: 5 },
     blurb: 'A white trumpet bloom that glows softly, as if holding a little moonlight.',
   },
 };
 
+
 export const FEATURES = {
   rainbarrel: {
     id: 'rainbarrel', name: 'Rain Barrel', rarity: 'uncommon', type: 'Feature · Water',
     stats: { Growth: 3, Beauty: 2, Yield: 3, Atmosphere: 3 },
-    blurb: 'Unlocks Rain Barrel water in the market: 15 water for 10 coins.',
+    blurb: 'Unlocks the Rain Barrel at the Supply Market (40 coins): place it in a plot you bought to give that plot its own water — 1 a minute, up to 10, feeding up to 4 irrigated beds.',
   },
   beehive: {
     id: 'beehive', name: 'Honeybee Skep', rarity: 'epic', type: 'Feature · Pollinators',
@@ -39,6 +86,21 @@ export const FEATURES = {
     price: 45, stats: { Growth: 4, Beauty: 2, Yield: 3, Atmosphere: 2 },
     blurb: 'Assign it to one raised bed: a drip line from the rain barrel waters that bed’s thirsty plants for you (1 water each). Each card covers one bed.',
   },
+  tincture: {
+    id: 'tincture', name: 'Tincture Stand', rarity: 'rare', type: 'Feature · Crafting', img: 'assets/card-tincture.jpg',
+    price: 120, stats: { Growth: 1, Beauty: 4, Yield: 5, Atmosphere: 4 },
+    blurb: 'A little wooden stall of glass bottles. Find it, buy it at the Supply Market, then build it: steep your blooms in Glycerin or Vinegar into tinctures that sell for far more.',
+  },
+  sickle: {
+    id: 'sickle', name: 'Harvest Sickle', rarity: 'rare', type: 'Tool · Harvest',
+    price: 100, stats: { Growth: 1, Beauty: 2, Yield: 4, Atmosphere: 2 }, cooldownS: 20,
+    blurb: 'A reusable tool. Tap the Sickle, then a plot: every ripe plant in every bed there is harvested in one sweep (normal yields and seeds). Rests 20 s between sweeps.',
+  },
+  plow: {
+    id: 'plow', name: 'Hand Plow', rarity: 'rare', type: 'Tool · Planting',
+    price: 110, stats: { Growth: 3, Beauty: 1, Yield: 3, Atmosphere: 2 }, cooldownS: 20,
+    blurb: 'A reusable tool. Tap the Plow, pick a seed, then a plot: every empty bed tile there is planted, as far as your seeds go. Rests 20 s between uses.',
+  },
   sundial: {
     id: 'sundial', name: 'Golden Sundial', rarity: 'legendary', type: 'Feature · Time',
     price: 90, stats: { Growth: 5, Beauty: 4, Yield: 3, Atmosphere: 5 },
@@ -46,6 +108,9 @@ export const FEATURES = {
   },
 };
 
+// Apply the tier multipliers to each plant's base numbers (no-op for Basic).
+for (const sp of [...Object.values(SPECIES), ...Object.values(FANTASY_SPECIES)]) { const t = PLANT_TIERS[sp.tier];
+  sp.growS = Math.round(sp.growS * t.grow); sp.seedPrice = Math.round(sp.seedPrice * t.cost); sp.flowerSell = Math.round(sp.flowerSell * t.sell); sp.seedSell = Math.round(sp.seedSell * t.sell); sp.dropW = t.drop; }
 export const CARDS = { ...SPECIES, ...FEATURES };
 
 export const RARITY = {
@@ -54,38 +119,77 @@ export const RARITY = {
   rare:      { label: 'Rare',      w: 15, color: '#7FB3C6' },
   epic:      { label: 'Epic',      w: 7,  color: '#E2B653' },
   legendary: { label: 'Legendary', w: 2,  color: '#D9A93F' },
+  ultra:     { label: 'Ultra Rare', w: 0,  color: '#B48AD8' },   // v0.4: reserved (weight 0) — for the fantasy plants later
 };
 
+// v0.4 CARD STACKS & UPGRADES (placeholder numbers). Every copy of a card you find stacks on one card (×n).
+// Copies are kept as progress (never consumed): at 3 / 6 / 10 copies the card can be upgraded to Lv2 / Lv3 / Lv4 with a tap.
+// Plant levels: +10% sell price and -5% grow time per level above 1, +1 Beauty/Yield pip per level, and +1 flower per harvest at Lv4.
+// Seeds per harvest always follow the plant's tier rule (PLANT_TIERS) — levels never change them.
+// Tool levels (Sickle, Plow): -15% rest time per level. Irrigation: every copy is one more card (= one more irrigated bed).
+export const CARD_LEVELS = {
+  thresholds: [3, 6, 10],          // copies needed for Lv2, Lv3, Lv4 (max)
+  plant: { sell: 0.10, grow: 0.05, statPip: 1, bonusFlowerAt: 4 },
+  tool: { cooldown: 0.15 },
+  upgradable: (id, card) => !!card.tier || id === 'sickle' || id === 'plow',
+};
 export const PACK_PRICE = 40;
 export const DUP_COINS = 8;
 export const RACK_SLOTS = 3;
 export const DRY_S = 40;
-export const WATER_PRICE = 5;      // for 5
-export const BARREL_PRICE = 10;    // for 15
+
+// ---------- v0.4: one rain barrel per plot ----------
+// Each owned plot gets ONE barrel (the home lot's arrives with your first bed; other plots: Build → Rain Barrel).
+// A barrel feeds at most maxBeds irrigated beds, and only beds in its own plot.
+export const BARREL = { price: 40, maxBeds: 4 };   // v0.4: bought at the Supply Market as a placeable barrel (water itself is never sold)
+
+// ---------- v0.4: Tincture Stand ----------
+// Bases are bought at the Supply Market. Every craft uses 1 base (Glycerin OR Vinegar) + flowers.
+export const BASES = {
+  glycerin: { name: 'Glycerin', price: 8, pack: { n: 5, price: 32 }, color: '#F3E7B5', blurb: 'Sweet, gentle base · makes Glycerites' },
+  vinegar:  { name: 'Vinegar',  price: 6, pack: { n: 5, price: 24 }, color: '#E3BF8C', blurb: 'Tangy base · makes Vinegar Tinctures' },
+};
+export const TINCTURE = {
+  slots: 2,
+  recipes: {   // flowers per craft, steep time (s), sale price by base
+    lavender:  { n: 2, s: 90,  sell: { glycerin: 42, vinegar: 36 } },
+    calendula:   { n: 2, s: 120, sell: { glycerin: 52, vinegar: 46 } },
+    chamomile: { n: 1, s: 150, sell: { glycerin: 80, vinegar: 72 } },
+  },
+};
+export const tinctureId = (sp, base) => `tinc_${base === 'vinegar' ? 'v' : 'g'}_${sp}`;
+export const TINCTURE_NAMES = { lavender: 'Lavender', calendula: 'Calendula', chamomile: 'Chamomile' };
 
 export const ITEMS = {
-  seed_heartvine:  { name: 'Heartvine Seeds',  sell: 3,  icon: ['seed', '#F2A9AE'] },
-  seed_sunpetal:   { name: 'Sunpetal Seeds',   sell: 5,  icon: ['seed', '#EDC15A'] },
-  seed_moonflower: { name: 'Moonflower Seeds', sell: 9,  icon: ['seed', '#D8E6EC'] },
-  flower_heartvine:{ name: 'Heartvine',        sell: 5,  icon: ['heart', '#F2A9AE'] },
-  flower_sunpetal: { name: 'Spiral Sunpetal',  sell: 9,  icon: ['sun', '#EDC15A'] },
-  flower_moonflower:{ name: 'Moonflower',      sell: 24, icon: ['moon', '#FFFFFF'] },
-  dried_heartvine: { name: 'Dried Heartvine',  sell: 14, icon: ['bundle', '#C99A8E'] },
+  seed_lavender:  { name: 'Lavender Seeds',  sell: 3,  icon: ['seed', '#B9A6DC'] },
+  seed_calendula:   { name: 'Calendula Seeds',   sell: 5,  icon: ['seed', '#F0A33A'] },
+  seed_chamomile: { name: 'Chamomile Seeds', sell: 9,  icon: ['seed', '#F3EFC9'] },
+  flower_lavender:{ name: 'Lavender',        sell: 5,  icon: ['spike', '#9C86C9'] },
+  flower_calendula: { name: 'Calendula',  sell: 9,  icon: ['daisy', '#F0A33A'] },
+  flower_chamomile:{ name: 'Chamomile',      sell: 24, icon: ['daisy', '#FFFFFF'] },
+  dried_lavender: { name: 'Dried Lavender',  sell: 14, icon: ['bundle', '#A58BC9'] },
+  tinc_g_lavender:  { name: 'Lavender Glycerite',         sell: 42, icon: ['dropper', '#C7B3E6'] },
+  tinc_v_lavender:  { name: 'Lavender Vinegar Tincture',  sell: 36, icon: ['dropper', '#9A7A9A'] },
+  tinc_g_calendula:   { name: 'Calendula Glycerite',          sell: 52, icon: ['dropper', '#EDC15A'] },
+  tinc_v_calendula:   { name: 'Calendula Vinegar Tincture',   sell: 46, icon: ['dropper', '#C08A3A'] },
+  tinc_g_chamomile: { name: 'Chamomile Glycerite',        sell: 80, icon: ['dropper', '#F3E7B5'] },
+  tinc_v_chamomile: { name: 'Chamomile Vinegar Tincture', sell: 72, icon: ['dropper', '#D2B67A'] },
 };
-export const SELL_ORDER = ['dried_heartvine', 'flower_moonflower', 'flower_sunpetal', 'flower_heartvine', 'seed_moonflower', 'seed_sunpetal', 'seed_heartvine'];
+export const SELL_ORDER = ['tinc_g_chamomile', 'tinc_v_chamomile', 'tinc_g_calendula', 'tinc_v_calendula', 'tinc_g_lavender', 'tinc_v_lavender', 'dried_lavender', 'flower_chamomile', 'flower_calendula', 'flower_lavender', 'seed_chamomile', 'seed_calendula', 'seed_lavender'];
 
 export const WOOD = { tree: 3, stump: 1, bush: 0, rock: 0 };
 export const BED_COSTS = [12, 20, 28, 36, 44, 52];   // wood per raised bed, escalating
 export const STAND_CAP = 12;
 export const MARKET_GOAL = 100;                        // coins earned at the stand to unlock the Rebuild Market project
 export const WATER_REGEN_S = 60, WATER_REGEN_MAX = 10; // rain barrel by the stand: +1 water per minute (v0.31), offline too
-export const STARTER = { seed_heartvine: 4, seed_sunpetal: 3, water: 10 };
+export const STARTER = { seed_lavender: 4, seed_calendula: 3 }, STARTER_FILL = 10;   // v0.4: no bag water — the starter pack fills the home barrel instead
 export const STARTER_JEWELS = 3;
 
 // ---------- v0.3: things you build ----------
 export const BUILDS = {
   stand:  { name: 'Roadside Farm Stand', wood: 15, coins: 0, opt: { find: 'old_crate', label: 'Use an Old Crate as a display shelf (+4 shelf space)' } },
   rack:   { name: 'Drying Rack', wood: 10, coins: 0 },
+  tincture: { name: 'Tincture Stand', wood: 20, coins: 0, opt: { decor: 'chime', save: 6, label: 'Use your restored Glass Bottles (Bottle Chime) for the shelves (−6 Wood)' } },
   market: { name: 'Rebuild the Supply Market', wood: 30, coins: 60, s: 60, opt: { scrap: 3, save: 20, label: 'Patch the roof with 3 Scrap (save 20 coins)' }, hurryJewels: 2 },
 };
 export const BUILD_ANIM_MS = 2450;
@@ -94,7 +198,7 @@ export const BUILD_ANIM_MS = 2450;
 export const FIND_CHANCE = 0.22, SAPLING_CHANCE = 0.12;   // sapling chance applies to wild trees only
 export const FINDS = {
   watering_can: { name: 'Rusty Watering Can', restore: { wood: 2, coins: 5, s: 30 }, recycle: { scrap: 2 },
-    into: { name: 'Brass Watering Can', bonus: 'can', blurb: 'Rain barrel refills twice as fast (1 water / 30 s) and holds 15' } },
+    into: { name: 'Brass Watering Can', bonus: 'can', blurb: 'Every rain barrel refills twice as fast (1 water / 30 s) and holds 15' } },
   wheelbarrow:  { name: 'Old Wheelbarrow', restore: { wood: 6, coins: 8, s: 45 }, recycle: { wood: 3, scrap: 1 },
     into: { name: 'Trusty Wheelbarrow', bonus: 'barrow', blurb: '+1 Wood from every tree you chop' } },
   old_crate:    { name: 'Old Crate', restore: { wood: 2, coins: 0, s: 20 }, recycle: { wood: 3 },
@@ -173,11 +277,15 @@ export const TIPS = {
   bloom: 'A bloom! <b>Tap the sparkling plant</b> to harvest it.',
   harvested: 'Harvests give flowers <i>and</i> seeds. Put spares on your <b>Farm Stand</b> by the road.',
   stand: 'Your <b>Farm Stand</b> is built! Tap it to stock flowers — drivers will pull over to buy.',
-  barrel: 'The <b>rain barrel</b> by the road refills your watering can by <b>1 water a minute</b> (up to 10), even while the game is closed.',
+  barrel: 'Each <b>rain barrel</b> refills by <b>1 water a minute</b> (up to 10), even while the game is closed — the badge shows when the next drop lands. Hand watering uses the bed’s own plot barrel first, then the nearest other barrel. Water only comes from rain barrels.',
+  plotbarrel: 'This plot has no rain barrel yet. Buy a <b>Rain Barrel</b> at the Supply Market (40 coins) and place it here: its own water for irrigation, up to <b>4 beds</b>. Until then, hand watering borrows from your nearest barrel.',
+  sickle: 'You own the <b>Harvest Sickle</b>! Tap the sickle button on the left, then tap a plot to harvest every ripe plant there at once.',
+  plow: 'You own the <b>Hand Plow</b>! Tap the plow button on the left, pick a seed, then tap a plot to plant every empty bed tile there.',
+  tincture: 'Your <b>Tincture Stand</b> is ready! Steep flowers with <b>Glycerin</b> or <b>Vinegar</b> (Supply Market) — tinctures sell for far more at the Farm Stand.',
   customer: 'A customer! They’ll pick what they want from your stand and pay in coins.',
-  heartvine: 'You can now build a <b>Drying Rack</b> (Build). Dried Heartvine sells for almost 3× fresh.',
+  lavender: 'You can now build a <b>Drying Rack</b> (Build). Dried Lavender sells for almost 3× fresh.',
   rebuild: 'Your stand has earned enough to <b>rebuild the Supply Market</b>. Tap the old cottage or open Build.',
-  market: 'The <b>Supply Market</b> is open — seeds, water, <b>Wood bundles</b>, <b>saplings</b> and Card Packs.',
+  market: 'The <b>Supply Market</b> is open — seeds, <b>Rain Barrels</b> for new plots, <b>Wood bundles</b>, <b>saplings</b> and Card Packs.',
   pack: 'Discovered cards unlock new items in the Supply Market — buy them with coins.',
   decor: 'Placed decor raises your garden’s <b>atmosphere</b> — customers stop by more often.',
   plot: 'The woods around you are <b>for sale</b>. Tap a <b>For Sale</b> sign to expand.',
@@ -198,7 +306,7 @@ export const SHADE = {
   tree: { w: 0.55, reach: 3.4 },  // a wild tree of scale 1 (weight & reach scale with tree size)
   grownStage: [0.15, 0.45, 0.75, 1.0], // planted trees cast more shade as they grow (sapling → mature)
   bgTree: { w: 0.55, reach: 3.4 },
-  buildings: { stand: { w: 0.35, reach: 2.6 }, market: { w: 0.55, reach: 3.4 }, rack: { w: 0.2, reach: 2.0 } },
+  buildings: { stand: { w: 0.35, reach: 2.6 }, market: { w: 0.55, reach: 3.4 }, rack: { w: 0.2, reach: 2.0 }, tincture: { w: 0.3, reach: 2.4 } },
   slowerBelow: 0.95,              // sun under this shows 'growing slower'
   muchSlowerBelow: 0.3,
 };
