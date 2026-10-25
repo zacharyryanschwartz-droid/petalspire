@@ -1,4 +1,4 @@
-// Petalspire v0.1 — game data
+// Petalspire v0.2 — game data
 export const SPECIES = {
   heartvine: {
     id: 'heartvine', name: 'Heartvine', rarity: 'common', type: 'Plant · Climbing vine',
@@ -69,13 +69,27 @@ export const ITEMS = {
 };
 export const SELL_ORDER = ['dried_heartvine', 'flower_moonflower', 'flower_sunpetal', 'flower_heartvine', 'seed_moonflower', 'seed_sunpetal', 'seed_heartvine'];
 
+export const WOOD = { tree: 3, stump: 1, bush: 0, rock: 0 };
+export const BED_COSTS = [12, 20, 28, 36, 44, 52];   // wood per raised bed, escalating
+export const STAND_CAP = 12;
+export const MARKET_GOAL = 100;                        // coins earned at the stand to reopen the Supply Market
+export const WATER_REGEN_S = 20, WATER_REGEN_MAX = 10; // rain barrel by the stand
+export const STARTER = { seed_heartvine: 4, seed_sunpetal: 3, water: 10 };
+
 export const TIPS = {
-  welcome: 'Welcome to your garden! <b>Tap a soil tile</b> to plant a seed.',
+  chop: 'An old wooded lot. <b>Tap a tree</b> to chop it down — you’ll get <b>Wood</b>.',
+  stump: 'Stumps stay behind. <b>Tap a stump</b> to dig it out and clear the ground.',
+  build: 'Nice clearing! Tap <b>Build</b> and place a <b>raised bed</b> on a fully cleared patch.',
   water: 'Seeds need a drink. <b>Tap the planted tile</b> and water it.',
   growing: 'It’s growing! <b>Drag</b> to look around, <b>pinch</b> to zoom.',
   bloom: 'A bloom! <b>Tap the sparkling plant</b> to harvest it.',
-  harvested: 'Harvests give flowers <i>and</i> seeds. Replant, or sell at the <b>Market</b>.',
-  heartvine: 'Heartvine can be hung on the <b>Drying Rack</b> — dried bundles sell for almost 3×.',
-  sold: 'Coins! Try a <b>Card Pack</b> to discover new plants and features.',
-  pack: 'Discovered cards unlock new items in the Market — buy them with coins.',
+  harvested: 'Harvests give flowers <i>and</i> seeds. Put spares on your <b>Farm Stand</b> by the road.',
+  stand: 'Your <b>Farm Stand</b> is open! Tap it to stock flowers — drivers will pull over to buy.',
+  barrel: 'The <b>rain barrel</b> by the stand slowly refills your watering can.',
+  customer: 'A customer! They’ll pick what they want from your stand and pay in coins.',
+  heartvine: 'A <b>Drying Rack</b> appeared! Dried Heartvine sells for almost 3× fresh.',
+  market: 'The <b>Supply Market</b> reopened — buy seeds, water and Card Packs there.',
+  pack: 'Discovered cards unlock new items in the Supply Market — buy them with coins.',
+  plot: 'The woods around you are <b>for sale</b>. Tap a <b>For Sale</b> sign to expand.',
+  plotbought: 'New land! Clear its trees for Wood and room for more beds.',
 };
