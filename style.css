@@ -475,3 +475,17 @@ body.ads-on{--sab:calc(env(safe-area-inset-bottom,0px) + 48px)}
 .set-btn{display:flex;flex-direction:column;align-items:flex-start;width:100%;text-align:left;font-family:inherit;color:var(--ink);cursor:pointer}
 .set-btn b{font-size:15px;font-weight:800}.set-btn small{font-size:12px;font-weight:600;color:var(--ink-soft)}
 .set-btn.danger{border-color:#E8A5A8}.set-btn.danger b{color:#A2444A}
+
+/* ================= v0.31: shade ================= */
+.sun-line{display:flex;align-items:center;gap:6px;margin:2px 0 8px;padding:6px 10px;border-radius:12px;font:700 13px/1.25 Nunito,sans-serif;color:#3D5A40;background:#FFF3CF;border:1px solid #F5D07A}
+.sun-line i{width:18px;height:18px;flex:none;display:inline-flex}
+.sun-line i svg{width:100%;height:100%}
+.sun-line small{font-weight:600;opacity:.75;margin-left:2px}
+.sun-line.shady{background:#E7F0F2;border-color:#C8E0E8;color:#3D5A40}
+.bb-sun{display:flex;align-items:center;gap:4px;margin-top:3px;font:600 11.5px/1.2 Nunito,sans-serif;opacity:.85}
+.bb-sun i{width:14px;height:14px;display:inline-flex}
+.bb-sun i svg{width:100%;height:100%}
+.irrig-row .ico{border:0;padding:0;background:none;cursor:pointer}
+.irrig-line{display:flex;align-items:center;gap:6px;margin:-2px 0 8px;padding:5px 10px;border-radius:12px;font:700 12.5px/1.25 Nunito,sans-serif;color:#3D5A40;background:#EAF4F7;border:1px solid #C8E0E8}
+.irrig-line i{width:16px;height:16px;display:inline-flex}.irrig-line i svg{width:100%;height:100%}
+.irrig-line.paused{background:#FDEDED;border-color:#F7C5C5}

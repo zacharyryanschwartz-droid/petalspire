@@ -1,4 +1,4 @@
-# Petalspire v0.3
+# Petalspire v0.31
 
 A cozy 3D flower-garden prototype for iPhone Safari (portrait, one thumb). Also plays on desktop with a mouse.
 This is a **prototype**: version numbers stay below 1.0 until the first official release.
@@ -21,6 +21,16 @@ This is a **prototype**: version numbers stay below 1.0 until the first official
 
 Drag with one finger to pan, pinch to zoom, and twist with two fingers to turn. On desktop, right-drag or shift-drag turns the view.
 
+## New in v0.31
+- **Shade slows growth.** Every standing tree (wild, planted or the background woods) and every building (stand, market, rack) casts shade in a circle around it. Bigger and closer casters shade more, and casters on the golden-hour (north-west) side count most. Stumps cast none.
+  - Model: `shade = Σ weight · (1 − dist/reach)^1.3 · (0.4 + 0.6 · sunSide)`, clamped to 0–100%; `sun = 1 − shade`.
+  - Growth speed = 25% + 75% × sun, so **full shade grows 4× slower**. This applies to bed plants and saplings, and to offline catch-up.
+  - Shaded tiles get a soft dappled overlay. Tile and tree info shows "Sun: 40% · growing slower", and the Build preview labels every patch with its Sun %.
+  - Shade is recomputed whenever a tree is chopped, planted or grows a stage, or a building or bed is placed. Progress is kept and only the remaining time stretches or shrinks.
+  - All numbers live in `SHADE` in `js/data.js`.
+- **Rain barrel refills 1 water per minute** (was 1 per 20 s), cap 10, including while the game is closed. The Brass Watering Can halves that to 30 s and raises the cap to 15.
+- **Irrigation card** (Uncommon feature, 45 coins in the Supply Market once pulled from a Card Pack). Tap the card in Bag → Garden features, then tap a raised bed. A drip hose runs from the rain barrel to that bed, and the bed waters its thirsty plants by itself, using 1 barrel water per plant. When the barrel is empty it pauses until it refills. Each card covers one bed, so more cards cover more beds. Offline catch-up waters plants at the barrel's 1-per-minute pace.
+
 ## Jewels, ads and settings (prototype, no real money)
 - **Jewel Shop:** opens from the Jewel counter, the Bag or the Market.
   - Bundles: 1 for $0.99, 10 for $6.99, 50 for $29.99 (Best value).
@@ -37,7 +47,7 @@ Drag with one finger to pan, pinch to zoom, and twist with two fingers to turn. 
   - Show tips again.
   - Reset garden.
 
-Progress autosaves to localStorage (`petalspire.v03`). v0.2 saves are migrated automatically: your beds, stand, rack, market, land and coins are kept, plus a gift of a sapling and 3 Jewels. The old save is kept as a backup.
+Progress autosaves to localStorage (`petalspire.v03`; v0.31 uses the same save, and plants already growing in a v0.3 save keep their progress). v0.2 saves are migrated automatically: your beds, stand, rack, market, land and coins are kept, plus a gift of a sapling and 3 Jewels. The old save is kept as a backup.
 
 ## Tech
 Plain HTML/CSS/ES modules with no build step. Three.js r170 is vendored in `vendor/`. All 3D meshes are procedural low-poly, made in code.
@@ -46,5 +56,6 @@ Plain HTML/CSS/ES modules with no build step. Three.js r170 is vendored in `vend
 - `js/data.js`: costs, timings, finds, bundles, ad config
 - `js/main.js`: game state, goals, panels, the stand and customers, and the card reveal
 - `js/payments.js`, `js/ads.js`: the swappable purchase and ad layers
+- `js/shade.js`: the shade model (pure functions)
 
 Run it locally with `python3 -m http.server` and open http://localhost:8000. Add `?treeMin=1` to make trees grow in 1 minute when testing.

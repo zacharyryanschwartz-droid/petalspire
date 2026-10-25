@@ -1,4 +1,4 @@
-// Petalspire v0.3: Jewel purchases.
+// Petalspire v0.31: Jewel purchases.
 // Prototype only: there is NO real payment integration in this build.
 // PAYMENTS_MODE (js/data.js) is the single switch:
 //   'simulated'  -> the purchase is simulated after an on-screen confirm, nothing is charged.

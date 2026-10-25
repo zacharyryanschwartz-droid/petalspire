@@ -1,4 +1,4 @@
-// Petalspire v0.3 — game data
+// Petalspire v0.31 — game data
 export const SPECIES = {
   heartvine: {
     id: 'heartvine', name: 'Heartvine', rarity: 'common', type: 'Plant · Climbing vine',
@@ -33,6 +33,11 @@ export const FEATURES = {
     id: 'beehive', name: 'Honeybee Skep', rarity: 'epic', type: 'Feature · Pollinators',
     price: 60, stats: { Growth: 3, Beauty: 3, Yield: 5, Atmosphere: 4 },
     blurb: 'Once bought, busy bees add +1 flower to every harvest.',
+  },
+  irrigation: {
+    id: 'irrigation', name: 'Irrigation', rarity: 'uncommon', type: 'Feature · Water',
+    price: 45, stats: { Growth: 4, Beauty: 2, Yield: 3, Atmosphere: 2 },
+    blurb: 'Assign it to one raised bed: a drip line from the rain barrel waters that bed’s thirsty plants for you (1 water each). Each card covers one bed.',
   },
   sundial: {
     id: 'sundial', name: 'Golden Sundial', rarity: 'legendary', type: 'Feature · Time',
@@ -73,7 +78,7 @@ export const WOOD = { tree: 3, stump: 1, bush: 0, rock: 0 };
 export const BED_COSTS = [12, 20, 28, 36, 44, 52];   // wood per raised bed, escalating
 export const STAND_CAP = 12;
 export const MARKET_GOAL = 100;                        // coins earned at the stand to unlock the Rebuild Market project
-export const WATER_REGEN_S = 20, WATER_REGEN_MAX = 10; // rain barrel by the stand
+export const WATER_REGEN_S = 60, WATER_REGEN_MAX = 10; // rain barrel by the stand: +1 water per minute (v0.31), offline too
 export const STARTER = { seed_heartvine: 4, seed_sunpetal: 3, water: 10 };
 export const STARTER_JEWELS = 3;
 
@@ -89,7 +94,7 @@ export const BUILD_ANIM_MS = 2450;
 export const FIND_CHANCE = 0.22, SAPLING_CHANCE = 0.12;   // sapling chance applies to wild trees only
 export const FINDS = {
   watering_can: { name: 'Rusty Watering Can', restore: { wood: 2, coins: 5, s: 30 }, recycle: { scrap: 2 },
-    into: { name: 'Brass Watering Can', bonus: 'can', blurb: 'Rain barrel refills twice as fast and holds 15' } },
+    into: { name: 'Brass Watering Can', bonus: 'can', blurb: 'Rain barrel refills twice as fast (1 water / 30 s) and holds 15' } },
   wheelbarrow:  { name: 'Old Wheelbarrow', restore: { wood: 6, coins: 8, s: 45 }, recycle: { wood: 3, scrap: 1 },
     into: { name: 'Trusty Wheelbarrow', bonus: 'barrow', blurb: '+1 Wood from every tree you chop' } },
   old_crate:    { name: 'Old Crate', restore: { wood: 2, coins: 0, s: 20 }, recycle: { wood: 3 },
@@ -168,7 +173,7 @@ export const TIPS = {
   bloom: 'A bloom! <b>Tap the sparkling plant</b> to harvest it.',
   harvested: 'Harvests give flowers <i>and</i> seeds. Put spares on your <b>Farm Stand</b> by the road.',
   stand: 'Your <b>Farm Stand</b> is built! Tap it to stock flowers — drivers will pull over to buy.',
-  barrel: 'The <b>rain barrel</b> by the road slowly refills your watering can.',
+  barrel: 'The <b>rain barrel</b> by the road refills your watering can by <b>1 water a minute</b> (up to 10), even while the game is closed.',
   customer: 'A customer! They’ll pick what they want from your stand and pay in coins.',
   heartvine: 'You can now build a <b>Drying Rack</b> (Build). Dried Heartvine sells for almost 3× fresh.',
   rebuild: 'Your stand has earned enough to <b>rebuild the Supply Market</b>. Tap the old cottage or open Build.',
@@ -177,4 +182,23 @@ export const TIPS = {
   decor: 'Placed decor raises your garden’s <b>atmosphere</b> — customers stop by more often.',
   plot: 'The woods around you are <b>for sale</b>. Tap a <b>For Sale</b> sign to expand.',
   plotbought: 'New land! Clear its trees for Wood and room for more beds.',
+  shade: 'Trees and buildings cast <b>shade</b> — a shaded plot grows up to <b>4× slower</b>. <b>Clear nearby trees to let the sun in.</b>',
+};
+
+// ---------- v0.31: shade slows growth ----------
+// Every standing tree (wild, grown, background woods) and building casts shade in a circle around it.
+// shade at a spot = Σ weight · (1 − dist/reach)^falloff · sunBias, clamped to 0–1;  sun = 1 − shade.
+// Casters on the golden-hour (north-west) side count fully; casters on the far side count (1 − sunBias).
+// Growth speed = minSpeed + (1 − minSpeed) · sun  →  full sun 100%, full shade 25% (4× slower).
+export const SHADE = {
+  minSpeed: 0.25,                 // growth speed in full shade
+  sunDir: [-0.79, -0.61],         // ground direction toward the low sun (matches the scene light)
+  sunBias: 0.6,                   // 0 = shade equal all round, 1 = only the sun side shades
+  falloff: 1.3,
+  tree: { w: 0.55, reach: 3.4 },  // a wild tree of scale 1 (weight & reach scale with tree size)
+  grownStage: [0.15, 0.45, 0.75, 1.0], // planted trees cast more shade as they grow (sapling → mature)
+  bgTree: { w: 0.55, reach: 3.4 },
+  buildings: { stand: { w: 0.35, reach: 2.6 }, market: { w: 0.55, reach: 3.4 }, rack: { w: 0.2, reach: 2.0 } },
+  slowerBelow: 0.95,              // sun under this shows 'growing slower'
+  muchSlowerBelow: 0.3,
 };

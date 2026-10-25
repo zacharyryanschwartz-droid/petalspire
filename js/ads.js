@@ -1,4 +1,4 @@
-// Petalspire v0.3: ads. Prototype only: there is NO ad SDK and nothing is requested from an ad network.
+// Petalspire v0.31: ads. Prototype only: there is NO ad SDK and nothing is requested from an ad network.
 //  - Banner: a HOUSE ad for our own games (OTHER_GAMES in js/data.js). Tapping it opens Settings → Play Other Games.
 //  - Interstitial + rewarded: 'Partner ad' placeholders. A real partner-network SDK (ADS.partner.network) can replace
 //    overlay() later — the game only calls maybeBreak() / rewarded() and never needs to change.

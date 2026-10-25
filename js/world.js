@@ -1,4 +1,4 @@
-// Petalspire v0.3: scene, environment, lots & woods, raised beds, roadside buildings, cars, effects
+// Petalspire v0.31: scene, environment, lots & woods, raised beds, roadside buildings, cars, effects
 import * as THREE from 'three';
 import { mat, glowSprite, glowTexture } from './plants.js';
 import { TILE, BED_N, ROAD, SPOTS, LOTS, LOT_FOR_SALE, SIGNS, SITES, OBSTACLES, siteById } from './layout.js';
@@ -201,6 +201,7 @@ export function createWorld(canvas) {
   }
 
   // ---------- Background trees (not interactive) ----------
+  const bgTrees = [];   // v0.31: positions feed the shade model
   for (let i = 0; i < 46; i++) {
     let x, z;
     const side = i % 4;
@@ -208,7 +209,7 @@ export function createWorld(canvas) {
     else if (side === 1) { x = -16 - rnd() * 16; z = -24 + rnd() * 28; }
     else if (side === 2) { x = 16 + rnd() * 16; z = -24 + rnd() * 28; }
     else { x = -30 + rnd() * 60; z = -20 - rnd() * 14; }
-    const t = makeTree(1.0 + rnd() * 0.8, Math.floor(rnd() * 8), rnd, 2); t.position.set(x, 0, z);
+    const bs = 1.0 + rnd() * 0.8; const t = makeTree(bs, Math.floor(rnd() * 8), rnd, 2); t.position.set(x, 0, z); bgTrees.push({ x, z, s: bs });
     const yy = (noise(x * 0.07, z * 0.07) * 6) * THREE.MathUtils.smoothstep(Math.hypot(Math.max(0, Math.abs(x) - 17), Math.max(0, z > 0 ? z - 14 : -z - 21)), 0, 18);
     t.position.y = yy - 0.1; decor.add(t);
   }
@@ -292,6 +293,16 @@ export function createWorld(canvas) {
   const tileGeo = new THREE.BoxGeometry(1.0, 0.16, 1.0, 7, 1, 7);
   { const p = tileGeo.attributes.position; for (let i = 0; i < p.count; i++) { if (p.getY(i) > 0) { const x = p.getX(i), z = p.getZ(i); const edge = Math.max(Math.abs(x), Math.abs(z)) * 2; p.setY(i, p.getY(i) + 0.05 * (1 - edge * edge) + (hash(x * 9, z * 9) - 0.5) * 0.035); } } tileGeo.computeVertexNormals(); }
   const ICON_TEX = { water: iconTexture('water'), ready: iconTexture('ready') };
+  // v0.31: soft dappled shade overlay per tile (opacity follows the tile's shade)
+  const SHADE_TEX = (() => {
+    const c = document.createElement('canvas'); c.width = c.height = 128; const g = c.getContext('2d');
+    const rg = g.createRadialGradient(64, 64, 10, 64, 64, 66); rg.addColorStop(0, 'rgba(32,52,44,.85)'); rg.addColorStop(0.7, 'rgba(32,52,44,.6)'); rg.addColorStop(1, 'rgba(32,52,44,0)');
+    g.fillStyle = rg; g.fillRect(0, 0, 128, 128);
+    g.globalCompositeOperation = 'destination-out';
+    for (let k = 0; k < 9; k++) { const x = 20 + hash(k, 7) * 88, y = 20 + hash(7, k) * 88, r = 5 + hash(k, k + 3) * 9; const d = g.createRadialGradient(x, y, 0, x, y, r); d.addColorStop(0, 'rgba(0,0,0,.55)'); d.addColorStop(1, 'rgba(0,0,0,0)'); g.fillStyle = d; g.beginPath(); g.arc(x, y, r, 0, 7); g.fill(); }
+    const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t;
+  })();
+  const shadeGeo = new THREE.PlaneGeometry(1.06, 1.06); shadeGeo.rotateX(-Math.PI / 2);
   const span = BED_N * TILE + 0.1;
   function addBed(siteId, animate) {
     const s = siteById(siteId); const bed = new THREE.Group(); bed.position.set(s.x, 0, s.z); scene.add(bed);
@@ -316,12 +327,44 @@ export function createWorld(canvas) {
       const holder = new THREE.Group(); holder.position.set(m.position.x, 0.32, m.position.z); holder.scale.setScalar(1.3); bed.add(holder);
       const icon = new THREE.Sprite(new THREE.SpriteMaterial({ transparent: true, depthWrite: false, depthTest: false }));
       icon.scale.setScalar(0.36); icon.visible = false; icon.renderOrder = 10; holder.add(icon);
-      tiles.push({ mesh: m, holder, icon, plant: null, key: '', bed });
+      const sh = new THREE.Mesh(shadeGeo, new THREE.MeshBasicMaterial({ map: SHADE_TEX, transparent: true, opacity: 0, depthWrite: false }));
+      sh.position.set(m.position.x, 0.365, m.position.z); sh.rotation.y = hash(base + k, 9) * 6.28; sh.renderOrder = 1; sh.visible = false; sh.userData.shade = true; bed.add(sh);
+      tiles.push({ mesh: m, holder, icon, plant: null, key: '', bed, shade: sh });
     }
     beds.push({ site: siteId, group: bed });
     if (animate) { bed.userData.born = performance.now(); bed.scale.set(1, 0.01, 1); poof(new THREE.Vector3(s.x, 0.4, s.z), '#C99A6B', 26, 1.8); poof(new THREE.Vector3(s.x, 0.3, s.z), '#E9D9B8', 16, 1.6); }
     return base;
   }
+  // ---------- v0.31: irrigation (drip hose from the rain barrel + badge on the bed) ----------
+  const irrig = new Map(); const hoseM = mat('#3D5A40', { roughness: 0.7 }), hoseL = mat('#5F7F5F', { roughness: 0.8 });
+  const IRRIG_TEX = (() => { const c = document.createElement('canvas'); c.width = c.height = 128; const g = c.getContext('2d');
+    g.shadowColor = 'rgba(60,40,20,.25)'; g.shadowBlur = 8; g.shadowOffsetY = 3; g.fillStyle = '#FFF9F0'; g.beginPath(); g.arc(64, 62, 48, 0, 7); g.fill(); g.shadowColor = 'transparent';
+    g.lineWidth = 7; g.strokeStyle = '#B7D4B5'; g.stroke();
+    g.strokeStyle = '#3D5A40'; g.lineWidth = 7; g.lineCap = 'round'; g.beginPath(); g.moveTo(30, 48); g.bezierCurveTo(48, 36, 70, 60, 98, 46); g.stroke();
+    g.fillStyle = '#8EC0D0'; for (const [x, y] of [[44, 64], [66, 70], [86, 62]]) { g.beginPath(); g.moveTo(x, y - 12); g.bezierCurveTo(x + 9, y, x + 7, y + 9, x, y + 9); g.bezierCurveTo(x - 7, y + 9, x - 9, y, x, y - 12); g.fill(); }
+    const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t; })();
+  function setIrrigation(siteId, on) {
+    const old = irrig.get(siteId); if (old) { scene.remove(old); irrig.delete(siteId); }
+    if (!on) return;
+    const s = siteById(siteId); const g = new THREE.Group(); g.userData.irrigation = siteId;
+    const [bx, bz] = SPOTS.barrel, half = span / 2 + 0.12, frontZ = s.z + half + 0.28, sideX = s.x + (s.x < bx ? half : -half) * 0.7;
+    const pts = [[bx + 0.05, 0.22, bz - 0.28], [bx + 0.05, 0.04, bz - 0.6], [bx + (sideX - bx) * 0.35, 0.04, Math.min(bz - 1.0, frontZ + 1.2)]];
+    if (Math.abs(s.z - bz) > 3) pts.push([sideX, 0.04, frontZ + 0.5]);
+    pts.push([sideX, 0.04, frontZ], [sideX, 0.4, s.z + half]);
+    const curve = new THREE.CatmullRomCurve3(pts.map((p) => new THREE.Vector3(...p)), false, 'centripetal');
+    const hose = shadowy(new THREE.Mesh(new THREE.TubeGeometry(curve, 64, 0.045, 6, false), hoseM)); g.add(hose);
+    // drip lines between the rows, with little emitters
+    for (const r of [-0.5, 0.5]) {
+      const z = s.z + r * TILE, line = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.022, span + 0.1, 6), hoseL); line.rotation.z = Math.PI / 2; line.position.set(s.x, 0.38, z); g.add(line);
+      for (let c = -1; c <= 1; c++) { const e = new THREE.Mesh(new THREE.SphereGeometry(0.04, 6, 5), mat('#8EC0D0', { emissive: '#8EC0D0', emissiveIntensity: 0.25 })); e.position.set(s.x + c * TILE, 0.37, z); g.add(e); }
+    }
+    const feed = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.022, TILE + 0.1, 6), hoseL); feed.rotation.x = Math.PI / 2; feed.position.set(sideX, 0.38, s.z); g.add(feed);
+    const badge = new THREE.Sprite(new THREE.SpriteMaterial({ map: IRRIG_TEX, transparent: true, depthWrite: false, depthTest: false })); badge.scale.setScalar(0.5); badge.renderOrder = 11;
+    badge.position.set(s.x + (s.x < bx ? half : -half), 0.95, s.z + half); badge.userData.irrigBadge = siteId; g.add(badge); g.userData.badge = badge;
+    scene.add(g); irrig.set(siteId, g);
+  }
+  function irrigPulse(siteId) { const g = irrig.get(siteId); if (!g) return; g.userData.pulse = performance.now(); }
+  frameHooks.push((dt, t) => { for (const g of irrig.values()) { const b = g.userData.badge; const k = g.userData.pulse ? Math.max(0, 1 - (performance.now() - g.userData.pulse) / 700) : 0; b.scale.setScalar(0.5 + 0.18 * k + 0.02 * Math.sin(t * 3)); } });
   function tileWorld(i) { const t = tiles[i]; return t.mesh.getWorldPosition(new THREE.Vector3()).setY(0.3); }
 
   // Build ghosts
@@ -333,11 +376,12 @@ export function createWorld(canvas) {
   function setGhosts(list) {
     ghosts.clear(); ghostMeshes.length = 0;
     if (!list) return;
-    for (const { id, ok } of list) {
+    for (const { id, ok, sun } of list) {
       const s = siteById(id); const g = new THREE.Group(); g.position.set(s.x, 0.09, s.z);
       const pl = new THREE.Mesh(new THREE.PlaneGeometry(span + 0.5, span + 0.5), ok ? ghostOk : ghostNo); pl.rotation.x = -Math.PI / 2; pl.renderOrder = 2; g.add(pl);
       for (let k = 0; k < 4; k++) { const b = new THREE.Mesh(new THREE.BoxGeometry(span + 0.6, 0.05, 0.09), ok ? barOk : barNo); b.rotation.y = k * Math.PI / 2; const d = (span + 0.5) / 2; b.position.set(k === 1 ? d : k === 3 ? -d : 0, 0.03, k === 0 ? d : k === 2 ? -d : 0); b.renderOrder = 3; g.add(b); }
-      pl.userData = { kind: 'site', id, ok }; ghostMeshes.push(pl); ghosts.add(g);
+      if (sun != null) { const lb = textSprite(`Sun ${Math.round(sun * 100)}%`, { h: 0.42, color: sun >= 0.8 ? '#3D5A40' : '#7C6A4C', border: sun >= 0.8 ? '#F5D07A' : '#C8E0E8', bg: sun >= 0.8 ? 'rgba(255,246,214,.95)' : 'rgba(234,242,244,.95)' }); lb.material.depthTest = false; lb.renderOrder = 12; lb.position.set(0, 0.75, 0); lb.userData.sunLabel = Math.round(sun * 100); g.add(lb); }
+      pl.userData = { kind: 'site', id, ok, sun }; ghostMeshes.push(pl); ghosts.add(g);
     }
   }
 
@@ -803,6 +847,7 @@ export function createWorld(canvas) {
     t.key = key; return true;
   }
   function attachPlant(i, obj, pop = true) { const t = tiles[i]; t.plant = obj; obj.userData.born = pop ? performance.now() : 0; if (pop) obj.scale.setScalar(0.01); t.holder.add(obj); }
+  function setShade(i, v) { const t = tiles[i]; if (!t) return; t.shade.visible = v > 0.06; t.shade.material.opacity = Math.min(0.62, v * 0.7); t.shade.userData.v = v; }
   function setIcon(i, kind) { const t = tiles[i]; if (!kind) { t.icon.visible = false; return; } t.icon.material.map = ICON_TEX[kind]; t.icon.material.needsUpdate = true; t.icon.visible = true; }
   function select(i) {
     if (i == null) { sel.visible = false; selGlow.visible = false; return; }
@@ -863,7 +908,7 @@ export function createWorld(canvas) {
     renderer, scene, camera, ctl, DEF, tiles, beds, obs, stand, rack, market, barrel, cars, frameHooks,
     updateCamera, resize, glide, intro, pick, project, tileWorld,
     setObstacle, chop, clearObstacle, addBed, setGhosts, setLotOwned, setStandStock, setMarketOpen, setRack, appear, spawnCar, poof,
-    setPlant, attachPlant, setIcon, select, splash, render, textSprite, relabel, groundAt,
+    setPlant, attachPlant, setIcon, setShade, bgTrees, setIrrigation, irrigPulse, irrig, select, splash, render, textSprite, relabel, groundAt,
     buildAnim, makeBlueprint, setBlueprint, setMarketState, addLoot, removeLoot, addDecor, removeDecor, addGrown, setGrown, removeGrown, loots, decors,
     iconWorld(i) { const t = tiles[i]; t.icon.updateWorldMatrix(true, false); return new THREE.Vector3().setFromMatrixPosition(t.icon.matrixWorld); },
   };
