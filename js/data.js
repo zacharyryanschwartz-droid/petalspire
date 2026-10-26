@@ -98,57 +98,57 @@ for (const t of Object.keys(PLANT_TIERS)) { const ps = Object.values(SPECIES).fi
 
 export const FEATURES = {
   rainbarrel: {
-    id: 'rainbarrel', name: 'Rain Barrel', rarity: 'uncommon', type: 'Feature · Water',
+    id: 'rainbarrel', name: 'Rain Barrel', rarity: 'basic', type: 'Feature · Water',
     stats: { Growth: 3, Beauty: 2, Yield: 3, Atmosphere: 3 },
     blurb: 'Unlocks the Rain Barrel at the Supply Market (40 coins): place it in a plot you bought to give that plot its own water — 1 a minute, up to 10, feeding up to 4 irrigated beds.',
   },
   beehive: {
-    id: 'beehive', name: 'Honeybee Skep', rarity: 'epic', type: 'Feature · Pollinators',
+    id: 'beehive', name: 'Honeybee Skep', rarity: 'legendary', type: 'Feature · Pollinators',
     price: 60, stats: { Growth: 3, Beauty: 3, Yield: 5, Atmosphere: 4 },
     blurb: 'Once bought, busy bees add +1 flower to every harvest.',
   },
   irrigation: {
-    id: 'irrigation', name: 'Irrigation', rarity: 'uncommon', type: 'Feature · Water',
+    id: 'irrigation', name: 'Irrigation', rarity: 'basic', type: 'Feature · Water',
     price: 45, stats: { Growth: 4, Beauty: 2, Yield: 3, Atmosphere: 2 },
     blurb: 'Assign it to one raised bed: a drip line from the rain barrel waters that bed’s thirsty plants for you (1 water each). Each card covers one bed.',
   },
   tincture: {
-    id: 'tincture', name: 'Tincture Stand', rarity: 'rare', type: 'Feature · Crafting', img: 'assets/card-tincture.jpg',
+    id: 'tincture', name: 'Tincture Stand', rarity: 'epic', type: 'Feature · Crafting', img: 'assets/card-tincture.jpg',
     price: 120, stats: { Growth: 1, Beauty: 4, Yield: 5, Atmosphere: 4 },
     blurb: 'A little wooden stall of glass bottles. Find it, buy it at the Supply Market, then build it: steep your blooms in Glycerin or Vinegar into tinctures that sell for far more.',
   },
   still: {
-    id: 'still', name: 'Essential Oil Stand', rarity: 'rare', type: 'Feature · Crafting', img: 'assets/card-still.jpg',
+    id: 'still', name: 'Essential Oil Stand', rarity: 'epic', type: 'Feature · Crafting', img: 'assets/card-still.jpg',
     price: 150, stats: { Growth: 1, Beauty: 4, Yield: 5, Atmosphere: 5 },
     blurb: 'A little stall with gleaming copper stills. Find it, buy it at the Supply Market, build it on one of your other plots, then distill your seeds into essential oils that sell for a premium.',
   },
   sickle: {
-    id: 'sickle', name: 'Harvest Sickle', rarity: 'rare', type: 'Tool · Harvest',
+    id: 'sickle', name: 'Harvest Sickle', rarity: 'epic', type: 'Tool · Harvest',
     price: 80, stats: { Growth: 1, Beauty: 2, Yield: 4, Atmosphere: 2 }, cooldownS: 8,
     blurb: 'Harvest a whole raised bed at once. Tap the Sickle, then a raised bed: every ripe plant in that bed is harvested in one sweep (normal yields and seeds). Rests 8 s between sweeps.',
   },
   plow: {
-    id: 'plow', name: 'Hand Plow', rarity: 'rare', type: 'Tool · Planting',
+    id: 'plow', name: 'Hand Plow', rarity: 'epic', type: 'Tool · Planting',
     price: 90, stats: { Growth: 3, Beauty: 1, Yield: 3, Atmosphere: 2 }, cooldownS: 8,
     blurb: 'Plant a whole raised bed at once. Tap the Plow, pick a seed, then a raised bed: every empty tile in that bed is planted, as far as your seeds go. Rests 8 s between uses.',
   },
   parking: {
-    id: 'parking', name: 'Parking Lot', rarity: 'epic', type: 'Feature · Traffic',
+    id: 'parking', name: 'Parking Lot', rarity: 'legendary', type: 'Feature · Traffic',
     price: 140, stats: { Growth: 1, Beauty: 2, Yield: 5, Atmosphere: 3 },
     blurb: 'Painted bays by your Farm Stand: room for 2 cars at once (3 at card Lv2+), customers come 30% more often, and 30% of them pick up one extra item. Build it next to the stand for 20 Wood.',
   },
   windmill: {
-    id: 'windmill', name: 'Windmill', rarity: 'epic', type: 'Feature · Water',
+    id: 'windmill', name: 'Windmill', rarity: 'legendary', type: 'Feature · Water',
     price: 160, stats: { Growth: 3, Beauty: 4, Yield: 3, Atmosphere: 4 },
     blurb: 'Pumps for every rain barrel on your land: connected barrels refill every 40 s instead of 60 s (faster with card levels, and it stacks with the Brass Watering Can). Build it once anywhere on your cleared ground for 20 Wood.',
   },
   billboard: {
-    id: 'billboard', name: 'Roadside Billboard', rarity: 'rare', type: 'Feature · Advertising',
+    id: 'billboard', name: 'Roadside Billboard', rarity: 'epic', type: 'Feature · Advertising',
     price: 90, stats: { Growth: 1, Beauty: 3, Yield: 4, Atmosphere: 2 },
     blurb: 'A painted sign across the road. Tap it to Run ad: twice the traffic for 5 minutes. Free once an hour, or 1 Jewel to run it now. Build it by the road for 15 Wood.',
   },
   sundial: {
-    id: 'sundial', name: 'Golden Sundial', rarity: 'legendary', type: 'Feature · Time',
+    id: 'sundial', name: 'Golden Sundial', rarity: 'rare', type: 'Feature · Time',
     price: 90, stats: { Growth: 5, Beauty: 4, Yield: 3, Atmosphere: 5 },
     blurb: 'Once bought, every plant you water grows 25% faster.',
   },
@@ -163,15 +163,20 @@ export const RARITY = {
   epic:      { label: 'Epic',      w: 7,  color: '#E2B653' },
   legendary: { label: 'Legendary', w: 2,  color: '#D9A93F' },
   ultra:     { label: 'Ultra Rare', w: 0,  color: '#B48AD8' },
-  // v0.5: plant-tier frames (plants use their tier as the card frame; pack odds now come from PLANT_TIERS[].pack)
   basic:      { label: 'Basic',       w: 0, color: '#8DB78A' },
   superrare:  { label: 'Super Rare',  w: 0, color: '#3D5A40' },
   otherworld: { label: 'Other World', w: 0, color: '#8C9BE0' },
 };
+// v0.51: every card (plant or feature) is framed and labelled by its tier, so a tier name means the same thing everywhere.
+for (const t of Object.keys(PLANT_TIERS)) RARITY[t] = { ...RARITY[t], label: PLANT_TIERS[t].label, color: PLANT_TIERS[t].color };
+export const cardTier = (c) => c.tier || c.rarity;
 // v0.5 pack odds: every card has a weight in % of one pack slot. Features keep exactly their v0.41 odds (rarity weight split
 // over that v0.41 rarity pool): Uncommon 10% each, Rare 2.5% each, Epic 2.33% each, Legendary 2%. Plants get the rest (58.5%)
 // through PLANT_TIERS[].pack. Total = 100%.
-export const FEATURE_PACK_W = { uncommon: 10, rare: 2.5, epic: 7 / 3, legendary: 2 };
+// v0.51: feature cards use the plant tier names too (one tier system everywhere). Old feature ranks map in order, keeping
+// each card's rank and exact per-card odds: Uncommon → Basic (10% each), Rare → Epic (2.5%), Epic → Legendary (2.33%), Legendary → Rare (2%).
+export const FEATURE_TIER_FROM_OLD = { common: 'basic', uncommon: 'basic', rare: 'epic', epic: 'legendary', legendary: 'rare' };
+export const FEATURE_PACK_W = { basic: 10, epic: 2.5, legendary: 7 / 3, rare: 2 };
 for (const f of Object.values(FEATURES)) f.packW = FEATURE_PACK_W[f.rarity] ?? 0;
 export const PACK_W = Object.fromEntries(Object.entries(CARDS).map(([k, c]) => [k, c.packW || 0]));
 
@@ -412,7 +417,7 @@ export const TIPS = {
   plotbarrel: 'This plot has no rain barrel yet. Buy a <b>Rain Barrel</b> at the Supply Market (40 coins) and place it here: its own water for irrigation, up to <b>4 beds</b>. A barrel only collects rain through a gutter from a <b>stand on the same plot</b> (Tincture or Essential Oil Stand) — it connects automatically. Until then, hand watering borrows from your nearest barrel.',
   sickle: 'You own the <b>Harvest Sickle</b>! Tap the sickle button on the left, then tap a glowing raised bed to harvest every ripe plant in that bed at once.',
   plow: 'You own the <b>Hand Plow</b>! Tap the plow button on the left, pick a seed, then tap a glowing raised bed to plant every empty tile in that bed.',
-  oils: 'The <b>Essential Oil Stand</b> is a Rare card: find it in a Card Pack, buy it at the Supply Market (150 coins), then build it (25 Wood) on one of your <b>other plots</b>. It distills <b>seeds</b> into oils worth far more than the seeds.',
+  oils: 'The <b>Essential Oil Stand</b> is an Epic card: find it in a Card Pack, buy it at the Supply Market (150 coins), then build it (25 Wood) on one of your <b>other plots</b>. It distills <b>seeds</b> into oils worth far more than the seeds.',
   still: 'Your <b>Essential Oil Stand</b> is ready! Distill <b>seeds</b> into essential oils (5 Lavender, 4 Calendula or 3 Chamomile seeds each) — oils sell for a premium at the Farm Stand, far more than the seeds.',
   tincture: 'Your <b>Tincture Stand</b> is ready! Steep flowers with <b>Glycerin</b> or <b>Vinegar</b> (Supply Market) — tinctures sell for far more at the Farm Stand.',
   customer: 'A customer! They’ll pick what they want from your stand and pay in coins.',

@@ -1,8 +1,8 @@
-// Petalspire v0.5 — game logic + UI (v0.5: the full 21-plant catalog)
+// Petalspire v0.51 — game logic + UI (v0.5: the full 21-plant catalog · v0.51: feature cards use the plant tier names)
 import * as THREE from 'three';
 import { createWorld } from './world.js';
 import { buildPlant } from './plants.js';
-import { SPECIES, FANTASY_SPECIES, PLANT_TIERS, TIER_ORDER, PACK_W, DRYING, rollSeeds, FEATURES, CARDS, RARITY, ITEMS, SELL_ORDER, TIPS, RESALE, PACKS, PACK_JEWELS, JEWEL_EXCHANGE, JEWEL_DROP, PARKING, BILLBOARD, WINDMILL, DUP_COINS, CARD_LEVELS, RACK_SLOTS, DRY_S, BARREL, BASES, TINCTURE, STILL, oilId, tinctureId, TINCTURE_NAMES,
+import { SPECIES, FANTASY_SPECIES, PLANT_TIERS, cardTier, FEATURE_TIER_FROM_OLD, TIER_ORDER, PACK_W, DRYING, rollSeeds, FEATURES, CARDS, RARITY, ITEMS, SELL_ORDER, TIPS, RESALE, PACKS, PACK_JEWELS, JEWEL_EXCHANGE, JEWEL_DROP, PARKING, BILLBOARD, WINDMILL, DUP_COINS, CARD_LEVELS, RACK_SLOTS, DRY_S, BARREL, BASES, TINCTURE, STILL, oilId, tinctureId, TINCTURE_NAMES,
   WOOD, BED_COSTS, STAND_CAP, MARKET_GOAL, WATER_REGEN_S, WATER_REGEN_MAX, STARTER, STARTER_FILL, STARTER_JEWELS,
   BUILDS, FINDS, FIND_IDS, FIND_CHANCE, SAPLING_CHANCE, RESTORE_HURRY_JEWELS, ATMOS_STEP, ATMOS_MAX, TREE, SHOP, JEWEL_BUNDLES, NO_ADS_BUNDLE, ADS, ADS_MODE, OTHER_GAMES, SHADE } from './data.js';
 import { LOTS, SIGNS, LOT_FOR_SALE, LOT_PRICES, SITES, OBSTACLES, SPOTS, PARK_X, BED_N, TILE, SITE_HALF, siteById, obstacleById, inSite, lotCenter, lotAt } from './layout.js';
@@ -13,7 +13,7 @@ import { shadeAt, speedFor, sunLabel, rebaseStart } from './shade.js';
 
 // Save format: v0.3, v0.31 and v0.4 share one localStorage key (schema v: 3). `build` records which prototype build last wrote the save;
 // v0.3 / v0.31 saves (no `build`, no per-plot barrels) are migrated on load (migrate04 below); v0.4 saves load as-is and are re-tagged. Prototype builds stay below 1.0.
-export const BUILD = '0.5';
+export const BUILD = '0.51';
 const SAVE_KEY = 'petalspire.v03', V02_KEY = 'petalspire.v02', OLD_KEYS = ['petalspire.v01'];
 const QS = new URLSearchParams(location.search);
 const TREE_MS = Math.max(0.05, +QS.get('treeMin') || TREE.growMin) * 60000;   // ?treeMin=1 for quick testing
@@ -1458,21 +1458,21 @@ function marketHTML() {
   rows.push(S.unlocked.irrigation ? buyRow('irrigation', FEATURE_ART.irrigation, `Irrigation card${S.irrigN ? ` · you have ${S.irrigN}` : ''}`, 'Waters one raised bed from your rain barrel. One card per bed.', FEATURES.irrigation.price) + (irrigFree() > 0 && S.beds.length > S.irrigBeds.length ? `<div class="ts-actions" style="margin:-4px 0 6px"><button class="btn sm" data-act="assign-irrig">Assign a spare card to a bed</button></div>` : '') : lockedRow(FEATURE_ART.irrigation, 'Irrigation'));
   const tf = FEATURES.tincture;
   rows.push(S.owned.tincture ? `<div class="row"><div class="ico">${FEATURE_ART.tincture}</div><div class="meta"><b>${tf.name}</b><small>${S.tinctureBuilt ? `Owned · built on ${lotName(S.tincPos?.lot || 'home')}` : tincLots().length ? 'Owned · build it on one of your other plots (Build menu)' : 'Owned · buy a neighbouring plot, then build it there'}</small></div></div>`
-    : S.unlocked.tincture ? buyRow('tincture', FEATURE_ART.tincture, tf.name, `Rare · then build it (${BUILDS.tincture.wood} Wood) to make tinctures`, tf.price) : lockedRow(FEATURE_ART.tincture, tf.name));
+    : S.unlocked.tincture ? buyRow('tincture', FEATURE_ART.tincture, tf.name, `${ftag('tincture')} · then build it (${BUILDS.tincture.wood} Wood) to make tinctures`, tf.price) : lockedRow(FEATURE_ART.tincture, tf.name));
   { const sf = FEATURES.still;
     rows.push(S.owned.still ? `<div class="row"><div class="ico">${FEATURE_ART.still}</div><div class="meta"><b>${sf.name}</b><small>${S.stillBuilt ? `Owned · built on ${lotName(S.stillPos?.lot || 'home')}` : tincLots().length ? 'Owned · build it on one of your other plots (Build menu)' : 'Owned · buy a neighbouring plot, then build it there'}</small></div></div>`
-      : S.unlocked.still ? buyRow('still', FEATURE_ART.still, sf.name, `Rare · then build it (${BUILDS.still.wood} Wood) on another plot to distill seeds into oils`, sf.price) : lockedRow(FEATURE_ART.still, sf.name)); }
+      : S.unlocked.still ? buyRow('still', FEATURE_ART.still, sf.name, `${ftag('still')} · then build it (${BUILDS.still.wood} Wood) on another plot to distill seeds into oils`, sf.price) : lockedRow(FEATURE_ART.still, sf.name)); }
   { const F = FEATURES.windmill;   // v0.41 Windmill
     rows.push(S.owned.windmill ? `<div class="row"><div class="ico">${FEATURE_ART.windmill}</div><div class="meta"><b>${F.name}</b><small>${S.windmillBuilt ? `Owned · turning on ${lotName(S.windmillPos?.lot || 'home')} · barrels refill every ${regenS()} s` : 'Owned · build it anywhere on your land (Build menu)'}</small></div></div>`
-      : S.unlocked.windmill ? buyRow('windmill', FEATURE_ART.windmill, F.name, `Epic · build once anywhere (${BUILDS.windmill.wood} Wood) · all connected barrels refill every ${WINDMILL.regenS[0]} s instead of ${WATER_REGEN_S} s`, F.price) : lockedRow(FEATURE_ART.windmill, F.name)); }
+      : S.unlocked.windmill ? buyRow('windmill', FEATURE_ART.windmill, F.name, `${ftag('windmill')} · build once anywhere (${BUILDS.windmill.wood} Wood) · all connected barrels refill every ${WINDMILL.regenS[0]} s instead of ${WATER_REGEN_S} s`, F.price) : lockedRow(FEATURE_ART.windmill, F.name)); }
   for (const id of ['parking', 'billboard']) { const F = FEATURES[id], B = BUILDS[id];   // v0.41 traffic cards
     rows.push(S.owned[id] ? `<div class="row"><div class="ico">${FEATURE_ART[id]}</div><div class="meta"><b>${F.name}</b><small>${S[id + 'Built'] ? 'Owned · built by the road' : 'Owned · build it by the road (Build menu)'}</small></div></div>`
-      : S.unlocked[id] ? buyRow(id, FEATURE_ART[id], F.name, `${RARITY[F.rarity].label} · then build it by the road (${B.wood} Wood) · ${id === 'parking' ? '2–3 cars at once, 30% shorter gaps, +1 item sometimes' : `Run ad: ${BILLBOARD.mult}× traffic for ${BILLBOARD.boostMs / 60000} min, free hourly`}`, F.price) : lockedRow(FEATURE_ART[id], F.name)); }
+      : S.unlocked[id] ? buyRow(id, FEATURE_ART[id], F.name, `${ftag(id)} · then build it by the road (${B.wood} Wood) · ${id === 'parking' ? '2–3 cars at once, 30% shorter gaps, +1 item sometimes' : `Run ad: ${BILLBOARD.mult}× traffic for ${BILLBOARD.boostMs / 60000} min, free hourly`}`, F.price) : lockedRow(FEATURE_ART[id], F.name)); }
   for (const b of ['glycerin', 'vinegar']) { const d = BASES[b];
     rows.push(buyRow(b, itemSvg(b), d.name, `${d.blurb} · you have ${S.inv[b]}`, d.price) + buyRow(b + '5', itemSvg(b), `${d.name} ×${d.pack.n}`, `Pack of ${d.pack.n} · save ${d.price * d.pack.n - d.pack.price} coins`, d.pack.price)); }
   { const d = FEATURES.beehive, need = hiveLots(), more = need.length - (S.hiveInv || 0);
     rows.push(!S.unlocked.beehive ? lockedRow(FEATURE_ART.beehive, d.name)
-      : more > 0 ? buyRow('beehive', FEATURE_ART.beehive, d.name, `Epic · place it on ${need.map(lotName).join(' or ')} · +${HIVE_BONUS} flower per harvest on that plot only · one per plot`, d.price)
+      : more > 0 ? buyRow('beehive', FEATURE_ART.beehive, d.name, `${ftag('beehive')} · place it on ${need.map(lotName).join(' or ')} · +${HIVE_BONUS} flower per harvest on that plot only · one per plot`, d.price)
       : `<div class="row"><div class="ico">${FEATURE_ART.beehive}</div><div class="meta"><b>${d.name}</b><small>${S.hiveInv > 0 ? `You have ${S.hiveInv} to place` : `${Object.keys(S.hives).length} placed · every plot you own has one`}</small></div>${S.hiveInv > 0 ? '<div class="acts"><button class="btn btn-primary sm" data-act="place-hive">Place</button></div>' : ''}</div>`); }
   for (const f of ['sundial', 'sickle', 'plow']) {
     const d = FEATURES[f];
@@ -1503,8 +1503,8 @@ function buy(id, price) {
 function packsHTML() {
   const disc = Object.keys(CARDS).filter((k) => S.discovered[k]);
   // v0.5: odds per card, by plant tier (plus all feature cards together)
-  const odds = TIER_ORDER.map((t) => `<span class="t-${t}" style="border-color:${PLANT_TIERS[t].color};color:${PLANT_TIERS[t].color}">${PLANT_TIERS[t].label} ${PLANT_TIERS[t].pack}%</span>`).join('') +
-    `<span style="border-color:#7FB3C6;color:#5E8C9A">Features ${+featureOdds().toFixed(1)}%</span>`;
+  // v0.51: one tier system for every card. Each chip is that tier's share of a card slot (its plants + its feature cards).
+  const odds = TIER_ORDER.map((t) => `<span class="t-${t}" style="border-color:${PLANT_TIERS[t].color};color:${PLANT_TIERS[t].color}">${PLANT_TIERS[t].label} ${+tierOdds(t).toFixed(2)}%</span>`).join('');
   const group = (title, ids, cls = '') => `<div class="sec-title coll-tier ${cls}">${title} · ${ids.filter((k) => S.discovered[k]).length}/${ids.length}</div><div class="coll">${ids.map((k) => (S.discovered[k] ? cardHTML(k) : `<div class="card"><div class="back" style="position:absolute;inset:0;border-radius:1.1em;opacity:.55"><img src="assets/emblem.png" alt=""/><span>?</span></div></div>`)).join('')}</div>`;
   return `<div class="pack-hero"><div class="pack-art"><img src="assets/pack.jpg" alt="Botanical card pack"/></div>
     <div class="pack-info"><h4>Botanical Card Pack</h4><p>3 illustrated cards. New discoveries unlock seeds &amp; features here at the market.</p>
@@ -1513,8 +1513,8 @@ function packsHTML() {
     <small class="pack-note">You have ${S.jewels} <i data-icon="jewel"></i> · Jewels come from the Jewel Shop or, rarely, the woods</small></div></div>
     <div class="odds">${odds}</div>
     <div class="sec-title">Your collection · ${disc.length}/${Object.keys(CARDS).length}</div>
-    ${TIER_ORDER.map((t) => group(`<em class="tier-tag t-${t}">${PLANT_TIERS[t].label}</em> plants · ${PLANT_TIERS[t].pack}% a card`, Object.keys(SPECIES).filter((k) => SPECIES[k].tier === t), 't-' + t)).join('')}
-    ${group('Garden features', Object.keys(FEATURES))}`;
+    ${TIER_ORDER.map((t) => { const pl = Object.keys(SPECIES).filter((k) => SPECIES[k].tier === t), fe = Object.keys(FEATURES).filter((k) => FEATURES[k].rarity === t);
+      return group(`<em class="tier-tag t-${t}">${PLANT_TIERS[t].label}</em> ${+tierOdds(t).toFixed(2)}% a card · ${pl.length} plants${fe.length ? ` + ${fe.length} feature${fe.length > 1 ? 's' : ''}` : ''}`, [...pl, ...fe], 't-' + t); }).join('')}`;
 }
 
 // v0.5 Drying Rack: any dryable herb (DRYING). Each slot remembers its plant (old slots without one are Lavender).
@@ -1725,13 +1725,13 @@ W.frameHooks.push(() => {
 
 // ---------------- Cards ----------------
 function cardHTML(id, extra = '') {
-  const c = CARDS[id]; const r = RARITY[c.rarity]; const rl = c.tier ? PLANT_TIERS[c.tier].label : r.label;   // plant cards show their tier
+  const c = CARDS[id]; const r = RARITY[c.rarity]; const ct = cardTier(c), rl = PLANT_TIERS[ct]?.label || r.label;   // v0.51: every card (plant or feature) shows its tier
   const st = S.cards?.[id], lv = st?.lv || 1, bump = c.tier ? (lv - 1) * CARD_LEVELS.plant.statPip : 0;
   const statsOf = bump ? { ...c.stats, Beauty: Math.min(5, c.stats.Beauty + bump), Yield: Math.min(5, c.stats.Yield + bump) } : c.stats;
   if (st && (st.n > 1 || lv > 1)) extra += `${st.n > 1 ? `<span class="stack-badge">×${st.n}</span>` : ''}${CARD_LEVELS.upgradable(id, c) ? `<span class="lv-badge">Lv${lv}</span>` : ''}`;
   const art = SPECIES[id] || c.img ? `<img src="${c.img}" alt=""/>` : FEATURE_ART[id];
   const stats = Object.entries(statsOf).map(([k, v]) => `<span>${k}</span><span class="pips">${[1, 2, 3, 4, 5].map((n) => `<b class="${n <= v ? 'on' : ''}"></b>`).join('')}</span>`).join('');
-  return `<div class="card r-${c.rarity}${c.tier ? ` plant-card t-${c.tier}` : ''}${S.cards && canUpgrade(id) ? ' can-up' : ''}" data-card="${id}">${extra}<div class="card-face"><div class="card-rar">${rl}</div><div class="card-art">${art}</div>
+  return `<div class="card r-${ct} t-${ct}${c.tier ? ' plant-card' : ' feature-card'}${S.cards && canUpgrade(id) ? ' can-up' : ''}" data-card="${id}">${extra}<div class="card-face"><div class="card-rar">${rl}</div><div class="card-art">${art}</div>
     <div class="card-name">${c.name}</div><div class="card-type">${c.type}</div><div class="stats">${stats}</div></div></div>`;
 }
 const plantUses = (sp) => { const d = SPECIES[sp]; if (!d) return ''; const T = PLANT_TIERS[d.tier], sd = T.seeds[0] === T.seeds[1] ? `${T.seeds[0]}${T.bonus ? ' (sometimes ' + (T.seeds[0] + 1) + ')' : ''}` : T.seeds.join('–');
@@ -1742,6 +1742,9 @@ function zoomCard(id) { const z = el('div', 'zoom', cardHTML(id) + `<p class="zo
 // their tier (Basic 40 · Epic 8 · Legendary 4.5 · Rare 3 · Super Rare 1.8 · Ultra Rare 0.8 · Other World 0.4).
 const PACK_TOTAL = Object.values(PACK_W).reduce((a, b) => a + b, 0);
 const featureOdds = () => Object.keys(FEATURES).reduce((a, k) => a + PACK_W[k], 0) / PACK_TOTAL * 100;
+const tierOdds = (t) => Object.keys(CARDS).filter((k) => cardTier(CARDS[k]) === t).reduce((a, k) => a + PACK_W[k], 0) / PACK_TOTAL * 100;
+const tierRank = (t) => PLANT_TIERS[t]?.order || 1;
+const ftag = (id) => { const t = FEATURES[id].rarity; return `<em class="tier-tag t-${t}">${PLANT_TIERS[t].label}</em>`; };
 function drawCard(rnd = Math.random) {
   let w = rnd() * PACK_TOTAL;
   for (const [k, p] of Object.entries(PACK_W)) { if (!p) continue; w -= p; if (w < 0) return k; }
@@ -1780,8 +1783,8 @@ function deal(results) {
   R.innerHTML = `<div class="rays"></div><h2>Your new cards</h2><p class="sub">Tap each card to reveal it</p><div class="deal"></div><div class="reveal-actions"><button class="btn" data-act="reveal-all">Reveal all</button></div>`;
   const d = $('.deal', R);
   results.forEach((r, k) => {
-    const rar = CARDS[r.id].rarity;
-    const c = el('div', `card flip ${['rare', 'epic', 'legendary'].includes(rar) ? 'hint-' + rar : ''}`);
+    const rar = cardTier(CARDS[r.id]);
+    const c = el('div', `card flip ${tierRank(rar) >= 2 ? 'hint-tier hint-' + rar : ''}`);
     const w = el('div', 'slotw'); w.style.animationDelay = `${k * 0.16}s`; w.appendChild(c);
     c.innerHTML = `<div class="flip-inner"><div class="back"><img src="assets/emblem.png" alt=""/><span>Petalspire</span></div><div class="front">${cardHTML(r.id, r.isNew ? '<span class="new-tag">NEW</span>' : `<span class="dup-tag">${r.up ? '✨ Upgrade ready' : r.coins ? `Max level · +${r.coins}` : r.id === 'irrigation' ? `Stacked ×${r.n} · +1 bed` : `Stacked ×${r.n}`}</span>`)}</div></div>`;
     const front = c.querySelector('.front > .card'); front.style.cssText = 'position:absolute;inset:0;width:auto;--cw:inherit';
@@ -1792,8 +1795,8 @@ function deal(results) {
 }
 function flip(c, r) {
   c.classList.add('flipped');
-  const rar = CARDS[r.id].rarity; const b = c.getBoundingClientRect();
-  if (rar !== 'common') sparkles($('#reveal'), b.left + b.width / 2, b.top + b.height / 2, rar === 'legendary' ? 30 : rar === 'epic' ? 22 : 14);
+  const rar = cardTier(CARDS[r.id]); const b = c.getBoundingClientRect();
+  if (tierRank(rar) >= 2) sparkles($('#reveal'), b.left + b.width / 2, b.top + b.height / 2, 10 + tierRank(rar) * 4);   // v0.51: more sparkle the higher the tier (Epic 18 … Other World 38)
   const R = $('#reveal');
   if ([...R.querySelectorAll('.deal .flip')].every((x) => x.classList.contains('flipped'))) {
     const news = revealCards.filter((x) => x.isNew).map((x) => CARDS[x.id].name);
@@ -2008,7 +2011,7 @@ window.__ps = {
   // v0.4 helpers
   get barrels() { return S.barrels; }, barrelText, totalWater, handSource: (i) => handSource(i)?.lot || null, buildBarrel, unhookIrrigation, BARREL, craftTincture, collectTincture, buildTincture,
   setBarrelCap(n) { BARREL.maxBeds = n; syncBarrels(); }, barrelScreen(lot) { const b = S.barrels[lot]; return W.project(V(b.x, 0.5, b.z)); }, barrelLabel(lot) { const s = W.barrels.get(lot)?.userData.info; return s && { main: s.userData.main, sub: s.userData.sub, visible: s.visible, scale: s.scale.y, opacity: s.material.opacity }; },
-  cardPool: (r) => Object.keys(CARDS).filter((k) => CARDS[k].rarity === r), RARITY, SPECIES, FANTASY_SPECIES, PLANT_TIERS, TIER_ORDER, PACK_W, DRYING, ITEMS, TINCTURE, STILL, drawCard, packOdds: () => ({ total: PACK_TOTAL, features: featureOdds() }), rollSeeds,
+  CARDS, FEATURES, zoomCard: (id) => zoomCard(id), cardPool: (r) => Object.keys(CARDS).filter((k) => CARDS[k].rarity === r), cardTier, FEATURE_TIER_FROM_OLD, RARITY, SPECIES, FANTASY_SPECIES, PLANT_TIERS, TIER_ORDER, PACK_W, DRYING, ITEMS, TINCTURE, STILL, drawCard, packOdds: () => ({ total: PACK_TOTAL, tiers: Object.fromEntries(TIER_ORDER.map((t) => [t, tierOdds(t)])), features: featureOdds() }), rollSeeds,
   sickleBed, plowBed, useTool, toolLeft, lotTiles, bedTiles, get bedTargets() { return W.bedTargets.children.map((g) => ({ b: g.userData.b, ok: g.userData.ok })); }, get fxCount() { return W.fxCount(); },
   giveTool(id) { S.discovered[id] = true; S.unlocked[id] = true; S.owned[id] = true; if (!S.cards[id]) addCard(id); save(); hud(); },
   resetTool(id) { S.toolAt[id] = 0; save(); hud(); },

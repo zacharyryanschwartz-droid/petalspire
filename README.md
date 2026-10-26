@@ -1,4 +1,4 @@
-# Petalspire v0.5
+# Petalspire v0.51
 
 A cozy 3D flower-garden prototype for iPhone Safari (portrait, one thumb). Also plays on desktop with a mouse.
 This is a **prototype**: version numbers stay below 1.0 until the first official release.
@@ -20,6 +20,28 @@ This is a **prototype**: version numbers stay below 1.0 until the first official
 7. **Land for sale.** Five wooded plots, each with a floating For Sale sign: 150 → 300 → 600 → 1000 → 1500 coins.
 
 Drag with one finger to pan, pinch to zoom, and twist with two fingers to turn. On desktop, right-drag or shift-drag turns the view.
+
+## New in v0.51 — one tier system for every card
+
+Garden and feature cards now use the plant tiers too (Basic, Epic, Legendary, Rare, Super Rare, Ultra Rare, Other World, from lowest to highest), so a tier name means the same thing everywhere. The old feature ranks were mapped in order, and every card keeps its rank and its exact per-card pack odds.
+
+| Old feature rank | New tier | Cards | Odds per card |
+|---|---|---|---|
+| Uncommon | **Basic** | Rain Barrel, Irrigation | 10% |
+| Rare | **Epic** | Tincture Stand, Essential Oil Stand, Harvest Sickle, Hand Plow, Roadside Billboard | 2.5% |
+| Epic | **Legendary** | Honeybee Skep, Parking Lot, Windmill | 2.33% |
+| Legendary | **Rare** | Golden Sundial | 2% |
+
+(No feature card was ever Common.)
+
+- **Cards:** feature cards use the same tier label, colour and frame as plant cards of that tier.
+- **Collection:** grouped into 7 tier groups, each holding its plants plus its features.
+- **Pack odds:** shown per tier. Each figure is that tier's plants plus its features: Basic 60%, Epic 20.5%, Legendary 11.5%, Rare 5%, Super Rare 1.8%, Ultra Rare 0.8%, Other World 0.4%.
+- **Market and pack opening:**
+  - Market feature rows carry the tier tag.
+  - When you open a pack, the face-down glow and the sparkles follow the tier.
+- **Saves:** rarity was never stored in a save, so old saves load unchanged and are re-tagged 0.51.
+- **Fix:** Epic-and-up cards used to fade to 35% opacity every 2.4 s. A tab-bar animation with the same name was overriding the card glow pulse; it has been renamed.
 
 ## New in v0.5 — the full plant catalog
 

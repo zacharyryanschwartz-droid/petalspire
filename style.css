@@ -218,13 +218,13 @@ i[data-icon] svg{width:100%;height:100%}
   box-shadow:0 0 2em .7em rgba(245,208,122,.95),0 .6em 1.4em rgba(70,50,20,.2),inset 0 0 0 .2em #FFF6DE,inset 0 0 0 .3em #E9C46A}
 .r-legendary .card-face::before,.r-legendary .card-face::after{content:"❦";position:absolute;color:#D9A93F;font-size:1em;top:.05em;left:.3em}
 .r-legendary .card-face::after{left:auto;right:.3em;transform:scaleX(-1)}
-.r-legendary,.r-epic{animation:pulse 2.4s ease-in-out infinite}
-@keyframes pulse{50%{filter:brightness(1.06)}}
-/* v0.5 plant-tier frames (Basic → Epic → Legendary → Rare → Super Rare → Ultra Rare → Other World): each step glows more */
+.r-legendary,.r-epic{animation:cardpulse 2.4s ease-in-out infinite}
+@keyframes cardpulse{50%{filter:brightness(1.06)}}
+/* v0.51: plant AND feature cards share these tier frames. v0.5 plant-tier frames (Basic → Epic → Legendary → Rare → Super Rare → Ultra Rare → Other World): each step glows more */
 .r-basic{--fr:#B7D4B5;--fr2:rgba(183,212,181,.9);--rc:#5E825F;--pc:#8DB78A}
-.plant-card.r-rare .card-face{border-width:.36em;border-style:double;box-shadow:0 0 2em .6em rgba(200,224,232,1),0 .6em 1.4em rgba(70,50,20,.2),inset 0 0 0 .2em #F6FBFC,inset 0 0 0 .3em #9CC6D6}
-.plant-card.r-rare .card-face::before,.plant-card.r-rare .card-face::after{content:"✧";position:absolute;color:#7FB3C6;font-size:1em;top:.05em;left:.35em}
-.plant-card.r-rare .card-face::after{left:auto;right:.35em}
+.r-rare .card-face{border-width:.36em;border-style:double;box-shadow:0 0 2em .6em rgba(200,224,232,1),0 .6em 1.4em rgba(70,50,20,.2),inset 0 0 0 .2em #F6FBFC,inset 0 0 0 .3em #9CC6D6}
+.r-rare .card-face::before,.r-rare .card-face::after{content:"✧";position:absolute;color:#7FB3C6;font-size:1em;top:.05em;left:.35em}
+.r-rare .card-face::after{left:auto;right:.35em}
 .r-superrare{--fr:#3D5A40;--fr2:#F5D07A;--rc:#3D5A40;--pc:#6E9A62}
 .r-superrare .card-face{border-width:.36em;border-style:double;background:radial-gradient(120% 70% at 50% 0%,#EEF6EA,#FFF9F0 65%);
   box-shadow:0 0 2.2em .75em rgba(183,212,181,.95),0 0 .9em .2em rgba(245,208,122,.8),0 .6em 1.4em rgba(70,50,20,.2),inset 0 0 0 .2em #FFF9F0,inset 0 0 0 .3em #F5D07A}
@@ -241,7 +241,7 @@ i[data-icon] svg{width:100%;height:100%}
   box-shadow:0 0 2.8em 1.1em rgba(200,200,255,.95),0 0 1.2em .4em rgba(245,208,122,.95),0 .6em 1.4em rgba(70,50,20,.2),inset 0 0 1.2em rgba(200,224,232,.9)}
 .r-otherworld .card-face::before,.r-otherworld .card-face::after{content:"☾";position:absolute;color:#8C9BE0;font-size:1em;top:.05em;left:.35em;text-shadow:0 0 .4em #fff}
 .r-otherworld .card-face::after{content:"✺";left:auto;right:.35em;color:#D9A93F}
-.r-superrare,.r-ultra,.plant-card.r-rare{animation:pulse 2.4s ease-in-out infinite}
+.r-superrare,.r-ultra,.r-rare{animation:cardpulse 2.4s ease-in-out infinite}
 .r-otherworld{animation:owglow 2.2s ease-in-out infinite}
 @keyframes owglow{50%{filter:brightness(1.1) saturate(1.15) drop-shadow(0 0 .6em rgba(220,215,255,.95))}}
 /* tier tags & chips (Market, collection, pack odds) */
@@ -262,9 +262,13 @@ i[data-icon] svg{width:100%;height:100%}
   box-shadow:0 .6em 1.4em rgba(70,50,20,.25),inset 0 0 0 .3em #FFFBF3,inset 0 0 0 .4em var(--blush)}
 .back img{width:62%;mix-blend-mode:multiply;opacity:.9}
 .back span{position:absolute;bottom:.8em;left:0;right:0;text-align:center;font-family:'Fraunces';font-weight:700;color:var(--moss);font-size:1.05em}
-.flip.hint-rare .back{box-shadow:0 0 1.4em .4em rgba(160,205,222,.95)}
-.flip.hint-epic .back{box-shadow:0 0 1.6em .5em rgba(247,170,175,.95)}
-.flip.hint-legendary .back{box-shadow:0 0 2em .8em rgba(245,200,100,1)}
+/* v0.51: face-down glow hints follow the shared tier order (Epic → Other World) */
+.flip.hint-epic .back{box-shadow:0 0 1.4em .4em rgba(247,170,175,.9)}
+.flip.hint-legendary .back{box-shadow:0 0 1.7em .55em rgba(245,200,100,.95)}
+.flip.hint-rare .back{box-shadow:0 0 1.9em .65em rgba(160,205,222,1)}
+.flip.hint-superrare .back{box-shadow:0 0 2.1em .75em rgba(183,212,181,1),0 0 .8em .2em rgba(245,208,122,.9)}
+.flip.hint-ultra .back{box-shadow:0 0 2.3em .85em rgba(196,160,232,1)}
+.flip.hint-otherworld .back{box-shadow:0 0 2.7em 1em rgba(200,200,255,1),0 0 1.1em .35em rgba(245,208,122,1)}
 .flip:not(.flipped){animation:hover 2.2s ease-in-out infinite}
 @keyframes hover{50%{transform:translateY(-4px)}}
 
