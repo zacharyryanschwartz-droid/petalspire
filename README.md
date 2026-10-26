@@ -82,6 +82,7 @@ Price = raw × (1.6 + 0.25 × (tier − 1)); jelly ×1.08, butters/preserves ×1
 | Plum Sauce (4) | 64 | 118 | | Crystal Apple Jelly (2) | 440 | 1473 |
 
 ### Also since v0.51
+- **Follow us** (Settings): buttons for Facebook, Instagram and X open each page in a new tab and give **1 free Jewel per platform, once** (3 max). Claims are kept in the save, so they can't be claimed twice; claimed buttons show ✓ Claimed.
 - **Crate Shelf**: a restored Old Crate is now an item in Bag › Finds. **Install** puts it on the Farm Stand at once: a stacked-crate shelf appears beside the counter, with jars on it once the stand holds more than 12, and shelf space goes **12 → 16**. **Take out** (in the Bag or the Stand panel) returns it to the Bag; anything over 12 goes back to your Bag. Old saves keep an already-working shelf installed; a shelf that was stuck in the Bag can now be installed.
 - The Tincture Stand and Essential Oil Stand use drawn icons (dropper bottles on a stand, a copper still) everywhere, like every other feature.
 - **Tea Stand** (Epic card, any owned plot): blend 3 dried herbs. Price = round(Σ dried × (1.4 + 0.35 × (avg tier − 1)) × 1.1 if all different); brew 15 + 10 × (tier − 1) s. Lavender Tea 59 (vs 42 dried) · Lavender + Rosemary + Tulsi 689 (vs 316) · Moonflower Starlight 11319 (vs 3234) · Moonflower + Crystal Rose + Sunpetal 13583.

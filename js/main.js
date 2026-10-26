@@ -4,7 +4,7 @@ import { createWorld } from './world.js';
 import { buildPlant } from './plants.js';
 import { parkLv, hydroId, HYDROSOL, NON_CARDS, ROAD_SCRAP, TINC_DUP_COINS, SPECIES, FANTASY_SPECIES, PLANT_TIERS, cardTier, FEATURE_TIER_FROM_OLD, TIER_ORDER, PACK_W, DRYING, rollSeeds, FEATURES, CARDS, RARITY, ITEMS, SELL_ORDER, TIPS, RESALE, PACKS, PACK_JEWELS, JEWEL_EXCHANGE, JEWEL_DROP, PARKING, BILLBOARD, WINDMILL, DUP_COINS, SUPPLY_CARDS, SUPPLY_DUP, WATER_TRUCK, CARD_LEVELS, RACK_SLOTS, DRY_S, BARREL, BASES, TINCTURE, STILL, oilId, tinctureId, TINCTURE_NAMES,
   WOOD, BED_COSTS, STAND_CAP, MARKET_GOAL, WATER_REGEN_S, WATER_REGEN_MAX, STARTER, STARTER_FILL, STARTER_JEWELS,
-  BUILDS, FINDS, FIND_IDS, FIND_CHANCE, SAPLING_CHANCE, RESTORE_HURRY_JEWELS, ATMOS_STEP, ATMOS_MAX, TREE, SHOP, JEWEL_BUNDLES, NO_ADS_BUNDLE, ADS, ADS_MODE, OTHER_GAMES, SHADE, TEA, teaInfo, teaId, teaSps, registerTea, DRY_TIER_S, PACK_W_ORCH, TREES, TREE_IDS, PRESS, FRUITSTAND, SEED_BAGS, bagId } from './data.js';
+  BUILDS, FINDS, FIND_IDS, FIND_CHANCE, SAPLING_CHANCE, RESTORE_HURRY_JEWELS, ATMOS_STEP, ATMOS_MAX, TREE, SHOP, JEWEL_BUNDLES, NO_ADS_BUNDLE, ADS, ADS_MODE, OTHER_GAMES, SOCIALS, FOLLOW_REWARD, SHADE, TEA, teaInfo, teaId, teaSps, registerTea, DRY_TIER_S, PACK_W_ORCH, TREES, TREE_IDS, PRESS, FRUITSTAND, SEED_BAGS, bagId } from './data.js';
 import { ROAD, LOTS, SIGNS, LOT_FOR_SALE, LOT_PRICES, SITES, OBSTACLES, SPOTS, PARK_X, BEHIND, FRONT, BED_N, TILE, SITE_HALF, siteById, obstacleById, inSite, lotCenter, lotAt, ORCHARD_TREE_SPOTS, OWNABLE_LOTS, LOCATIONS, ORCHARD_PRICE, ORCH_X } from './layout.js';
 import { ICONS, itemIcon, FEATURE_ART, findIcon, decorIcon } from './icons.js';
 import { Payments } from './payments.js';
@@ -58,7 +58,7 @@ function freshState() {
     // v0.3: things are built, not unlocked
     barrel: false, standBuilt: false, rackAvail: false, rackBuilt: false, marketAvail: false, marketBuilt: false, marketProj: null,
     finds: {}, restoring: [], decorInv: {}, bonus: { can: false, barrow: false, crate: false },
-    decor: [], ground: [], trees: [], looted: {}, uid: 1, noAds: false, adRewardAt: 0, irrigN: 0, irrigBeds: [], irrigFrom: {},
+    decor: [], ground: [], trees: [], looted: {}, uid: 1, noAds: false, follows: {}, adRewardAt: 0, irrigN: 0, irrigBeds: [], irrigFrom: {},
     // v0.4: one rain barrel per plot ({ lot: { x, z, w, at } }), Tincture Stand
     barrels: {}, barrelInv: 0, tinctureBuilt: false, tinc: Array(TINCTURE.slots).fill(null), tincBase: 'glycerin',
     stillBuilt: false, stills: Array(STILL.slots).fill(null), stillPos: null,
@@ -1586,6 +1586,21 @@ function renderPanel() {
   if (panel === 'jewels') { title.innerHTML = `Jewel Shop${Payments.isTest ? ' <span class="test-tag">Test mode</span>' : ''}`; body.innerHTML = jewelsHTML(); }
   fillIcons(body); fillIcons(title); body.scrollTop = st;
 }
+// v0.6: drawn brand marks for the Follow us buttons (brand colours, same soft hand-drawn style as js/icons.js)
+const SOCIAL_ART = {
+  facebook: `<svg viewBox="0 0 48 48" aria-hidden="true"><circle cx="24" cy="24" r="21" fill="#1877F2" stroke="#0E5BC4" stroke-width="2"/><path d="M26.6 39V26.6h4.2l.7-4.9h-4.9v-3.1c0-1.4.5-2.4 2.5-2.4h2.6v-4.4c-.5-.1-2-.2-3.8-.2-3.8 0-6.3 2.3-6.3 6.5v3.6h-4.2v4.9h4.2V39" fill="#fff"/></svg>`,
+  instagram: `<svg viewBox="0 0 48 48" aria-hidden="true"><defs><radialGradient id="igg" cx="0.3" cy="1.05" r="1.25"><stop offset="0" stop-color="#FFD776"/><stop offset=".25" stop-color="#F9A24B"/><stop offset=".5" stop-color="#E9466F"/><stop offset=".78" stop-color="#C13584"/><stop offset="1" stop-color="#6A4BD6"/></radialGradient></defs><rect x="3" y="3" width="42" height="42" rx="12" fill="url(#igg)" stroke="#A8326E" stroke-width="1.5"/><rect x="11.5" y="11.5" width="25" height="25" rx="7.5" fill="none" stroke="#fff" stroke-width="3"/><circle cx="24" cy="24" r="6" fill="none" stroke="#fff" stroke-width="3"/><circle cx="31.6" cy="16.4" r="1.9" fill="#fff"/></svg>`,
+  x: `<svg viewBox="0 0 48 48" aria-hidden="true"><rect x="3" y="3" width="42" height="42" rx="12" fill="#14171A" stroke="#000" stroke-width="1.5"/><path d="M13 13h7.2l5.4 7.3L32 13h3.2l-8.1 9.3L35.5 35h-7.2l-5.8-7.8L15.6 35h-3.2l8.6-9.8z" fill="#fff"/><path d="M17.3 15.2h2l11.5 17.6h-2z" fill="#14171A"/></svg>`,
+};
+function claimFollow(id) {
+  const p = SOCIALS.find((q) => q.id === id); if (!p) return false;
+  S.follows = S.follows || {};
+  if (S.follows[id]) { toast(`Thanks again for following on ${p.name}!`); return false; }
+  S.follows[id] = Date.now(); S.jewels += FOLLOW_REWARD; save(); hud();
+  toast(`<i data-icon="jewel"></i> +${FOLLOW_REWARD} Jewel, thanks for following!`); buzz([15, 30, 15]);
+  if (panel === 'settings') renderPanel();
+  return true;
+}
 function settingsHTML() {
   const games = OTHER_GAMES.map((g) => `<div class="game-row" data-game="${g.id}"><div class="game-art">${gameArt(g.id)}</div>
     <div class="meta"><b>${g.name}${g.status === 'soon' ? ' <span class="soon-tag">Coming soon</span>' : ''}</b><small class="gr-tag">${g.tagline}</small><small>${g.blurb}</small></div>
@@ -1593,7 +1608,13 @@ function settingsHTML() {
   const adsRow = ADS_MODE === 'off' ? '' : S.noAds
     ? `<div class="row"><div class="ico"><i data-icon="heart" style="width:34px;height:34px"></i></div><div class="meta"><b>No More Ads · Owned</b><small>Thank you! Banners and partner ads are switched off.</small></div></div>`
     : `<div class="row"><div class="ico"><i data-icon="jewel" style="width:34px;height:34px"></i></div><div class="meta"><b>No More Ads + ${NO_ADS_BUNDLE.n} Jewels</b><small>Removes the banner and partner ads · ${NO_ADS_BUNDLE.price}</small></div><div class="acts"><button class="btn btn-blush sm" data-act="open-jewels">View</button></div></div>`;
-  return `<div class="sec-title" id="play-other-games">Play Other Games</div><div class="list games">${games}</div>
+  const follow = SOCIALS.map((p) => { const got = !!S.follows?.[p.id];
+    return `<a class="follow-btn ${p.id}${got ? ' claimed' : ''}" href="${p.url}" target="_blank" rel="noopener" data-follow="${p.id}" aria-label="Follow Petalspire on ${p.name}">
+      <span class="fb-ico">${SOCIAL_ART[p.id]}</span><span class="fb-txt"><b>${p.name}</b><small>${p.handle}</small></span>
+      <em>${got ? '✓ Claimed' : `+${FOLLOW_REWARD} <i data-icon="jewel"></i>`}</em></a>`; }).join('');
+  const nGot = SOCIALS.filter((p) => S.follows?.[p.id]).length;
+  return `<div class="sec-title" id="follow-us">Follow us</div><p class="muted follow-note">${nGot < SOCIALS.length ? `Follow Petalspire for news and sneak peeks — get ${FOLLOW_REWARD} free Jewel for each one (once per platform).` : 'Thanks for following Petalspire everywhere!'}</p><div class="follow-list">${follow}</div>
+    <div class="sec-title" id="play-other-games">Play Other Games</div><div class="list games">${games}</div>
     ${adsRow ? `<div class="sec-title">Ads</div><div class="list">${adsRow}</div>` : ''}
     <div class="sec-title">Help</div><div class="list"><button class="row set-btn" data-act="tips-again"><b>Show tips again</b><small>Replay the helpful hints from the start</small></button></div>
     <div class="sec-title">Your save</div><div class="list"><div class="row"><div class="meta"><b>Autosaves on this device</b><small>Progress is kept in this browser, even while the game is closed.</small></div></div>
@@ -2250,6 +2271,7 @@ function askBuyJewels(id) {
 }
 
 $('#panel-body').addEventListener('click', (e) => {
+  const fl = e.target.closest('[data-follow]'); if (fl) { claimFollow(fl.dataset.follow); return; }   // the link itself opens the page in a new tab
   const b = e.target.closest('button, .coll .card'); if (!b) return;
   if (b.dataset.tab) { marketTab = b.dataset.tab; renderPanel(); return; }
   if (b.dataset.bag) { bagTab = b.dataset.bag; renderPanel(); return; }
@@ -2749,7 +2771,7 @@ const V = (x, y, z) => new THREE.Vector3(x, y, z);
 window.__ps = {
   BUILD, get fromBuild() { return fromBuild; },
   TIPS, JEWEL_DROP, obsState, PACKS,
-  hud, syncBarrels, lotRoofs, standsLine, buildBarrelAt: (lot, x, z) => buildBarrel(lot, x, z), openMap, closeMap, travel, buyOrchard, setLoc, loc: () => curLoc(), orchardLocked, mapPlaces: () => MAP_PLACES.map((p) => ({ id: p.id, name: p.name, soon: !!p.soon, state: placeState(p) })), ORCHARD_PRICE, casterIds: () => casters().map((c) => c.id + (c.h != null ? ":box" : ":tree")), checkGoals, regenBarrels, feedLot, reachLots,  get barrelReachTargets() { return W.bedTargets.children.map((g) => ({ b: g.userData.b, ok: g.userData.ok })); }, barrelRoof, lotRoofs, barrelStands, barrelPerTick, get gutterLots() { return [...W.gutters.keys()]; }, gutterPipes(lot) { return W.gutters.get(lot)?.userData.pipes || 0; },
+  hud, syncBarrels, lotRoofs, standsLine, buildBarrelAt: (lot, x, z) => buildBarrel(lot, x, z), openMap, closeMap, travel, buyOrchard, claimFollow, SOCIALS, setLoc, loc: () => curLoc(), orchardLocked, mapPlaces: () => MAP_PLACES.map((p) => ({ id: p.id, name: p.name, soon: !!p.soon, state: placeState(p) })), ORCHARD_PRICE, casterIds: () => casters().map((c) => c.id + (c.h != null ? ":box" : ":tree")), checkGoals, regenBarrels, feedLot, reachLots,  get barrelReachTargets() { return W.bedTargets.children.map((g) => ({ b: g.userData.b, ok: g.userData.ok })); }, barrelRoof, lotRoofs, barrelStands, barrelPerTick, get gutterLots() { return [...W.gutters.keys()]; }, gutterPipes(lot) { return W.gutters.get(lot)?.userData.pipes || 0; },
   get tincGrandfathered() { return tincGrandfathered; }, tincProblem, tincSpots, buildTincture, placeTincture, buildStill, placeStill, distill, collectOil, STILL, TEA, teaInfo, teaId, teaSps, registerTea, buildTea, placeTea, brewTea, collectTea, teaAdd, teaRemove, get teaPick() { return [...teaPick]; }, set teaPick(v) { teaPick = [...v]; }, teaHTML, syncTea, DRY_TIER_S,
   CRAFT, PRESS, FRUITSTAND, TREES, TREE_IDS, SEED_BAGS, bagId, bagSeeds, buildCraft, placeCraft, craftMake, craftCollect, craftHTML, syncCraft, orchardSpots, orchardProblem, plantOrchard, pickTree, syncOrchard, orchStage, orchRipe, orchardTreeHTML, startTreePlace, orchardLocked, packW, cardOdds, tierOdds, featureOdds, drawNonBasic, collIds, get sunflowerRefund() { return sunflowerRefund; }, ORCHARD_TREE_SPOTS,
   RESALE, sellPlaced, stockAntique, sellRestored, installShelf, uninstallShelf, shelfOn, syncShelf, SHELF_BONUS, STAND_CAP, focusThing, get atmosphere() { return atmosphere(); }, get standCap() { return standCap(); },

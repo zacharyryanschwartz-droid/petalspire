@@ -581,6 +581,13 @@ export const ADS = {
 };
 
 // Settings → Play Other Games. Add more entries here; status 'soon' | 'live' (live entries need a url).
+// v0.6: follow Petalspire on social media. Each platform's button opens the page in a new tab and gives 1 Jewel, once per platform (saved).
+export const SOCIALS = [
+  { id: 'facebook', name: 'Facebook', handle: 'Petalspire', url: 'https://www.facebook.com/profile.php?id=61595699559019' },
+  { id: 'instagram', name: 'Instagram', handle: '@petalspiregame', url: 'https://www.instagram.com/petalspiregame/' },
+  { id: 'x', name: 'X', handle: '@petalspiregame', url: 'https://x.com/petalspiregame' },
+];
+export const FOLLOW_REWARD = 1;   // Jewels per platform
 export const OTHER_GAMES = [
   { id: 'market_plot', name: 'Market Plot', status: 'soon', tagline: 'Invent it. Grow it. Sell it.',
     blurb: 'A cozy invent-and-market farming game: dream up new crops and handmade goods, then run your own little market.', url: null },

@@ -765,7 +765,19 @@ body.modal-open .tooldock, body.modal-open .goal, body.modal-open .bubble{visibi
 .travel-fade{position:absolute;inset:0;z-index:40;background:#F3EAD3;opacity:0;pointer-events:none!important}
 .travel-fade.go{animation:tfade .75s ease-in-out}
 @keyframes tfade{0%{opacity:0}35%{opacity:1}100%{opacity:0}}
-.goal{right:calc(var(--sar) + 72px)!important}
+.goal:not(.collapsed){right:calc(var(--sar) + 72px)!important}
 .shelf-strip{display:flex;align-items:center;gap:8px;background:#FFF6E6;border:1.5px dashed #D9A93F;border-radius:12px;padding:6px 8px;margin:0 2px 8px}
 .shelf-strip svg{width:32px;height:32px;flex:none}.shelf-strip span{flex:1;font-size:13px}
 .shelf-row.on{background:linear-gradient(90deg,rgba(245,208,122,.18),transparent)}
+/* v0.6: Follow us (Settings) */
+.follow-note{margin:2px 4px 8px;font-size:13px}
+.follow-list{display:grid;gap:8px}
+.follow-btn{display:grid;grid-template-columns:46px 1fr auto;align-items:center;gap:10px;padding:9px 12px 9px 9px;border-radius:18px;text-decoration:none;color:var(--moss);background:linear-gradient(90deg,#FFF3F1,#FFF9F0);border:1.5px solid var(--blush);box-shadow:0 2px 0 rgba(90,60,40,.08);-webkit-tap-highlight-color:transparent}
+.follow-btn:active{transform:translateY(1px)}
+.follow-btn .fb-ico svg{width:46px;height:46px;display:block}
+.follow-btn .fb-txt b{display:block;font-family:'Fraunces',serif;font-weight:700;font-size:17px}
+.follow-btn .fb-txt small{display:block;font-size:12.5px;font-weight:600;color:var(--ink-soft)}
+.follow-btn em{font-style:normal;display:flex;align-items:center;gap:4px;font-weight:800;font-size:14px;padding:6px 11px;border-radius:999px;background:linear-gradient(180deg,#FFE7A3,#F4C35A);color:#6B4A12;border:1.5px solid #D9A441}
+.follow-btn em i{width:18px;height:18px;display:inline-block}
+.follow-btn.claimed{opacity:.88;background:#F4F1E8;border-color:#DCD5C2}
+.follow-btn.claimed em{background:#E3EED8;border-color:#A9C493;color:#3F6332}
