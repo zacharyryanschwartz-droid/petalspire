@@ -611,9 +611,32 @@ const BUILDERS = { lavender, calendula, chamomile, heartvine, sunpetal, moonflow
 export const PLANT_BUILDERS = Object.keys(BUILDERS);
 // Glow by tier (data.js PLANT_TIERS[].glow): 0 none · 1 soft halo (Rare, Super Rare) · 2 shimmer (Ultra Rare) · 3 Other World: brightest halo + motes
 const GLOW = { 1: { size: 0.9, op: 0.22 }, 2: { size: 1.2, op: 0.32 }, 3: { size: 1.6, op: 0.5 } };
-export function buildPlant(species, stage) {
+// v0.61: the Blue Lotus grows in a soft wooden water barrel instead of a soil mound. fill: 0 empty · 1 half · 2 full
+export const LOTUS_BARREL = { r: 0.3, h: 0.44, waterY: (fill) => 0.05 + (fill / 2) * 0.33 };
+function lotusBarrel(fill) {
+  const g = new THREE.Group(); g.name = 'lotusBarrel'; g.userData.fill = fill; const { r, h } = LOTUS_BARREL;
+  const wood = mat('#B9875A', { roughness: 0.85 }), woodIn = mat('#7E5638', { roughness: 0.9, side: THREE.BackSide }), hoopM = mat('#6E5A48', { roughness: 0.6, metalness: 0.2 });
+  const shell = shadowy(new THREE.Mesh(new THREE.CylinderGeometry(r, r * 0.9, h, 18, 1, true), wood)); shell.position.y = h / 2; g.add(shell);
+  const inner = new THREE.Mesh(new THREE.CylinderGeometry(r * 0.94, r * 0.85, h - 0.01, 18, 1, true), woodIn); inner.position.y = h / 2; g.add(inner);
+  const floor = new THREE.Mesh(new THREE.CircleGeometry(r * 0.86, 18), mat('#6A4A30')); floor.rotation.x = -Math.PI / 2; floor.position.y = 0.02; g.add(floor);
+  for (let k = 0; k < 9; k++) { const a = (k / 9) * Math.PI * 2; const st = new THREE.Mesh(new THREE.BoxGeometry(0.012, h * 0.98, 0.012), mat('#9A6C45')); st.position.set(Math.cos(a) * r * 0.97, h / 2, Math.sin(a) * r * 0.97); g.add(st); }
+  for (const [y, rr] of [[0.1, r * 0.93], [h - 0.07, r * 0.99]]) { const hoop = shadowy(new THREE.Mesh(new THREE.TorusGeometry(rr + 0.008, 0.016, 6, 24), hoopM)); hoop.rotation.x = Math.PI / 2; hoop.position.y = y; g.add(hoop); }
+  const rim = new THREE.Mesh(new THREE.TorusGeometry(r * 0.98, 0.022, 6, 24), mat('#C99A6B')); rim.rotation.x = Math.PI / 2; rim.position.y = h; g.add(rim);
+  const water = new THREE.Mesh(new THREE.CircleGeometry(r * 0.9, 20), mat('#7FB9D6', { roughness: 0.15, metalness: 0.1, transparent: true, opacity: 0.92, emissive: '#3E7FA0', emissiveIntensity: 0.12 }));
+  water.name = 'lotusWater'; water.rotation.x = -Math.PI / 2; water.position.y = LOTUS_BARREL.waterY(fill); water.visible = fill > 0; g.add(water);
+  return g;
+}
+function lotusInBarrel(stage, fill) {
+  const g = new THREE.Group(); g.add(lotusBarrel(fill)); g.userData.lotusFill = fill;
+  const y = LOTUS_BARREL.waterY(Math.max(fill, 1));
+  if (stage === 0) { const pod = new THREE.Mesh(new THREE.SphereGeometry(0.045, 8, 6), mat(SEED_COLORS.bluelotus)); pod.position.y = fill ? y + 0.01 : 0.06; g.add(pod); }
+  else { const p = bluelotus(stage); p.scale.setScalar(0.8); p.position.y = y - 0.005; g.add(p); }
+  return g;
+}
+export function buildPlant(species, stage, opts = {}) {
   let g;
-  if (stage === 0) g = seedMound(SEED_COLORS[species] || '#B08A4E');
+  if (species === 'bluelotus') g = lotusInBarrel(stage, opts.fill ?? 2);
+  else if (stage === 0) g = seedMound(SEED_COLORS[species] || '#B08A4E');
   else g = (BUILDERS[species] || lavender)(stage);
   const sp = SPECIES[species], lvl = sp ? PLANT_TIERS[sp.tier]?.glow || 0 : 0;
   if (lvl && stage >= 2) {

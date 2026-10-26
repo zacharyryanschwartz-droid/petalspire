@@ -190,8 +190,8 @@ export const FEATURES = {
   },
   fruitstand: {
     id: 'fruitstand', name: 'Fruit Stand', rarity: 'epic', type: 'Feature · Crafting',
-    price: 120, stats: { Growth: 1, Beauty: 4, Yield: 5, Atmosphere: 5 },   // v0.6
-    blurb: 'A canning kitchen under a striped awning. Turn orchard fruit into Canned Fruit, Jelly, Fruit Butter and Sauce — Apple Sauce, Peach Butter, Cherry Jelly, Lemon Curd, glowing Moonpeach Preserves… Buy it and place it on any plot you own (20 Wood).',
+    price: 0, stats: { Growth: 1, Beauty: 4, Yield: 5, Atmosphere: 5 },   // v0.61: free with the Orchard (was 120)
+    blurb: 'A canning kitchen under a striped awning. Turn orchard fruit into Canned Fruit, Jelly, Fruit Butter and Sauce — Apple Sauce, Peach Butter, Cherry Jelly, Lemon Curd, glowing Moonpeach Preserves… Free with the Orchard: place it on any Orchard plot. Sell its jars at the Orchard Stand.',
   },
   billboard: {
     id: 'billboard', name: 'Roadside Billboard', rarity: 'epic', type: 'Feature · Advertising',
@@ -218,7 +218,7 @@ export const FEATURES = {
 };
 
 // v0.52: the Tincture Stand is a goal reward now, so it is not a collectable card (and never in packs).
-export const NON_CARDS = ['tincture'];
+export const NON_CARDS = ['tincture', 'fruitstand'];   // v0.61: the Fruit Stand is free with the Orchard, no longer a pack card
 export const CARDS = { ...SPECIES, ...TREES, ...Object.fromEntries(Object.entries(FEATURES).filter(([k]) => !NON_CARDS.includes(k))) };
 
 export const RARITY = {
@@ -457,6 +457,18 @@ for (const [C, pre] of [[PRESS, 'press_'], [FRUITSTAND, 'jar_']]) for (const r o
   r.item = pre + r.id; r.sell ??= Math.round(r.n * inSell * C.mult(o) * C.kinds[r.kind]); r.s ??= 40 + 20 * (o - 1); r.raw = r.n * inSell;
   ITEMS[r.item] = { name: r.name, sell: r.sell, icon: [r.icon, r.color], craft: true, glow: r.glow || (TREES[r.src] || SPECIES[r.src]).glow || 0 };
 }
+// v0.61: where each good can be SOLD. Fruit and Fruit Stand jars only at the Orchard Stand, pressed oils at both stands,
+// everything else (flowers, herbs, tinctures, essential oils, teas, dried herbs, hydrosols, seeds, antiques) only at Home.
+export const itemLoc = (id) => (id.startsWith('fruit_') || id.startsWith('jar_') ? 'orchard' : id.startsWith('press_') ? 'both' : 'home');
+export const sellsAt = (id, loc) => { const w = itemLoc(id); return w === 'both' || w === loc; };
+// v0.61: the Orchard Stand — the Orchard's selling stand (like the Home Farm Stand), built on its spot by the Orchard road
+export const ORCH_STAND = { coins: 300, wood: 30, cap: 12 };
+// v0.61: Garden Workers (after every Home plot is bought). One per plot; a shift is 6 real hours (offline time counts).
+// hire = the price of the last Home plot; wage = about a tenth of what a busy plot earns in 6 hours.
+// v0.61: every crafting stand can also be unlocked with coins (no real money needed). In the order players reach them;
+// only the next one on the ladder is offered. A Card Pack find (or the Tincture goal reward) is still the faster, luckier route.
+export const STAND_UNLOCK = [{ id: 'tincture', coins: 1000 }, { id: 'still', coins: 2500 }, { id: 'teastand', coins: 5000 }, { id: 'press', coins: 8000 }];
+export const WORKER = { hire: 2000, wage: 500, shiftH: 6, stepS: 5, catchStepS: 120 };
 const kindRank = (id) => ['oil_', 'press_', 'jar_', 'tea_', 'tinc_', 'hydro_', 'dried_', 'fruit_', 'flower_', 'bag', 'seed_'].findIndex((p) => id.startsWith(p));
 export const SELL_ORDER = Object.keys(ITEMS).sort((a, b) => kindRank(a) - kindRank(b) || ITEMS[b].sell - ITEMS[a].sell || (a.startsWith('tinc_g') ? -1 : 1));
 
@@ -504,7 +516,7 @@ export const BUILDS = {
   still: { name: 'Essential Oil Stand', wood: 25, coins: 0 },
   teastand: { name: 'Tea Stand', wood: 20, coins: 0 },   // v0.52
   press: { name: 'Pressed Oil Stand', wood: 20, coins: 0 },   // v0.6
-  fruitstand: { name: 'Fruit Stand', wood: 20, coins: 0 },   // v0.6
+  fruitstand: { name: 'Fruit Stand', wood: 0, coins: 0 },   // v0.61: free, built right away at the Orchard
   parking: { name: 'Parking Lot', wood: 20, coins: 0 },
   windmill: { name: 'Windmill', wood: 20, coins: 0, scrap: 5 },   // v0.52: + 5 Scrap Metal (and the 160-coin card price when bought)
   billboard: { name: 'Roadside Billboard', wood: 15, coins: 0 },
@@ -584,7 +596,7 @@ export const ADS = {
 // v0.6: follow Petalspire on social media. Each platform's button opens the page in a new tab and gives 1 Jewel, once per platform (saved).
 export const SOCIALS = [
   { id: 'facebook', name: 'Facebook', handle: 'Petalspire', url: 'https://www.facebook.com/profile.php?id=61595699559019' },
-  { id: 'instagram', name: 'Instagram', handle: '@petalspiregame', url: 'https://www.instagram.com/petalspiregame/' },
+  { id: 'instagram', name: 'Instagram', handle: '@petal_spire_game', url: 'https://www.instagram.com/petal_spire_game/' },
   { id: 'x', name: 'X', handle: '@petalspiregame', url: 'https://x.com/petalspiregame' },
 ];
 export const FOLLOW_REWARD = 1;   // Jewels per platform

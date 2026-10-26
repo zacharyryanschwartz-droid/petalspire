@@ -21,12 +21,66 @@ This is a **prototype**: version numbers stay below 1.0 until the first official
 
 Drag with one finger to pan, pinch to zoom, and twist with two fingers to turn. On desktop, right-drag or shift-drag turns the view.
 
-## New in v0.61 — the Map unlocks with your land
+## New in v0.61 — the Orchard grows up, and Gardeners
 
-v0.61 (build `0.61`, label "v0.61 prototype") is v0.6 plus one change:
-- The **Map is locked until all 6 Home plots are bought**. Until then the Map button is greyed out with a gold lock badge, and tapping it shows "Buy all Home plots to unlock the Map · n/6 plots".
-- Buying the 6th plot unlocks it with a little bounce, sparkles and the toast "All Home plots are yours — the Map is unlocked!". The unlock is kept in the save.
-- Old saves that already own every Home plot (or The Orchard) get the Map unlocked on load.
+v0.61 (build `0.61`, label "v0.61 prototype") is v0.6 plus the changes below. Old saves migrate on load with nothing lost.
+
+### The Map unlocks with your land
+- The **Map button is hidden until all 6 Home plots are bought**. Buying the 6th plot reveals it with a bounce, sparkles and the toast "All Home plots are yours — the Map is unlocked!". The unlock is kept in the save.
+- Old saves that already own every Home plot (or The Orchard) get the Map on load.
+
+### The Orchard
+- A **road with passing cars** runs along the Orchard.
+- **Orchard plots for sale** at escalating prices: **4000 coins + 40 Wood → 6000 + 60 → 9000 + 80**.
+- The **Orchard Stand** replaces the Orchard Shed. It is a glowing blueprint in the Build menu (**300 coins + 30 Wood**, 12 shelf slots) with its own tappable panel, and Orchard visitors buy from it.
+- **Roof rule:** the Orchard rain barrel is fed by the Orchard Stand's roof, so it collects nothing until the stand is built. Saves that already owned The Orchard keep their barrel working.
+- The **Fruit Stand is free and Orchard-only**. A Fruit Stand bought in an older save is refunded 120 coins (and duplicates are removed).
+
+### Stands, menus and selling by location
+- The **Pressed Oil Stand** can go at Home or the Orchard. All other crafting stands are Home-only.
+- The **Build, Market and Bag menus follow where you are** and show only what applies there.
+- **Items sell only where they belong:** Bag items carry a Home or Orchard tag. Fruit sells at the Orchard Stand; flowers and herbal products sell at the Farm Stand. Fruit left on the Home stand goes back to the Bag.
+
+### Every stand can be unlocked with coins
+- No real money is ever needed. Each crafting stand still unlocks the usual way: its card from a Card Pack, or the free goal reward for the Tincture Stand. It can also be unlocked with coins, on a rising ladder in the order players usually reach the stands:
+
+| Stand | Coin unlock | Where |
+|---|---|---|
+| Tincture Stand | 1,000 | Home only |
+| Essential Oil Stand | 2,500 | Home only |
+| Tea Stand | 5,000 | Home only |
+| Pressed Oil Stand | 8,000 | Home or Orchard |
+
+- **Only the next stand on the ladder is offered**, as one card in Build and one row in the Market, with its price. The next one appears once that stand is unlocked, whether by coins or by finding its card. The offer only shows where that stand can be built.
+- After unlocking, the stand is bought and placed as before (for example, the Tea Stand is still 130 coins + 20 Wood to place).
+- Stands that were already free stay free: the Farm Stand and Drying Rack, and the Fruit Stand, which comes with the Orchard. The Orchard Stand has always cost coins (300 + 30 Wood).
+
+### Follow us
+- The Instagram handle is now **@petal_spire_game** (https://www.instagram.com/petal_spire_game/).
+- 4:5 (1080×1350) crops for Instagram feed posts are in `screenshots/ig/`.
+
+### Blue Lotus barrel
+- A Blue Lotus grows in a barrel that needs **two waterings** (half full → full), with a visible water level. It only grows when full. The barrel is removed at harvest.
+
+### Locked items are hidden
+- Anything you can't use yet is **hidden everywhere** (Build, Market, Collection, recipes) instead of being shown greyed out. Empty lists show a short hint about what unlocks more.
+
+### Gardeners (workers)
+- **Unlock:** Gardeners appear (Build › Your land, and on each plot's sheet) once all Home plots are bought. Before that they are hidden.
+- **Hire: 2000 coins** per Gardener, at most one per plot. A small straw-hatted Gardener with a watering can appears beside that plot's bed.
+- **What they do on their plot, automatically:**
+  - harvest ready plants and replant the same species from your Bag (they skip it if you have no seeds);
+  - water when needed, including both fills of the Blue Lotus barrel;
+  - pick ripe fruit trees;
+  - run the stands on that plot (Drying Rack, Tincture, Still, Tea and crafting stands) with the normal recipes, and collect what they make;
+  - restock the stand that sells those products, following the sell-by-location rule.
+  - Gardeners keep one seed per bed tile for replanting before they spend spare seeds on recipes.
+- **Shift:** a Gardener works **6 real-time hours**, including while the game is closed (caught up on load, like irrigation). Then they stop and show **Needs pay**, with a sign over their head and a gentle toast.
+- **Wage: 500 coins** starts a new 6-hour shift. A busy plot earns several thousand coins in 6 hours, so the wage is roughly a tenth of that. The hire price matches the last Home plot.
+- The plot sheet shows "Gardener · Working · 4h 12m left" (with Details) or "Gardener · Needs pay" (with **Pay 500**). Tapping the Gardener or Details opens a sheet showing the shift progress and that shift's work.
+
+### Screenshots
+`screenshots/69-map-hidden-soon.png`, `70-orchard-road-plots`, `71-orchard-stand-blueprint`, `72-orchard-stand-panel`, `73-build-orchard`, `74-orchard-visitor`, `75-build-home`, `76-home-stand-sell-tags`, `77-lotus-barrel-half`, `79-lotus-barrel-full`, `78/80/82-*-hidden-after` (with `78b/80b/82b-*-locked-before`), `83-worker-working`, `84-worker-panel-working`, `85-worker-needs-pay`, `86-worker-needs-pay-panel`, `87-coin-unlock-next-stand`, `88-coin-unlock-market`.
 
 ## New in v0.6 — the Map, the Orchard, Sunflower seeds, the Pressed Oil Stand and the Fruit Stand
 

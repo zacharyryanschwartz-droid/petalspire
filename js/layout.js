@@ -19,6 +19,10 @@ export const LOTS = {
   // v0.6: The Orchard is its own place on the Map (far from Home, so it reads as a separate scene). Bought on the Map
   // once every Home plot is yours. Sunny open field: 2 raised-bed patches up front, 12 tree spots behind.
   orchard:   { name: 'The Orchard',    x0: 293,   x1: 307,  z0: -10,   z1: 4, away: true },
+  // v0.61: more Orchard land, open meadow (nothing to clear), bought from For Sale signs at the Orchard
+  orchwest:  { name: 'Pear Meadow',    x0: 279,   x1: 293,  z0: -10,   z1: 4, away: true },
+  orcheast:  { name: 'Plum Hollow',    x0: 307,   x1: 321,  z0: -10,   z1: 4, away: true },
+  orchnorth: { name: 'Hilltop Grove',  x0: 293,   x1: 307,  z0: -24,   z1: -10, away: true },
 };
 export const ORCH_X = 300, ORCH_Z = -3;
 export const LOCATIONS = { home: { name: 'Home', target: [-0.3, 0.3, -0.4] }, orchard: { name: 'The Orchard', target: [ORCH_X, 0.3, ORCH_Z - 0.6] } };
@@ -29,13 +33,24 @@ export const BEHIND = { home: 'north', west: 'northwest', east: 'northeast', nor
 export const FRONT = Object.fromEntries(Object.entries(BEHIND).map(([f, b]) => [b, f]));
 export const LOT_FOR_SALE = ['west', 'east', 'north', 'northwest', 'northeast', 'backwoods'];   // the Home plots (the Orchard is bought on the Map)
 export const LOT_PRICES = [150, 300, 600, 1000, 1500, 2000];
-export const OWNABLE_LOTS = [...LOT_FOR_SALE, 'orchard'];
+// v0.61: Orchard plots for sale (in this order of price; any order may be bought): coins + Wood, priced above every Home plot
+export const ORCH_FOR_SALE = ['orchwest', 'orcheast', 'orchnorth'];
+export const ORCH_PLOT_PRICES = [{ coins: 4000, wood: 40 }, { coins: 6000, wood: 60 }, { coins: 9000, wood: 80 }];
+export const ORCH_LOTS = ['orchard', ...ORCH_FOR_SALE];
+export const lotLoc = (lot) => (ORCH_LOTS.includes(lot) ? 'orchard' : 'home');
+export const OWNABLE_LOTS = [...LOT_FOR_SALE, ...ORCH_LOTS];
 export const ORCHARD = 'orchard';
 // 12 tree spots in the back of the Orchard (the front row keeps 2 raised-bed patches)
 export const ORCHARD_TREE_SPOTS = [];
-for (const z of [-3.2, -5.6, -8.0]) for (const x of [-4.5, -1.5, 1.5, 4.5]) ORCHARD_TREE_SPOTS.push({ k: ORCHARD_TREE_SPOTS.length, x: ORCH_X + x, z });
+for (const z of [-3.2, -5.6, -8.0]) for (const x of [-4.5, -1.5, 1.5, 4.5]) ORCHARD_TREE_SPOTS.push({ k: ORCHARD_TREE_SPOTS.length, x: ORCH_X + x, z, lot: 'orchard' });
+// v0.61: 6 more tree spots on each Orchard plot (2 rows of 3); keys 12–17 Pear Meadow, 18–23 Plum Hollow, 24–29 Hilltop Grove
+for (const [lot, zs] of [['orchwest', [-4.0, -7.4]], ['orcheast', [-4.0, -7.4]], ['orchnorth', [-12.6, -15.6]]]) {
+  const cx = (LOTS[lot].x0 + LOTS[lot].x1) / 2;
+  for (const z of zs) for (const dx of [-4.2, 0, 4.2]) ORCHARD_TREE_SPOTS.push({ k: ORCHARD_TREE_SPOTS.length, x: cx + dx, z, lot });
+}
 export const SIGNS = {
   west: [-5.25, -1.7], east: [5.15, -1.9], north: [1.2, -7.4], northwest: [-5.4, -7.4], northeast: [5.4, -7.4], backwoods: [0, -18.4],
+  orchwest: [291.4, 3.0], orcheast: [308.6, 3.0], orchnorth: [300, -11.2],
 };
 
 export const BARREL_SPOT_HOME = [-1.15, 4.25];
@@ -47,8 +62,8 @@ export const SITES = [];
 for (const id of Object.keys(LOTS)) {
   const [cx, cz] = lotCenter(id);
   const xs = id === 'home' ? [-2.15, 2.15] : [cx - 2.3, cx + 2.3];
-  const zs = (id === 'home' || id === 'west' || id === 'east') ? [-0.55, -4.5] : id === 'orchard' ? [1.2] : [cz + 2.2, cz - 2.2];
-  for (const z of zs) for (const x of xs) SITES.push({ id: `${id}-${SITES.filter((s) => s.lot === id).length}`, lot: id, x, z });
+  const zs = (id === 'home' || id === 'west' || id === 'east') ? [-0.55, -4.5] : id === 'orchard' ? [1.2] : id === 'orchnorth' ? [-20.6] : ORCH_LOTS.includes(id) ? [1.0] : [cz + 2.2, cz - 2.2];
+  for (const z of zs) for (const x of (ORCH_LOTS.includes(id) && id !== 'orchard' ? [cx - 3.2, cx + 3.2] : xs)) SITES.push({ id: `${id}-${SITES.filter((s) => s.lot === id).length}`, lot: id, x, z });
 }
 export const siteById = (id) => SITES.find((s) => s.id === id);
 
