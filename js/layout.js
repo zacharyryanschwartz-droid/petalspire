@@ -3,7 +3,8 @@ export const TILE = 1.08;          // tile spacing in a bed
 export const BED_N = 3;            // beds are 3x3 plots
 export const SITE_HALF = 2.0;      // half-size of a bed footprint used for clearing checks
 export const ROAD = { z0: 5.0, z1: 7.8, near: 5.72, far: 7.08 };
-export const SPOTS = { market: [-3.35, 3.75], stand: [0.75, 3.95], rack: [3.6, 3.8], barrel: [-1.15, 4.25], tincture: [3.25, 2.4] };
+export const SPOTS = { market: [-3.35, 3.75], stand: [0.75, 3.95], rack: [3.6, 3.8], barrel: [-1.15, 4.25], tincture: [3.25, 2.4], still: [0, -60], windmill: [0, -70], billboard: [-6.6, 9.3] };
+export const PARK_X = [0.75, -1.75, -4.25];   // v0.41 Parking Lot bays along the near lane (bay 0 = in front of the Farm Stand)   // still: off-map until the player places it (v0.41)
 
 export const LOTS = {
   home:      { name: 'Roadside Lot',   x0: -4.6,  x1: 4.6,  z0: -6.6,  z1: 4.6 },

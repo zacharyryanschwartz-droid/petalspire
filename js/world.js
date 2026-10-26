@@ -1,7 +1,7 @@
 // Petalspire v0.4: scene, environment, lots & woods, raised beds, roadside buildings, cars, effects
 import * as THREE from 'three';
 import { mat, glowSprite, glowTexture } from './plants.js';
-import { TILE, BED_N, ROAD, SPOTS, LOTS, LOT_FOR_SALE, SIGNS, SITES, OBSTACLES, siteById } from './layout.js';
+import { TILE, BED_N, ROAD, SPOTS, PARK_X, LOTS, LOT_FOR_SALE, SIGNS, SITES, OBSTACLES, siteById } from './layout.js';
 import { FIND_COLORS } from './data.js';
 
 const shadowy = (m, cast = true) => { m.castShadow = cast; m.receiveShadow = true; return m; };
@@ -388,6 +388,38 @@ export function createWorld(canvas) {
     }
   }
 
+  // v0.41: spot ghosts for placing a structure (Tincture Stand): green = can build here, pink = blocked
+  const spotGhosts = new THREE.Group(); scene.add(spotGhosts);
+  const spotOk = new THREE.MeshBasicMaterial({ color: '#8FD18B', transparent: true, opacity: 0.55, depthWrite: false });
+  const spotNo = new THREE.MeshBasicMaterial({ color: '#E8A5A8', transparent: true, opacity: 0.35, depthWrite: false });
+  const spotRingOk = new THREE.MeshBasicMaterial({ color: '#4E9F55', transparent: true, opacity: 0.9, depthWrite: false });
+  function setSpotGhosts(list) {
+    for (const c of [...spotGhosts.children]) { spotGhosts.remove(c); c.traverse((m) => m.geometry?.dispose()); }
+    if (!list) return;
+    for (const { x, z, ok } of list) {
+      const g = new THREE.Group(); g.position.set(x, 0.08, z);
+      const pl = new THREE.Mesh(new THREE.CircleGeometry(ok ? 0.62 : 0.42, 24), ok ? spotOk : spotNo); pl.rotation.x = -Math.PI / 2; pl.renderOrder = 2; g.add(pl);
+      if (ok) { const r = new THREE.Mesh(new THREE.RingGeometry(0.62, 0.72, 28), spotRingOk); r.rotation.x = -Math.PI / 2; r.position.y = 0.01; r.renderOrder = 3; g.add(r); }
+      g.userData = { spot: true, x, z, ok }; spotGhosts.add(g);
+    }
+  }
+  frameHooks.push(() => { const t = performance.now() / 1000; for (const g of spotGhosts.children) if (g.userData.ok) g.scale.setScalar(1 + 0.06 * Math.sin(t * 3 + g.position.x)); });
+  // v0.41: Sickle / Plow target one raised bed — each bed gets its own frame (green = something to do, grey = nothing to do)
+  const bedTargets = new THREE.Group(); scene.add(bedTargets);
+  const bedOkM = new THREE.MeshBasicMaterial({ color: '#7CCB78', transparent: true, opacity: 0.85, depthWrite: false });
+  const bedNoM = new THREE.MeshBasicMaterial({ color: '#CDBFA8', transparent: true, opacity: 0.45, depthWrite: false });
+  function setBedTargets(list) {
+    for (const c of [...bedTargets.children]) { bedTargets.remove(c); c.traverse((m) => m.geometry?.dispose()); }
+    if (!list) return;
+    const h = TILE * BED_N / 2 + 0.22, w = 0.16;
+    for (const { x, z, ok, b } of list) {
+      const g = new THREE.Group(); g.position.set(x, 0.07, z);
+      for (const [px, pz, sx, sz] of [[0, -h, 2 * h + w, w], [0, h, 2 * h + w, w], [-h, 0, w, 2 * h], [h, 0, w, 2 * h]]) {
+        const m = new THREE.Mesh(new THREE.PlaneGeometry(sx, sz), ok ? bedOkM : bedNoM); m.rotation.x = -Math.PI / 2; m.position.set(px, 0, pz); m.renderOrder = 3; g.add(m); }
+      g.userData = { bedTarget: true, ok, b }; bedTargets.add(g);
+    }
+  }
+  frameHooks.push(() => { const t = performance.now() / 1000; for (const g of bedTargets.children) if (g.userData.ok) g.scale.setScalar(1 + 0.025 * Math.sin(t * 3.4 + g.position.x)); });
   // Selection frame
   const sel = new THREE.Mesh(new THREE.RingGeometry(0.5, 0.6, 4, 1, Math.PI / 4), new THREE.MeshBasicMaterial({ color: '#F5D07A', transparent: true, opacity: 0.95, depthWrite: false }));
   sel.rotation.x = -Math.PI / 2; sel.scale.setScalar(Math.SQRT2 * 0.93); sel.visible = false; scene.add(sel);
@@ -464,6 +496,23 @@ export function createWorld(canvas) {
   const barrels = new Map();
   const barrel = makeBarrel('home', SPOTS.barrel[0], SPOTS.barrel[1]);
   function addBarrel(lot, x, z, animate) { const g = barrels.get(lot) || makeBarrel(lot, x, z); g.position.set(x, 0, z); if (animate) buildAnim(g, [0.9, 1.0, 0.9], null); else g.visible = true; return g; }
+  function removeBarrel(lot) { const g = barrels.get(lot); if (!g) return; setGutter(lot, null); poof(g.position.clone().setY(0.5), '#E9D9B8', 12, 1); scene.remove(g); barrels.delete(lot); }
+  // v0.41: a gutter + downspout from a roof on the same plot into the barrel (a barrel only collects rain when connected)
+  const gutters = new Map(); const gutterM = mat('#8E979C', { roughness: 0.45, metalness: 0.35 });
+  function setGutter(lot, from) {
+    const g = barrels.get(lot), key = g && from ? `${from[0].toFixed(2)},${from[1].toFixed(2)}>${g.position.x.toFixed(2)},${g.position.z.toFixed(2)}` : '';
+    const old = gutters.get(lot); if (old?.userData.key === key) return; if (old) { scene.remove(old); old.traverse((m) => m.geometry?.dispose()); gutters.delete(lot); }
+    if (!key) return;
+    const bx = g.position.x, bz = g.position.z, dx = bx - from[0], dz = bz - from[1], d = Math.hypot(dx, dz) || 1, ux = dx / d, uz = dz / d, off = Math.min(0.85, d * 0.45), H = 1.75;
+    const P = (x, y, z) => new THREE.Vector3(x, y, z), a = P(from[0] + ux * off, H, from[1] + uz * off), b = P(bx, H, bz), c = P(bx, 0.86, bz);
+    const grp = new THREE.Group(); grp.userData.key = key; grp.userData.gutter = lot;
+    const path = new THREE.CurvePath(); if (a.distanceTo(b) > 0.05) path.add(new THREE.LineCurve3(a, b)); path.add(new THREE.LineCurve3(b, c));
+    grp.add(shadowy(new THREE.Mesh(new THREE.TubeGeometry(path, 24, 0.04, 6), gutterM)));
+    for (const p of [a, b]) { const e = new THREE.Mesh(new THREE.SphereGeometry(0.06, 8, 6), gutterM); e.position.copy(p); grp.add(e); }
+    const trough = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.06, 0.16), gutterM); trough.position.copy(a); grp.add(trough);
+    scene.add(grp); gutters.set(lot, grp);
+  }
+  frameHooks.push(() => { for (const [lot, grp] of gutters) grp.visible = !!barrels.get(lot)?.visible; });
   // text: main line ('7/10 · next in 0:42' or '10/10 · Full'), sub: 'Feeds 2/4 beds'. Re-drawn only when the text changes (once a second at most).
   function setBarrelInfo(lot, main, sub, full, k = 0) {
     const g = barrels.get(lot); if (!g) return; const s = g.userData.info; const key = main + '|' + sub + '|' + full;
@@ -491,6 +540,7 @@ export function createWorld(canvas) {
     g.userData.kind = 'hive'; g.userData.lot = lot; g.userData.bees = bees; g.visible = false; hives.set(lot, g); return g;
   }
   function addHive(lot, x, z, animate) { const g = hives.get(lot) || makeHive(lot, x, z); g.position.set(x, 0, z); if (animate) buildAnim(g, [0.9, 1.3, 0.9], null); else g.visible = true; return g; }
+  function removeHive(lot) { const g = hives.get(lot); if (!g) return; poof(g.position.clone().setY(0.6), '#F3D27A', 14, 1.2); scene.remove(g); hives.delete(lot); }
   let beeTex = null;
   function beeIcon() { if (beeTex) return beeTex; const c = document.createElement('canvas'); c.width = c.height = 96; const x = c.getContext('2d');
     x.fillStyle = 'rgba(255,249,236,.95)'; x.beginPath(); x.arc(48, 48, 44, 0, 7); x.fill(); x.strokeStyle = '#E2B65A'; x.lineWidth = 5; x.stroke();
@@ -534,6 +584,99 @@ export function createWorld(canvas) {
   }
   tincture.userData.kind = 'tincture'; tincture.visible = false;
   function setTincture(slots) { slots.forEach((s, k) => { const t = tincSlots[k]; if (!t) return; t.g.visible = !!s; if (!s) return; t.f.material.color.set(s.done ? '#E9B44C' : s.base === 'vinegar' ? '#E8C9A0' : '#D8C6E8'); t.gl.visible = !!s.done; }); }
+  // ---------- v0.41: Essential Oil Stand — a stall with two copper stills; steam puffs while distilling ----------
+  const still = new THREE.Group(); still.position.set(SPOTS.still[0], 0, SPOTS.still[1]); still.rotation.y = 0.3; still.scale.setScalar(0.8); scene.add(still);
+  const stillSlots = [];
+  {
+    const copper = mat('#D0824A', { roughness: 0.32, metalness: 0.35, emissive: '#5A2A10', emissiveIntensity: 0.12 }), copperD = mat('#A35F34', { roughness: 0.4, metalness: 0.3 });
+    const counter = shadowy(new THREE.Mesh(new THREE.BoxGeometry(2.1, 0.9, 0.8), woodM)); counter.position.y = 0.45; still.add(counter);
+    const top = shadowy(new THREE.Mesh(new THREE.BoxGeometry(2.3, 0.08, 0.95), woodL)); top.position.y = 0.94; still.add(top);
+    for (const x of [-1.0, 1.0]) { const post = shadowy(new THREE.Mesh(new THREE.BoxGeometry(0.12, 2.3, 0.12), woodD)); post.position.set(x, 1.15, -0.3); still.add(post); }
+    const roof = shadowy(new THREE.Mesh(new THREE.BoxGeometry(2.5, 0.08, 1.2), mat('#7A5A44'))); roof.position.set(0, 2.3, 0.05); roof.rotation.x = 0.18; still.add(roof);
+    const shelf = shadowy(new THREE.Mesh(new THREE.BoxGeometry(1.9, 0.06, 0.3), woodL)); shelf.position.set(0, 1.5, -0.28); still.add(shelf);
+    const amber = mat('#8A4A1C', { roughness: 0.15, transparent: true, opacity: 0.9 });
+    for (let k = 0; k < 7; k++) { const bt = new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.06, 0.18, 8), amber); bt.position.set(-0.75 + k * 0.25, 1.62, -0.28); still.add(bt);
+      const cap = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, 0.07, 6), mat('#2F2A26')); cap.position.set(bt.position.x, 1.75, -0.28); still.add(cap); }
+    const steamMat = () => new THREE.SpriteMaterial({ map: glowTexture(), color: '#FFFFFF', transparent: true, opacity: 0, depthWrite: false });
+    for (let k = 0; k < 2; k++) {
+      const g = new THREE.Group(); g.position.set(-0.5 + k * 1.0, 0.98, 0.12); still.add(g);
+      const pot = shadowy(new THREE.Mesh(new THREE.SphereGeometry(0.25, 16, 12), copper)); pot.scale.y = 0.85; pot.position.y = 0.22; g.add(pot);
+      const helm = new THREE.Mesh(new THREE.SphereGeometry(0.11, 12, 10), copper); helm.position.y = 0.48; g.add(helm);
+      const curve = new THREE.CatmullRomCurve3([new THREE.Vector3(0, 0.56, 0), new THREE.Vector3(0.1, 0.72, 0), new THREE.Vector3(0.26, 0.68, 0), new THREE.Vector3(0.36, 0.42, 0)]);
+      g.add(new THREE.Mesh(new THREE.TubeGeometry(curve, 16, 0.025, 6), copper));
+      const cond = shadowy(new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 0.34, 10), copperD)); cond.position.set(0.38, 0.2, 0); g.add(cond);
+      for (const y of [0.1, 0.2, 0.3]) { const r = new THREE.Mesh(new THREE.TorusGeometry(0.09, 0.012, 4, 14), copper); r.rotation.x = Math.PI / 2; r.position.set(0.38, y, 0); g.add(r); }
+      const ember = glowSprite('#FF9A4A', 0.32, 0.8); ember.position.set(0, 0.02, 0.1); ember.visible = false; g.add(ember);
+      const bottle = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.065, 0.2, 8), mat('#B8692A', { roughness: 0.1, emissive: '#7A3A10', emissiveIntensity: 0.35 })); bottle.position.set(0.38, 0.47, 0); bottle.visible = false; g.add(bottle);
+      const gl = glowSprite('#FFD27A', 0.8, 0.45); gl.position.set(0.38, 0.5, 0); gl.visible = false; g.add(gl);
+      const steam = [0, 1, 2].map(() => { const sp = new THREE.Sprite(steamMat()); sp.userData.steam = true; sp.renderOrder = 6; sp.visible = false; g.add(sp); return sp; });
+      stillSlots.push({ g, ember, bottle, gl, steam, active: false });
+    }
+    const label = label_('Essential Oil Stand', { h: 0.5 }); label.position.set(0, 3.0, 0.2); still.add(label); still.userData.label = label;
+    const hit = new THREE.Mesh(new THREE.BoxGeometry(2.5, 2.8, 1.4), new THREE.MeshBasicMaterial({ visible: false })); hit.position.y = 1.3; still.add(hit);
+  }
+  still.userData.kind = 'still'; still.visible = false;
+  function setStill(slots) { slots.forEach((s, k) => { const t = stillSlots[k]; if (!t) return; t.active = !!s && !s.done; t.ember.visible = t.active; t.bottle.visible = !!s && s.done; t.gl.visible = !!s && s.done; }); }
+  frameHooks.push(() => { const tt = performance.now() / 1000;
+    for (const t of stillSlots) t.steam.forEach((sp, i) => { if (!t.active || !still.visible) { sp.visible = false; return; } const ph = (tt * 0.55 + i / 3) % 1; sp.visible = true;
+      sp.position.set(0.03 + ph * 0.15 + Math.sin(tt * 2 + i) * 0.04, 0.6 + ph * 0.9, ph * 0.95); sp.scale.setScalar(0.2 + ph * 0.55); sp.material.opacity = 0.9 * Math.sin(Math.PI * Math.min(1, ph * 1.15)); }); });
+  // ---------- v0.41: Parking Lot — painted bays along the near lane by the Farm Stand, plus a P sign ----------
+  const parking = new THREE.Group(); parking.position.set(PARK_X[1], 0, ROAD.near); parking.visible = false; scene.add(parking);   // children are relative to the middle bay
+  const paintM = new THREE.MeshStandardMaterial({ color: '#FFFFFF', roughness: 0.9, transparent: true, opacity: 0.92, depthWrite: false });
+  const parkBays = PARK_X.map((x, k) => { const g = new THREE.Group(); g.position.set(x - PARK_X[1], 0.015, 0); parking.add(g);
+    for (const dx of [-1.25, 1.25]) { const l = new THREE.Mesh(new THREE.PlaneGeometry(0.1, 1.2), paintM); l.rotation.x = -Math.PI / 2; l.position.x = dx; l.renderOrder = 1; g.add(l); }
+    const back = new THREE.Mesh(new THREE.PlaneGeometry(2.6, 0.1), paintM); back.rotation.x = -Math.PI / 2; back.position.z = 0.62; back.renderOrder = 1; g.add(back);
+    return g; });
+  { const post = shadowy(new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 1.7, 8), mat('#8E979C', { metalness: 0.3, roughness: 0.5 }))); post.position.set(2.15 - PARK_X[1], 0.85, 4.8 - ROAD.near); parking.add(post);
+    const c = document.createElement('canvas'); c.width = c.height = 128; const g = c.getContext('2d');
+    g.fillStyle = '#3F6FB0'; g.beginPath(); g.roundRect(4, 4, 120, 120, 18); g.fill(); g.strokeStyle = '#FFFFFF'; g.lineWidth = 7; g.beginPath(); g.roundRect(12, 12, 104, 104, 12); g.stroke();
+    g.fillStyle = '#FFFFFF'; g.font = '800 84px Nunito, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('P', 64, 70);
+    const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace;
+    const sign = new THREE.Mesh(new THREE.PlaneGeometry(0.62, 0.62), new THREE.MeshStandardMaterial({ map: t, roughness: 0.6 })); sign.position.set(2.15 - PARK_X[1], 1.55, 4.84 - ROAD.near); sign.rotation.y = 0.15; parking.add(sign);
+    const hit = new THREE.Mesh(new THREE.BoxGeometry(0.9, 1.9, 0.6), new THREE.MeshBasicMaterial({ visible: false })); hit.position.set(2.15 - PARK_X[1], 0.95, 4.8 - ROAD.near); parking.add(hit); }
+  parking.userData.kind = 'parking';
+  function setParking(cap) { parking.visible = cap > 1; parkBays.forEach((b, k) => (b.visible = k < cap)); }
+
+  // ---------- v0.41: Windmill (placed once anywhere on owned ground; sails turn gently) ----------
+  const windmill = new THREE.Group(); windmill.position.set(SPOTS.windmill[0], 0, SPOTS.windmill[1]); windmill.rotation.y = 0.35; windmill.visible = false; scene.add(windmill);
+  const sails = new THREE.Group();
+  { const tower = shadowy(new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.7, 2.6, 8), mat('#EFE4CF', { roughness: 0.9 }))); tower.position.y = 1.3; windmill.add(tower);
+    const cap = shadowy(new THREE.Mesh(new THREE.ConeGeometry(0.58, 0.7, 8), mat('#B0603A', { roughness: 0.8 }))); cap.position.y = 2.95; windmill.add(cap);
+    const door = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.6, 0.06), woodD); door.position.set(0, 0.3, 0.66); door.rotation.x = -0.08; windmill.add(door);
+    const win = new THREE.Mesh(new THREE.CircleGeometry(0.12, 12), mat('#7FB3C6', { roughness: 0.3 })); win.position.set(0, 1.7, 0.55); windmill.add(win);
+    sails.position.set(0, 2.55, 0.62); windmill.add(sails);
+    const hub = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 0.18, 10), woodD); hub.rotation.x = Math.PI / 2; sails.add(hub);
+    const cloth = mat('#FFF6E6', { roughness: 0.9, side: THREE.DoubleSide });
+    for (let k = 0; k < 4; k++) { const arm = new THREE.Group(); arm.rotation.z = k * Math.PI / 2; sails.add(arm);
+      const spar = shadowy(new THREE.Mesh(new THREE.BoxGeometry(0.06, 1.55, 0.05), woodM)); spar.position.y = 0.8; arm.add(spar);
+      const sail = shadowy(new THREE.Mesh(new THREE.PlaneGeometry(0.34, 1.15), cloth)); sail.position.set(0.2, 0.92, 0.02); arm.add(sail); }
+    const hit = new THREE.Mesh(new THREE.BoxGeometry(1.5, 3.6, 1.5), new THREE.MeshBasicMaterial({ visible: false })); hit.position.y = 1.7; windmill.add(hit); }
+  windmill.userData.kind = 'windmill'; windmill.userData.sails = sails;
+  frameHooks.push((dt) => { if (windmill.visible) sails.rotation.z -= Math.min(0.1, dt || 0.016) * 0.9; });
+
+  // ---------- v0.41: Billboard across the road — tap to Run ad (traffic boost); bulbs glow while the ad runs ----------
+  const billboard = new THREE.Group(); billboard.position.set(SPOTS.billboard[0], 0, SPOTS.billboard[1]); billboard.rotation.y = 0.18; billboard.visible = false; scene.add(billboard);
+  const bulbs = [], bbGlow = glowSprite('#FFD27A', 5.2, 0.0);
+  { for (const x of [-1.25, 1.25]) { const p = shadowy(new THREE.Mesh(new THREE.BoxGeometry(0.16, 2.4, 0.16), woodD)); p.position.set(x, 1.2, 0); billboard.add(p); }
+    const back = shadowy(new THREE.Mesh(new THREE.BoxGeometry(3.4, 1.75, 0.12), woodM)); back.position.set(0, 2.85, -0.05); billboard.add(back);
+    const c = document.createElement('canvas'); c.width = 512; c.height = 256; const g = c.getContext('2d');
+    g.fillStyle = '#FFF6E6'; g.fillRect(0, 0, 512, 256); g.strokeStyle = '#7FA47D'; g.lineWidth = 14; g.strokeRect(10, 10, 492, 236);
+    for (const [x, y, col] of [[70, 120, '#E58F94'], [112, 92, '#B79AD6'], [104, 160, '#F2B54A']]) { g.fillStyle = col; for (let k = 0; k < 6; k++) { const a = k * Math.PI / 3; g.beginPath(); g.arc(x + Math.cos(a) * 17, y + Math.sin(a) * 17, 14, 0, 7); g.fill(); } g.fillStyle = '#FFE08A'; g.beginPath(); g.arc(x, y, 11, 0, 7); g.fill(); }
+    g.fillStyle = '#3D5A40'; g.textAlign = 'left'; g.textBaseline = 'middle'; g.font = '700 64px Fraunces, Georgia, serif'; g.fillText('Petalspire', 168, 100);
+    g.font = '800 34px Nunito, sans-serif'; g.fillStyle = '#B0603A'; g.fillText('Fresh flowers ahead →', 168, 170);
+    const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4;
+    const face = new THREE.Mesh(new THREE.PlaneGeometry(3.2, 1.6), new THREE.MeshStandardMaterial({ map: t, roughness: 0.7, emissive: '#FFFFFF', emissiveMap: t, emissiveIntensity: 0.0 })); face.position.set(0, 2.85, 0.02); billboard.add(face); billboard.userData.face = face;
+    const bulbOff = mat('#E9DFC8', { roughness: 0.4 });
+    for (let k = 0; k < 14; k++) { const top = k < 7, i = k % 7; const b = new THREE.Mesh(new THREE.SphereGeometry(0.08, 8, 6), bulbOff.clone()); b.position.set(-1.5 + i * 0.5, top ? 3.78 : 1.92, 0.08); billboard.add(b); bulbs.push(b); }
+    bbGlow.position.set(0, 2.85, 0.4); billboard.add(bbGlow);
+    const hit = new THREE.Mesh(new THREE.BoxGeometry(3.6, 4.0, 0.8), new THREE.MeshBasicMaterial({ visible: false })); hit.position.y = 2.0; billboard.add(hit); }
+  const bbLabel = label('Billboard', { h: 0.5 }); bbLabel.position.set(0, 4.35, 0.1); billboard.add(bbLabel); billboard.userData.label = bbLabel; billboard.userData.kind = 'billboard';
+  let bbOn = false;
+  function setBillboard(on, text) { bbOn = !!on; if (text) setLabel(bbLabel, text); }
+  frameHooks.push(() => { if (!billboard.visible) return; const t = performance.now() / 1000;
+    bulbs.forEach((b, k) => { const lit = bbOn && ((Math.floor(t * 4) + k) % 3 !== 0); b.material.emissive.set(lit ? '#FFC94A' : '#000000'); b.material.emissiveIntensity = lit ? 1.6 : 0; b.material.color.set(lit ? '#FFF2B0' : '#E9DFC8'); });
+    billboard.userData.face.material.emissiveIntensity = bbOn ? 0.3 + 0.1 * Math.sin(t * 3) : 0; bbGlow.material.opacity = bbOn ? 0.75 + 0.2 * Math.sin(t * 3) : 0; });
+
   function setStandStock(f) { crates[0].visible = !!f.heart; crates[1].visible = !!f.sun; crates[2].visible = !!f.moon; }
 
   // ---------- Supply market (boarded up until unlocked) ----------
@@ -848,7 +991,7 @@ export function createWorld(canvas) {
   function updateCars(dt, t) {
     for (let k = cars.length - 1; k >= 0; k--) {
       const c = cars[k];
-      if (c.state === 'in') { const d = c.stopX - c.x; c.v = Math.max(0.0, Math.min(10, d * 1.5)); if (d < 0.03) { c.x = c.stopX; c.v = 0; c.state = 'park'; c.onPark?.(c); } }
+      if (c.state === 'in') { const d = c.stopX - c.x; c.v = Math.max(0.0, Math.min(10, d * 1.5)); if (d < 0.03) { c.x = c.stopX; c.v = 0; c.state = 'park'; const f = c.onPark; c.onPark = null; f?.(c); } }
       else if (c.state === 'out') c.v = Math.min(11, c.v + 5 * dt);
       else if (c.state === 'pass') c.v = 8;
       const dx = c.v * dt * c.dir; c.x += dx; c.group.position.x = c.x;
@@ -906,7 +1049,7 @@ export function createWorld(canvas) {
     if (mode === 'build') { const h = raycaster.intersectObjects(ghostMeshes, false)[0]; return h ? h.object.userData : null; }
     if (mode === 'ground') { const p = raycaster.ray.intersectPlane(groundPlane, new THREE.Vector3()); return p ? { kind: 'ground', point: p } : null; }
     const targets = [...tiles.map((t) => t.mesh), ...tiles.map((t) => t.holder), woods, lootG, decorG, bpGroup];
-    if (stand.visible) targets.push(stand); if (rack.visible) targets.push(rack); if (tincture.visible) targets.push(tincture); targets.push(market); for (const g of barrels.values()) if (g.visible) targets.push(g); for (const g of hives.values()) if (g.visible) targets.push(g);
+    if (stand.visible) targets.push(stand); if (rack.visible) targets.push(rack); if (tincture.visible) targets.push(tincture); if (still.visible) targets.push(still); if (parking.visible) targets.push(parking); if (windmill.visible) targets.push(windmill); if (billboard.visible) targets.push(billboard); targets.push(market); for (const g of barrels.values()) if (g.visible) targets.push(g); for (const g of hives.values()) if (g.visible) targets.push(g);
     for (const id of Object.keys(lotFx)) if (lotFx[id].fx.visible) targets.push(lotFx[id].sign, lotFx[id].tag);
     const hits = raycaster.intersectObjects(targets, true);
     for (const h of hits) { if (h.object.userData?.tag && visibleChain(h.object)) return { kind: 'lot', id: h.object.userData.id }; }
@@ -1015,7 +1158,7 @@ export function createWorld(canvas) {
       if (tl.icon.visible) tl.icon.position.y = 1.35 + (tl.key.endsWith(':3') ? 0.2 : -0.5) + Math.sin(t * 2.5 + p.userData.phase) * 0.06;
     }
     for (const b of beds) if (b.group.userData.born) { const k = Math.min(1, (now - b.group.userData.born) / 700); b.group.scale.set(1, Math.max(0.01, elastic(k)), 1); if (k >= 1) b.group.userData.born = 0; }
-    for (const o of [stand, rack, market, tincture, ...barrels.values(), ...hives.values()]) if (o.userData.appear && !builds.some((b) => b.obj === o && !b.shown)) { const k = Math.min(1, (now - o.userData.appear) / 750); o.scale.setScalar(Math.max(0.01, elastic(k)) * o.userData.baseScale); if (k >= 1) o.userData.appear = 0; }
+    for (const o of [stand, rack, market, tincture, still, parking, billboard, windmill, ...barrels.values(), ...hives.values()]) if (o.userData.appear && !builds.some((b) => b.obj === o && !b.shown)) { const k = Math.min(1, (now - o.userData.appear) / 750); o.scale.setScalar(Math.max(0.01, elastic(k)) * o.userData.baseScale); if (k >= 1) o.userData.appear = 0; }
     for (const o of obs.values()) if (o.stump?.userData.born) { const k = Math.min(1, (now - o.stump.userData.born) / 400); o.stump.scale.setScalar(Math.max(0.01, elastic(k)) * o.def.s * 0.95); if (k >= 1) o.stump.userData.born = 0; }
     sel.material.opacity = 0.65 + 0.3 * Math.sin(t * 4);
     const pulse = 0.5 + 0.5 * Math.sin(t * 4); ghostOk.opacity = 0.22 + 0.2 * pulse; barOk.opacity = 0.7 + 0.3 * pulse;
@@ -1037,7 +1180,7 @@ export function createWorld(canvas) {
   }
 
   return {
-    renderer, scene, camera, ctl, DEF, tiles, beds, obs, stand, rack, market, barrel, barrels, addBarrel, setBarrelInfo, hives, addHive, setBeeBeds, tincture, setTincture, cars, frameHooks,
+    renderer, scene, camera, ctl, DEF, tiles, beds, obs, stand, rack, market, barrel, still, setStill, parking, setParking, windmill, billboard, setBillboard, spotGhosts, setSpotGhosts, bedTargets, setBedTargets, barrels, addBarrel, removeBarrel, gutters, setGutter, setBarrelInfo, hives, addHive, removeHive, setBeeBeds, tincture, setTincture, cars, frameHooks,
     updateCamera, resize, glide, intro, pick, project, tileWorld, sickleSweep, plowFurrows, fxCount: () => fxs.length,
     setObstacle, chop, clearObstacle, addBed, setGhosts, setLotOwned, setStandStock, setMarketOpen, setRack, appear, spawnCar, poof,
     setPlant, attachPlant, setIcon, setShade, bgTrees, setIrrigation, irrigPulse, irrig, select, splash, render, textSprite, relabel, groundAt,

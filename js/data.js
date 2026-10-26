@@ -91,15 +91,35 @@ export const FEATURES = {
     price: 120, stats: { Growth: 1, Beauty: 4, Yield: 5, Atmosphere: 4 },
     blurb: 'A little wooden stall of glass bottles. Find it, buy it at the Supply Market, then build it: steep your blooms in Glycerin or Vinegar into tinctures that sell for far more.',
   },
+  still: {
+    id: 'still', name: 'Essential Oil Stand', rarity: 'rare', type: 'Feature · Crafting', img: 'assets/card-still.jpg',
+    price: 150, stats: { Growth: 1, Beauty: 4, Yield: 5, Atmosphere: 5 },
+    blurb: 'A little stall with gleaming copper stills. Find it, buy it at the Supply Market, build it on one of your other plots, then distill your seeds into essential oils that sell for a premium.',
+  },
   sickle: {
     id: 'sickle', name: 'Harvest Sickle', rarity: 'rare', type: 'Tool · Harvest',
-    price: 100, stats: { Growth: 1, Beauty: 2, Yield: 4, Atmosphere: 2 }, cooldownS: 20,
-    blurb: 'A reusable tool. Tap the Sickle, then a plot: every ripe plant in every bed there is harvested in one sweep (normal yields and seeds). Rests 20 s between sweeps.',
+    price: 80, stats: { Growth: 1, Beauty: 2, Yield: 4, Atmosphere: 2 }, cooldownS: 8,
+    blurb: 'Harvest a whole raised bed at once. Tap the Sickle, then a raised bed: every ripe plant in that bed is harvested in one sweep (normal yields and seeds). Rests 8 s between sweeps.',
   },
   plow: {
     id: 'plow', name: 'Hand Plow', rarity: 'rare', type: 'Tool · Planting',
-    price: 110, stats: { Growth: 3, Beauty: 1, Yield: 3, Atmosphere: 2 }, cooldownS: 20,
-    blurb: 'A reusable tool. Tap the Plow, pick a seed, then a plot: every empty bed tile there is planted, as far as your seeds go. Rests 20 s between uses.',
+    price: 90, stats: { Growth: 3, Beauty: 1, Yield: 3, Atmosphere: 2 }, cooldownS: 8,
+    blurb: 'Plant a whole raised bed at once. Tap the Plow, pick a seed, then a raised bed: every empty tile in that bed is planted, as far as your seeds go. Rests 8 s between uses.',
+  },
+  parking: {
+    id: 'parking', name: 'Parking Lot', rarity: 'epic', type: 'Feature · Traffic',
+    price: 140, stats: { Growth: 1, Beauty: 2, Yield: 5, Atmosphere: 3 },
+    blurb: 'Painted bays by your Farm Stand: room for 2 cars at once (3 at card Lv2+), customers come 30% more often, and 30% of them pick up one extra item. Build it next to the stand for 20 Wood.',
+  },
+  windmill: {
+    id: 'windmill', name: 'Windmill', rarity: 'epic', type: 'Feature · Water',
+    price: 160, stats: { Growth: 3, Beauty: 4, Yield: 3, Atmosphere: 4 },
+    blurb: 'Pumps for every rain barrel on your land: connected barrels refill every 40 s instead of 60 s (faster with card levels, and it stacks with the Brass Watering Can). Build it once anywhere on your cleared ground for 20 Wood.',
+  },
+  billboard: {
+    id: 'billboard', name: 'Roadside Billboard', rarity: 'rare', type: 'Feature · Advertising',
+    price: 90, stats: { Growth: 1, Beauty: 3, Yield: 4, Atmosphere: 2 },
+    blurb: 'A painted sign across the road. Tap it to Run ad: twice the traffic for 5 minutes. Free once an hour, or 1 Jewel to run it now. Build it by the road for 15 Wood.',
   },
   sundial: {
     id: 'sundial', name: 'Golden Sundial', rarity: 'legendary', type: 'Feature · Time',
@@ -131,9 +151,15 @@ export const CARD_LEVELS = {
   thresholds: [3, 6, 10],          // copies needed for Lv2, Lv3, Lv4 (max)
   plant: { sell: 0.10, grow: 0.05, statPip: 1, bonusFlowerAt: 4 },
   tool: { cooldown: 0.15 },
-  upgradable: (id, card) => !!card.tier || id === 'sickle' || id === 'plow',
+  upgradable: (id, card) => !!card.tier || id === 'sickle' || id === 'plow' || id === 'parking' || id === 'windmill',
+  parking: { capAt: 2, extraItem: 0.10 },   // v0.41: Lv2+ fits 3 cars; each level adds +10% extra-item chance
 };
-export const PACK_PRICE = 40;
+// v0.41: Card Packs cost Jewels, not coins (1 Jewel = one standard pack). Add more pack types here (e.g. a premium pack at 3 Jewels).
+export const PACKS = { standard: { name: 'Botanical Card Pack', jewels: 1, cards: 3 } };
+export const PACK_JEWELS = PACKS.standard.jewels;
+// v0.41: Jewel trades in the Jewel Shop, and the rare free Jewel hidden in the woods (so free players can still open packs now and then).
+export const JEWEL_EXCHANGE = { coins: 1000, wood: 250 };
+export const JEWEL_DROP = { clear: 0.04 };   // chance that clearing a tree, stump, bush or rock (without a find) turns up 1 Jewel
 export const DUP_COINS = 8;
 export const RACK_SLOTS = 3;
 export const DRY_S = 40;
@@ -157,6 +183,16 @@ export const TINCTURE = {
     chamomile: { n: 1, s: 150, sell: { glycerin: 80, vinegar: 72 } },
   },
 };
+// v0.41 Essential Oil Stand: SEEDS only in, oil out. Each oil is worth well over selling those seeds (or buying them new).
+export const STILL = {
+  slots: 2,
+  recipes: {   // seeds per distill, time (s), Farm Stand price
+    lavender:  { n: 5, s: 180, sell: 70 },
+    calendula: { n: 4, s: 210, sell: 95 },
+    chamomile: { n: 3, s: 240, sell: 120 },
+  },
+};
+export const oilId = (sp) => 'oil_' + sp;
 export const tinctureId = (sp, base) => `tinc_${base === 'vinegar' ? 'v' : 'g'}_${sp}`;
 export const TINCTURE_NAMES = { lavender: 'Lavender', calendula: 'Calendula', chamomile: 'Chamomile' };
 
@@ -168,6 +204,9 @@ export const ITEMS = {
   flower_calendula: { name: 'Calendula',  sell: 9,  icon: ['daisy', '#F0A33A'] },
   flower_chamomile:{ name: 'Chamomile',      sell: 24, icon: ['daisy', '#FFFFFF'] },
   dried_lavender: { name: 'Dried Lavender',  sell: 14, icon: ['bundle', '#A58BC9'] },
+  oil_lavender:  { name: 'Lavender Essential Oil',  sell: 70,  icon: ['dropper', '#7E5FB0'] },
+  oil_calendula: { name: 'Calendula Essential Oil', sell: 95,  icon: ['dropper', '#D9822B'] },
+  oil_chamomile: { name: 'Chamomile Essential Oil', sell: 120, icon: ['dropper', '#C9A43A'] },
   tinc_g_lavender:  { name: 'Lavender Glycerite',         sell: 42, icon: ['dropper', '#C7B3E6'] },
   tinc_v_lavender:  { name: 'Lavender Vinegar Tincture',  sell: 36, icon: ['dropper', '#9A7A9A'] },
   tinc_g_calendula:   { name: 'Calendula Glycerite',          sell: 52, icon: ['dropper', '#EDC15A'] },
@@ -175,7 +214,7 @@ export const ITEMS = {
   tinc_g_chamomile: { name: 'Chamomile Glycerite',        sell: 80, icon: ['dropper', '#F3E7B5'] },
   tinc_v_chamomile: { name: 'Chamomile Vinegar Tincture', sell: 72, icon: ['dropper', '#D2B67A'] },
 };
-export const SELL_ORDER = ['tinc_g_chamomile', 'tinc_v_chamomile', 'tinc_g_calendula', 'tinc_v_calendula', 'tinc_g_lavender', 'tinc_v_lavender', 'dried_lavender', 'flower_chamomile', 'flower_calendula', 'flower_lavender', 'seed_chamomile', 'seed_calendula', 'seed_lavender'];
+export const SELL_ORDER = ['oil_chamomile', 'oil_calendula', 'oil_lavender', 'tinc_g_chamomile', 'tinc_v_chamomile', 'tinc_g_calendula', 'tinc_v_calendula', 'tinc_g_lavender', 'tinc_v_lavender', 'dried_lavender', 'flower_chamomile', 'flower_calendula', 'flower_lavender', 'seed_chamomile', 'seed_calendula', 'seed_lavender'];
 
 export const WOOD = { tree: 3, stump: 1, bush: 0, rock: 0 };
 export const BED_COSTS = [12, 20, 28, 36, 44, 52];   // wood per raised bed, escalating
@@ -189,6 +228,10 @@ export const STARTER_JEWELS = 3;
 export const BUILDS = {
   stand:  { name: 'Roadside Farm Stand', wood: 15, coins: 0, opt: { find: 'old_crate', label: 'Use an Old Crate as a display shelf (+4 shelf space)' } },
   rack:   { name: 'Drying Rack', wood: 10, coins: 0 },
+  still: { name: 'Essential Oil Stand', wood: 25, coins: 0 },
+  parking: { name: 'Parking Lot', wood: 20, coins: 0 },
+  windmill: { name: 'Windmill', wood: 20, coins: 0 },
+  billboard: { name: 'Roadside Billboard', wood: 15, coins: 0 },
   tincture: { name: 'Tincture Stand', wood: 20, coins: 0, opt: { decor: 'chime', save: 6, label: 'Use your restored Glass Bottles (Bottle Chime) for the shelves (−6 Wood)' } },
   market: { name: 'Rebuild the Supply Market', wood: 30, coins: 60, s: 60, opt: { scrap: 3, save: 20, label: 'Patch the roof with 3 Scrap (save 20 coins)' }, hurryJewels: 2 },
 };
@@ -219,6 +262,15 @@ export const FINDS = {
     into: { name: 'Copper Weathervane', decor: 'vane', atm: 2 } },
 };
 export const FIND_IDS = Object.keys(FINDS);
+// v0.41 RESALE. Restored finds can go on the Farm Stand as antiques (a collector pays the antique price, well above the restore cost),
+// or be sold back instantly (Bag, or tap a placed item → Sell) for RESALE.buyback of their value. Placed garden items sell back the same way.
+export const RESALE = {
+  buyback: 0.5,
+  antique: { flower_pot: 18, lantern: 26, bench: 34, gnome: 24, fencing: 20, bottles: 16, scrap_metal: 28, watering_can: 40, wheelbarrow: 45, old_crate: 15 },
+  placed: { beehive: 60, barrel: 40 },   // what they cost new at the Market; buyback pays half
+};
+for (const k of FIND_IDS) ITEMS['antique_' + k] = { name: FINDS[k].into.name, sell: RESALE.antique[k], antique: k };
+SELL_ORDER.unshift(...[...FIND_IDS].sort((a, b) => RESALE.antique[b] - RESALE.antique[a]).map((k) => 'antique_' + k));
 export const FIND_COLORS = { watering_can: '#9FB0A8', wheelbarrow: '#8FA39A', old_crate: '#B9946A', flower_pot: '#C9876A', lantern: '#8A8F8A', bench: '#A89A86', gnome: '#8FAF86', fencing: '#8A8F8A', bottles: '#BFDCCF', scrap_metal: '#9AA3A6' };
 export const RESTORE_HURRY_JEWELS = 1;
 export const ATMOS_STEP = 0.04, ATMOS_MAX = 0.4;          // each atmosphere point: customers arrive 4% sooner (max 40%)
@@ -264,7 +316,14 @@ export const JEWEL_BUNDLES = [
   { id: 'jewels_50', n: 50, price: '$29.99', productId: 'com.petalspire.jewels.50', best: true },
 ];
 
+// v0.41: traffic features
+export const PARKING = { cap: 2, capLv2: 3, gapMult: 0.7, extraItem: 0.3 };            // gaps between customers ×0.7 (30% shorter)
+export const WINDMILL = { regenS: [40, 36, 33, 30] };   // seconds per water for a 60 s barrel at card Lv1..Lv4 (global: every connected barrel); ×½ again with the Brass Watering Can
+export const BILLBOARD = { boostMs: 5 * 60000, cooldownMs: 60 * 60000, mult: 2, jewels: 1 };  // Run ad: 2× traffic for 5 min · free once an hour · 1 Jewel to skip the wait
 export const TIPS = {
+  parking: 'Your <b>Parking Lot</b> is open! Up to 2 cars can stop at once (3 at card Lv2), customers come 30% more often, and some buy an extra item.',
+  windmill: 'Your <b>Windmill</b> is turning! Every rain barrel that’s connected to a stand now refills faster (40 s instead of 60 s; more with card levels).',
+  billboard: 'Your <b>Billboard</b> is up! Tap it and <b>Run ad</b> for twice the traffic for 5 minutes. It’s free once an hour; during the wait you can spend 1 Jewel to run it now.',
   chop: 'An old wooded lot. <b>Tap a tree</b> to chop it down — you’ll get <b>Wood</b>.',
   stump: 'Stumps stay behind. <b>Tap a stump</b> to dig it out and clear the ground.',
   find: 'Something glints! <b>Tap the sparkle</b> to pick up what you found.',
@@ -278,15 +337,18 @@ export const TIPS = {
   harvested: 'Harvests give flowers <i>and</i> seeds. Put spares on your <b>Farm Stand</b> by the road.',
   stand: 'Your <b>Farm Stand</b> is built! Tap it to stock flowers — drivers will pull over to buy.',
   barrel: 'Each <b>rain barrel</b> refills by <b>1 water a minute</b> (up to 10), even while the game is closed — the badge shows when the next drop lands. Hand watering uses the bed’s own plot barrel first, then the nearest other barrel. Water only comes from rain barrels.',
-  plotbarrel: 'This plot has no rain barrel yet. Buy a <b>Rain Barrel</b> at the Supply Market (40 coins) and place it here: its own water for irrigation, up to <b>4 beds</b>. Until then, hand watering borrows from your nearest barrel.',
-  sickle: 'You own the <b>Harvest Sickle</b>! Tap the sickle button on the left, then tap a plot to harvest every ripe plant there at once.',
-  plow: 'You own the <b>Hand Plow</b>! Tap the plow button on the left, pick a seed, then tap a plot to plant every empty bed tile there.',
+  plotbarrel: 'This plot has no rain barrel yet. Buy a <b>Rain Barrel</b> at the Supply Market (40 coins) and place it here: its own water for irrigation, up to <b>4 beds</b>. A barrel only collects rain through a gutter from a <b>stand on the same plot</b> (Tincture or Essential Oil Stand) — it connects automatically. Until then, hand watering borrows from your nearest barrel.',
+  sickle: 'You own the <b>Harvest Sickle</b>! Tap the sickle button on the left, then tap a glowing raised bed to harvest every ripe plant in that bed at once.',
+  plow: 'You own the <b>Hand Plow</b>! Tap the plow button on the left, pick a seed, then tap a glowing raised bed to plant every empty tile in that bed.',
+  oils: 'The <b>Essential Oil Stand</b> is a Rare card: find it in a Card Pack, buy it at the Supply Market (150 coins), then build it (25 Wood) on one of your <b>other plots</b>. It distills <b>seeds</b> into oils worth far more than the seeds.',
+  still: 'Your <b>Essential Oil Stand</b> is ready! Distill <b>seeds</b> into essential oils (5 Lavender, 4 Calendula or 3 Chamomile seeds each) — oils sell for a premium at the Farm Stand, far more than the seeds.',
   tincture: 'Your <b>Tincture Stand</b> is ready! Steep flowers with <b>Glycerin</b> or <b>Vinegar</b> (Supply Market) — tinctures sell for far more at the Farm Stand.',
   customer: 'A customer! They’ll pick what they want from your stand and pay in coins.',
   lavender: 'You can now build a <b>Drying Rack</b> (Build). Dried Lavender sells for almost 3× fresh.',
   rebuild: 'Your stand has earned enough to <b>rebuild the Supply Market</b>. Tap the old cottage or open Build.',
-  market: 'The <b>Supply Market</b> is open — seeds, <b>Rain Barrels</b> for new plots, <b>Wood bundles</b>, <b>saplings</b> and Card Packs.',
-  pack: 'Discovered cards unlock new items in the Supply Market — buy them with coins.',
+  market: 'The <b>Supply Market</b> is open — seeds, <b>Rain Barrels</b> for new plots, <b>Wood bundles</b>, <b>saplings</b> and Card Packs (<b>1 Jewel</b> each).',
+  packs: 'Card Packs cost <b>1 Jewel</b> each: Supply Market › Card Packs. Out of Jewels? Get some in the <b>Jewel Shop</b> — or keep clearing the woods, where a Jewel turns up now and then.',
+  pack: 'Discovered cards unlock new items in the Supply Market — buy them with coins. More Card Packs cost <b>1 Jewel</b> each (Jewels: Jewel Shop, or rare finds in the woods).',
   decor: 'Placed decor raises your garden’s <b>atmosphere</b> — customers stop by more often.',
   plot: 'The woods around you are <b>for sale</b>. Tap a <b>For Sale</b> sign to expand.',
   plotbought: 'New land! Clear its trees for Wood and room for more beds.',
@@ -306,7 +368,7 @@ export const SHADE = {
   tree: { w: 0.55, reach: 3.4 },  // a wild tree of scale 1 (weight & reach scale with tree size)
   grownStage: [0.15, 0.45, 0.75, 1.0], // planted trees cast more shade as they grow (sapling → mature)
   bgTree: { w: 0.55, reach: 3.4 },
-  buildings: { stand: { w: 0.35, reach: 2.6 }, market: { w: 0.55, reach: 3.4 }, rack: { w: 0.2, reach: 2.0 }, tincture: { w: 0.3, reach: 2.4 } },
+  buildings: { stand: { w: 0.35, reach: 2.6 }, market: { w: 0.55, reach: 3.4 }, rack: { w: 0.2, reach: 2.0 }, tincture: { w: 0.3, reach: 2.4 }, still: { w: 0.3, reach: 2.4 } },
   slowerBelow: 0.95,              // sun under this shows 'growing slower'
   muchSlowerBelow: 0.3,
 };

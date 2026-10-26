@@ -540,3 +540,34 @@ body.ads-on{--sab:calc(env(safe-area-inset-bottom,0px) + 48px)}
 .stack-row .btn{align-self:flex-start;margin-top:4px}
 .lv-prog{height:7px;border-radius:5px;background:#EFE6D6;overflow:hidden}.lv-prog b{display:block;height:100%;background:linear-gradient(90deg,#B7D4B5,#E2B653)}
 .lv-line{margin:6px 0 0;font-size:13px;color:#6B5418;background:#FBF1D2;border-radius:10px;padding:5px 9px}
+
+/* v0.41: Jewel-priced Card Packs + Jewel trades */
+.pack-info .need-jewels { background: linear-gradient(180deg, #F7D7DA, #EDB5BB); color: #7A2E3A; border-color: #E2A0A8; }
+.pack-info .pack-note { display: block; margin-top: 6px; font-size: .78em; color: #6B7A66; }
+.pack-info .pack-note i[data-icon] { width: 1em; height: 1em; vertical-align: -2px; }
+.jewel-trades .row .btn.sm .price i[data-icon] { width: 1.05em; height: 1.05em; }
+/* v0.41: resale */
+.link-btn { background: none; border: 0; padding: 4px 6px; color: #8A7F72; font: inherit; font-size: .82em; text-decoration: underline; cursor: pointer; }
+.find-row .acts, .row .acts { gap: 6px; }
+
+/* v0.41: compact goal tracker — a pill under the top bar that expands on tap */
+.goal .gp{display:none;align-items:center;gap:6px;font-weight:800;font-size:14px;color:var(--moss);white-space:nowrap}
+.goal .gpbar{display:block;width:28px;height:5px;border-radius:3px;background:#F1E2BE;overflow:hidden}
+.goal .gpbar em{display:block;height:100%;background:var(--honey)}
+.goal .gfull{flex:1;min-width:0;display:flex;flex-wrap:wrap;align-items:center;column-gap:8px}
+.goal .g-hint{margin-left:auto;margin-top:4px;border:1.5px solid var(--honey);background:#FFF6DE;color:#8A6A24;border-radius:999px;font-size:11px;font-weight:800;padding:2px 10px}
+.goal{transition:padding .2s ease,border-radius .2s ease}
+.goal.collapsed{right:auto;width:auto;max-width:none;padding:4px 11px 4px 5px;border-radius:999px;gap:6px}
+.goal.collapsed > i{width:24px;height:24px;border-radius:50%;padding:3px}
+.goal.collapsed .gp{display:flex}
+.goal.collapsed .gfull{display:none}
+@media (min-width:700px){.goal.collapsed{width:auto}}
+/* v0.41: panels and overlays sit above every floating HUD item; floating items step aside while one is open */
+.panel{z-index:12}
+.tile-sheet{z-index:11}
+.tooldock{left:calc(var(--sal) + 10px)!important}
+body.modal-open .tooldock, body.modal-open .goal, body.modal-open .bubble{visibility:hidden;opacity:0;pointer-events:none!important}
+.tooldock, .goal{transition:opacity .15s ease}
+#tabbar{z-index:13}
+.ad-banner{z-index:13}
+.toast{z-index:70}
