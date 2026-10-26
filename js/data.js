@@ -149,12 +149,12 @@ export const FEATURES = {
     blurb: 'Assign it to one raised bed: a drip line from the rain barrel waters that bed’s thirsty plants for you (1 water each). Each card covers one bed.',
   },
   tincture: {
-    id: 'tincture', name: 'Tincture Stand', rarity: 'epic', type: 'Feature · Crafting', img: 'assets/card-tincture.jpg',
+    id: 'tincture', name: 'Tincture Stand', rarity: 'epic', type: 'Feature · Crafting',
     price: 0, packW: 0, reward: 'plotbarrel', stats: { Growth: 1, Beauty: 4, Yield: 5, Atmosphere: 4 },   // v0.52: a free goal reward, not a pack card or a purchase
     blurb: 'A little wooden stall of glass bottles, given free when you give a bought plot its own Rain Barrel: steep your blooms in Glycerin or Vinegar into tinctures that sell for far more.',
   },
   still: {
-    id: 'still', name: 'Essential Oil Stand', rarity: 'epic', type: 'Feature · Crafting', img: 'assets/card-still.jpg',
+    id: 'still', name: 'Essential Oil Stand', rarity: 'epic', type: 'Feature · Crafting',
     price: 150, stats: { Growth: 1, Beauty: 4, Yield: 5, Atmosphere: 5 },
     blurb: 'A little stall with gleaming copper stills. Find it, buy it at the Supply Market, build it on one of your other plots, then distill your seeds: each run gives an essential oil that sells for a premium plus its hydrosol (Rose Water from Damask Rose).',
   },
@@ -623,7 +623,7 @@ export const TIPS = {
   teastand: 'Your <b>Tea Stand</b> is ready! Tap it, pick any <b>three dried herbs</b> (duplicates allowed) and brew a tea — the predicted price shows as you pick. Rarer herbs make far pricier teas; three different herbs add 10%. Teas sell at your Farm Stand.',
   press: 'Your <b>Pressed Oil Stand</b> is ready! Tap it and pick a recipe — Sunflower seeds become <b>Sunflower Oil</b> or <b>Sun Butter</b>; Damask Rose seeds, olives, almonds, cacao and Sunpetal seeds make richer oils.',
   fruitstand: 'Your <b>Fruit Stand</b> is ready! Tap it to cook orchard fruit into <b>jellies, butters, sauces and canned fruit</b> — each sells for well above the raw fruit.',
-  orchard: 'The <b>Orchard</b> is yours! Fruit-tree cards are in Card Packs now. Buy saplings at the Supply Market and plant them on the tree spots — they grow slowly, then fruit again and again.',
+  orchard: 'Welcome to <b>The Orchard</b>! Fruit-tree cards are in Card Packs now. Buy saplings at the Supply Market and plant them on the tree spots. Build beds and a rain barrel here too (the shed roof feeds it). Tap <b>Map</b> to go home: both places keep growing.',
   still: 'Your <b>Essential Oil Stand</b> is ready! Distill <b>seeds</b> into essential oils (5 Lavender, 4 Calendula or 3 Chamomile seeds each) — oils sell for a premium at the Farm Stand, far more than the seeds. Each distillation also leaves a <b>hydrosol</b> (Rose Water from Damask Rose) — a small extra to sell.',
   tincture: 'Your <b>Tincture Stand</b> is ready! Steep flowers with <b>Glycerin</b> or <b>Vinegar</b> — find their cards in Card Packs, then buy them at the Supply Market — tinctures sell for far more at the Farm Stand.',
   customer: 'A customer! They’ll pick what they want from your stand and pay in coins.',

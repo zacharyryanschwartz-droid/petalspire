@@ -730,3 +730,42 @@ body.modal-open .tooldock, body.modal-open .goal, body.modal-open .bubble{visibi
 /* v0.6: Sunflower seed-bag strip on the Farm Stand */
 .row.bag-strip { background: #FFF6DC; border: 1px solid #EBD38A; }
 .row.bag-strip .acts { display: flex; flex-direction: column; gap: 6px; }
+
+/* v0.6: Map */
+.map-btn{position:absolute;right:calc(var(--sar) + 10px);top:calc(var(--sat) + 56px);z-index:6;display:flex;flex-direction:column;align-items:center;gap:1px;width:52px;height:52px;border-radius:16px;border:2px solid #3D5A40;background:#FBF6EA;box-shadow:0 3px 0 #3D5A40,0 6px 14px rgba(61,90,64,.25);padding:5px 0 3px;font:inherit;cursor:pointer}
+.map-btn svg{width:26px;height:26px}.map-btn b{font-size:11px;color:#3D5A40;line-height:1}
+.map-btn:active{transform:translateY(2px);box-shadow:0 1px 0 #3D5A40}
+.loc-chip{position:absolute;right:calc(var(--sar) + 10px);top:calc(var(--sat) + 114px);z-index:6;background:#3D5A40;color:#FBF6EA;font-weight:700;font-size:12px;padding:5px 10px;border-radius:999px;box-shadow:0 3px 10px rgba(0,0,0,.18)}
+.map-screen{position:absolute;inset:0;z-index:30;background:#F3EAD3;display:flex;flex-direction:column;padding-top:env(safe-area-inset-top);animation:mapIn .28s ease-out}
+@keyframes mapIn{from{opacity:0;transform:scale(1.03)}to{opacity:1;transform:none}}
+.map-head{display:flex;align-items:center;justify-content:space-between;padding:10px 14px 4px}
+.map-head h2{margin:0;font-family:var(--serif,Georgia,serif);color:#3D5A40;font-size:24px}
+.map-body{flex:1;min-height:0;display:flex;align-items:center;justify-content:center;padding:0 6px}
+.map-svg{width:100%;height:100%;max-width:560px}
+.map-svg .road{fill:none;stroke:#E3CFA2;stroke-width:5;stroke-linecap:round;stroke-dasharray:2 9;opacity:.9}
+.map-svg .road.open{stroke:#D9BF85;stroke-dasharray:none;stroke-width:6}
+.map-svg .ribbon{fill:#FBF6EA;stroke:#7A5A3C;stroke-width:1.4}
+.map-svg text{font:700 12px var(--sans,system-ui);fill:#3D3326}
+.map-svg .soon-tag{font-size:10px;fill:#8A7A62;font-style:italic;font-weight:600}
+.map-svg .compass text{font-size:9px}
+.map-place{cursor:pointer}.map-place.st-soon .art,.map-place.st-locked .art{opacity:.72;filter:url(#paint) saturate(.55)}
+.map-place.here .ribbon{fill:#3D5A40}.map-place.here text{fill:#FBF6EA}
+.map-place.st-forsale .ribbon{fill:#F5D35A}
+.map-place .you{animation:bob 1.6s ease-in-out infinite}
+@keyframes bob{50%{transform:translate(0,-38px)}}
+.map-card-wrap{padding:8px 12px calc(14px + env(safe-area-inset-bottom));min-height:96px}
+.map-hint{text-align:center;margin:18px 0}
+.map-card{display:flex;gap:10px;align-items:center;background:#FBF6EA;border:2px solid #7A5A3C;border-radius:18px;padding:10px 12px;box-shadow:0 4px 14px rgba(61,90,64,.18);animation:mapIn .2s ease-out}
+.map-card .mc-art{width:84px;height:58px;flex:none}
+.map-card .mc-meta{flex:1;min-width:0}.map-card .mc-meta b{font-size:16px;color:#3D5A40}
+.map-card .mc-meta p{margin:3px 0 7px;font-size:13px;line-height:1.3}
+.map-card .mc-meta p.muted{margin:3px 0}
+.map-card.st-soon .mc-art{opacity:.7}
+.soon-pill{display:inline-block;background:#E9DFC6;color:#7A5A3C;font-weight:700;font-size:12px;border-radius:999px;padding:5px 12px;letter-spacing:.02em}
+.travel-fade{position:absolute;inset:0;z-index:40;background:#F3EAD3;opacity:0;pointer-events:none!important}
+.travel-fade.go{animation:tfade .75s ease-in-out}
+@keyframes tfade{0%{opacity:0}35%{opacity:1}100%{opacity:0}}
+.goal{right:calc(var(--sar) + 72px)!important}
+.shelf-strip{display:flex;align-items:center;gap:8px;background:#FFF6E6;border:1.5px dashed #D9A93F;border-radius:12px;padding:6px 8px;margin:0 2px 8px}
+.shelf-strip svg{width:32px;height:32px;flex:none}.shelf-strip span{flex:1;font-size:13px}
+.shelf-row.on{background:linear-gradient(90deg,rgba(245,208,122,.18),transparent)}

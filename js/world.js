@@ -1,7 +1,7 @@
 // Petalspire v0.4: scene, environment, lots & woods, raised beds, roadside buildings, cars, effects
 import * as THREE from 'three';
 import { mat, glowSprite, glowTexture } from './plants.js';
-import { TILE, BED_N, ROAD, SPOTS, PARK_X, LOTS, LOT_FOR_SALE, SIGNS, SITES, OBSTACLES, siteById, ORCHARD_TREE_SPOTS } from './layout.js';
+import { TILE, BED_N, ROAD, SPOTS, PARK_X, LOTS, LOT_FOR_SALE, SIGNS, SITES, OBSTACLES, siteById, ORCHARD_TREE_SPOTS, ORCH_X, ORCH_Z } from './layout.js';
 import { FIND_COLORS, TREES } from './data.js';
 import { drawBillboard } from './billboard.js';
 
@@ -75,7 +75,7 @@ export function createWorld(canvas) {
 
   // ---------- Sky ----------
   const sunDir = new THREE.Vector3(-0.75, 0.32, -0.58).normalize();
-  scene.add(new THREE.Mesh(new THREE.SphereGeometry(140, 32, 16), new THREE.ShaderMaterial({
+  const sky = new THREE.Mesh(new THREE.SphereGeometry(140, 32, 16), new THREE.ShaderMaterial({
     side: THREE.BackSide, depthWrite: false, fog: false,
     uniforms: { top: { value: new THREE.Color('#BFDCE6') }, mid: { value: new THREE.Color('#F4E6D2') }, hor: { value: HORIZON }, sun: { value: sunDir }, sunCol: { value: new THREE.Color('#FFD08A') } },
     vertexShader: `varying vec3 vP; void main(){ vP = normalize(position); gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }`,
@@ -85,7 +85,7 @@ export function createWorld(canvas) {
         gl_FragColor = vec4(c, 1.0);
 #include <colorspace_fragment>
       }`,
-  })));
+  })); scene.add(sky);   // v0.6: the sky dome follows the camera (Home and the Orchard are far apart)
 
   // ---------- Lights ----------
   scene.add(new THREE.HemisphereLight('#D3E6EC', '#B9C99A', 0.95));
@@ -288,6 +288,56 @@ export function createWorld(canvas) {
     const stalk = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, 1.3, 4), new THREE.MeshBasicMaterial({ color: '#D9A93F', transparent: true, opacity: 0.55, depthWrite: false })); stalk.position.set(sx, 1.98, sz); fx.add(stalk);
     lotFx[id] = { fx, sign, tag };
   }
+
+  // ---------- v0.6: The Orchard — its own place on the Map, far east of Home (so it reads as a separate scene) ----------
+  const orchardScene = new THREE.Group(); scene.add(orchardScene);
+  {
+    const og = new THREE.PlaneGeometry(170, 170, 90, 90); og.rotateX(-Math.PI / 2);
+    const op = og.attributes.position, oc = new Float32Array(op.count * 3), c0 = new THREE.Color('#A9CC8E'), c1 = new THREE.Color('#C4DA98'), c2 = new THREE.Color('#8FB37F'), cw = new THREE.Color('#E2D08E'), t = new THREE.Color();
+    for (let i = 0; i < op.count; i++) {
+      const x = op.getX(i), z = op.getZ(i), wx = x + ORCH_X, wz = z + ORCH_Z;
+      const out = Math.hypot(Math.max(0, Math.abs(x) - 11), Math.max(0, Math.abs(z) - (z > 0 ? 9 : 10))), hill = THREE.MathUtils.smoothstep(out, 0, 22);
+      op.setY(i, (noise(wx * 0.06, wz * 0.06) * 7 + noise(wx * 0.2, wz * 0.2) * 1.2) * hill + noise(wx * 0.6, wz * 0.6) * 0.04 - 0.02);
+      t.copy(c0).lerp(c1, noise(wx * 0.3, wz * 0.3 + 4) * 0.9).lerp(c2, hill * 0.75).lerp(cw, noise(wx * 0.1 + 2, wz * 0.1) * 0.18);
+      oc.set([t.r, t.g, t.b], i * 3);
+    }
+    og.setAttribute('color', new THREE.BufferAttribute(oc, 3)); og.computeVertexNormals();
+    const ground2 = new THREE.Mesh(og, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95 }));
+    ground2.position.set(ORCH_X, 0, ORCH_Z); ground2.receiveShadow = true; ground2.userData.kind = 'ground'; orchardScene.add(ground2);
+    // a sandy lane in from the front, mown rows between the tree spots
+    const lane = new THREE.Mesh(new THREE.PlaneGeometry(2.2, 22), mat('#E3CFA2', { roughness: 1 })); lane.rotation.x = -Math.PI / 2; lane.position.set(ORCH_X, 0.012, 14); lane.receiveShadow = true; orchardScene.add(lane);
+    const rowM = mat('#BCD596', { roughness: 1 });
+    for (const z of [-3.2, -5.6, -8.0]) { const r = new THREE.Mesh(new THREE.PlaneGeometry(12.6, 1.5), rowM); r.rotation.x = -Math.PI / 2; r.position.set(ORCH_X, 0.01, z); r.receiveShadow = true; orchardScene.add(r); }
+    // split-rail fence around the field (open at the lane)
+    const l = LOTS.orchard, postG = new THREE.CylinderGeometry(0.06, 0.07, 0.9, 6), railG = new THREE.BoxGeometry(1, 0.07, 0.06), posts = [], rails = [];
+    const edge = (ax, az, bx, bz) => { const n = Math.max(1, Math.round(Math.hypot(bx - ax, bz - az) / 2)); for (let k = 0; k <= n; k++) { const x = ax + (bx - ax) * k / n, z = az + (bz - az) * k / n; posts.push([x, z]); if (k < n) rails.push([x + (bx - ax) / n / 2, z + (bz - az) / n / 2, Math.hypot(bx - ax, bz - az) / n, Math.atan2(-(bz - az), bx - ax)]); } };
+    edge(l.x0, l.z0, l.x1, l.z0); edge(l.x0, l.z0, l.x0, l.z1); edge(l.x1, l.z0, l.x1, l.z1); edge(l.x0, l.z1, ORCH_X - 1.4, l.z1); edge(ORCH_X + 1.4, l.z1, l.x1, l.z1);
+    const pm = new THREE.InstancedMesh(postG, woodD, posts.length), rm = new THREE.InstancedMesh(railG, woodL, rails.length * 2), m4 = new THREE.Matrix4(), q = new THREE.Quaternion();
+    posts.forEach(([x, z], k) => { m4.makeTranslation(x, 0.45, z); pm.setMatrixAt(k, m4); });
+    rails.forEach(([x, z, len, a], k) => { q.setFromAxisAngle(new THREE.Vector3(0, 1, 0), a); for (const [j, y] of [[0, 0.4], [1, 0.72]]) { m4.compose(new THREE.Vector3(x, y, z), q, new THREE.Vector3(len, 1, 1)); rm.setMatrixAt(k * 2 + j, m4); } });
+    pm.castShadow = rm.castShadow = true; orchardScene.add(pm, rm);
+    // wildflowers dotted through the grass (sunny meadow)
+    { const fr = mulberry(77), fg = new THREE.IcosahedronGeometry(0.07, 0), cols = ['#FFFFFF', '#F5D35A', '#F7C5C5', '#B79AD6'];
+      for (const c of cols) { const n = 90, im = new THREE.InstancedMesh(fg, mat(c), n); for (let k = 0; k < n; k++) { let x, z; do { x = ORCH_X + (fr() - 0.5) * 30; z = ORCH_Z + (fr() - 0.5) * 26; } while (Math.abs(x - ORCH_X) < 1.3 && z > 4 || ORCHARD_TREE_SPOTS.some((p) => Math.hypot(p.x - x, p.z - z) < 1.1)); m4.makeTranslation(x, 0.06, z); im.setMatrixAt(k, m4); } orchardScene.add(im); } }
+    // wild trees and blossom shrubs scattered on the hills around the field
+    const r = mulberry(31);
+    for (let k = 0; k < 70; k++) { const a = r() * Math.PI * 2, d = 15 + r() * 32, x = ORCH_X + Math.cos(a) * d * 1.1, z = ORCH_Z + Math.sin(a) * d - 4; if (z > 6 && Math.abs(x - ORCH_X) < 4) continue;
+      const tr = makeTree(0.8 + r() * 0.7, Math.floor(r() * 8), r, 2 + Math.floor(r() * 2)); tr.position.set(x, 0, z); tr.rotation.y = r() * 6; orchardScene.add(tr); }
+    for (let k = 0; k < 18; k++) { const b = makeBush(0.9 + r() * 0.5, r); const sx = r() < 0.5 ? -1 : 1; b.position.set(ORCH_X + sx * (8.2 + r() * 3), 0, ORCH_Z - 8 + r() * 14); orchardScene.add(b); }
+  }
+  // The Orchard shed: a little open-sided packing shed whose roof feeds the Orchard's rain barrel
+  const orchardShed = new THREE.Group(); orchardShed.position.set(SPOTS.orchardshed[0], 0, SPOTS.orchardshed[1]); orchardScene.add(orchardShed);
+  {
+    for (const [x, z] of [[-0.8, -0.55], [0.8, -0.55], [-0.8, 0.55], [0.8, 0.55]]) { const p = shadowy(new THREE.Mesh(new THREE.BoxGeometry(0.12, 1.7, 0.12), woodD)); p.position.set(x, 0.85, z); orchardShed.add(p); }
+    const roofM = mat('#B5523B', { roughness: 0.8 });
+    for (const s of [-1, 1]) { const rf = shadowy(new THREE.Mesh(new THREE.BoxGeometry(2.0, 0.07, 0.8), roofM)); rf.position.set(0, 1.95, s * 0.36); rf.rotation.x = s * 0.42; orchardShed.add(rf); }
+    const ridge = shadowy(new THREE.Mesh(new THREE.BoxGeometry(2.05, 0.08, 0.1), woodL)); ridge.position.y = 2.12; orchardShed.add(ridge);
+    const bench = shadowy(new THREE.Mesh(new THREE.BoxGeometry(1.5, 0.08, 0.5), woodL)); bench.position.set(0, 0.75, -0.2); orchardShed.add(bench);
+    for (let k = 0; k < 3; k++) { const crate = shadowy(new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.28, 0.32), woodM)); crate.position.set(-0.5 + k * 0.5, 0.14, 0.25); orchardShed.add(crate);
+      const fr = new THREE.Mesh(new THREE.IcosahedronGeometry(0.1, 0), mat(['#E0584A', '#F2B04C', '#F5D35A'][k])); fr.position.set(-0.5 + k * 0.5, 0.31, 0.25); orchardShed.add(fr); }
+    orchardShed.userData.kind = 'orchardshed';
+  }
+  const orchSign = label('The Orchard', { h: 0.55, color: '#3D5A40', border: '#D9A93F' }); orchSign.position.set(ORCH_X - 2.6, 1.7, 5.4); orchardScene.add(orchSign);
   function setLotOwned(id, owned) { const f = lotFx[id]; if (f) f.fx.visible = !owned; }
 
   // ---------- Raised beds ----------
@@ -895,6 +945,26 @@ export function createWorld(canvas) {
     billboard.userData.face.material.emissiveIntensity = bbOn ? 0.32 + 0.08 * Math.sin(t * 3) : 0.04; bbGlow.material.opacity = bbOn ? 0.6 + 0.15 * Math.sin(t * 3) : 0;
     const sh = billboard.userData.shimmer; sh.material.opacity = bbOn ? 0.55 : 0; if (bbOn) sh.material.map.offset.x = ((t * 0.28) % 1.6) - 0.8; });
 
+  // v0.6: the Crate Shelf — two old crates stacked on their sides beside the counter (shown while installed)
+  const standShelf = new THREE.Group(); standShelf.position.set(-1.78, 0, 0.12); standShelf.rotation.y = 0.18; stand.add(standShelf); standShelf.visible = false;
+  const shelfGoods = new THREE.Group(); standShelf.add(shelfGoods);
+  {
+    const cm = mat('#B98A5A'), cd = mat('#8E6040');
+    for (const [y, w] of [[0.0, 0.78], [0.5, 0.66]]) {
+      const g = new THREE.Group(); g.position.y = y;
+      const back = shadowy(new THREE.Mesh(new THREE.BoxGeometry(w, 0.48, 0.04), cd)); back.position.set(0, 0.24, -0.2); g.add(back);
+      for (const sx of [-1, 1]) { const sd = shadowy(new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.48, 0.42), cm)); sd.position.set(sx * (w / 2 - 0.025), 0.24, 0); g.add(sd); }
+      for (const yy of [0.02, 0.46]) { const sl = shadowy(new THREE.Mesh(new THREE.BoxGeometry(w, 0.04, 0.42), cm)); sl.position.set(0, yy, 0); g.add(sl); }
+      const slat = new THREE.Mesh(new THREE.BoxGeometry(w * 0.96, 0.05, 0.02), cd); slat.position.set(0, 0.34, 0.21); g.add(slat);
+      standShelf.add(g);
+    }
+    const jarC = ['#E58F94', '#F5D07A', '#B79AD6', '#9BC48A', '#F2A23A'];
+    for (let k = 0; k < 8; k++) { const row = k < 4 ? 0 : 1, x = (k % 4 - 1.5) * (row ? 0.14 : 0.17);
+      const jar = shadowy(new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.055, 0.16, 10), mat(jarC[k % 5], { roughness: 0.4 }))); jar.position.set(x, 0.13 + row * 0.5, 0.02); shelfGoods.add(jar);
+      const lid = new THREE.Mesh(new THREE.CylinderGeometry(0.058, 0.058, 0.03, 10), mat('#F7F1E3')); lid.position.set(x, 0.225 + row * 0.5, 0.02); shelfGoods.add(lid); }
+    const tag = new THREE.Mesh(new THREE.PlaneGeometry(0.34, 0.12), mat('#FFF6E6')); tag.position.set(0, 0.85, 0.215); standShelf.add(tag);
+  }
+  function setStandShelf(on, filled) { standShelf.visible = !!on; shelfGoods.visible = !!filled; }
   function setStandStock(f) { crates[0].visible = !!f.heart; crates[1].visible = !!f.sun; crates[2].visible = !!f.moon; }
 
   // ---------- Supply market (boarded up until unlocked) ----------
@@ -1264,13 +1334,15 @@ export function createWorld(canvas) {
   function updateCamera() {
     const d = ctl.base * ctl.zoom, sp = Math.sin(ctl.pol);
     camera.position.set(ctl.target.x + d * sp * Math.sin(ctl.az), ctl.target.y + d * Math.cos(ctl.pol), ctl.target.z + d * sp * Math.cos(ctl.az));
-    camera.lookAt(ctl.target); camera.updateMatrixWorld();
+    camera.lookAt(ctl.target); camera.updateMatrixWorld(); sky.position.copy(camera.position);
     sun.target.position.set(ctl.target.x, 0, ctl.target.z); sun.position.copy(sunDir).multiplyScalar(26).setY(14).add(sun.target.position);
   }
+  let locHome = null;   // v0.6: the camera's resting spot for the current location (null = Home)
+  function setLocation(target) { locHome = target; resize(); ctl.moved = false; ctl.glide = null; ctl.target.copy(ctl.home); ctl.az = DEF.az; ctl.pol = DEF.pol; ctl.zoom = 1; updateCamera(); }
   function resize() {
     const w = window.innerWidth, h = window.innerHeight;
     renderer.setSize(w, h, false); camera.aspect = w / h; camera.fov = w / h < 0.8 ? 46 : 40; camera.updateProjectionMatrix();
-    ctl.base = fitDist(); ctl.home.set(-0.3, 0.3, w / h < 0.8 ? 0.2 : -0.4);
+    ctl.base = fitDist(); if (locHome) ctl.home.set(locHome[0], 0.3, locHome[2] + (w / h < 0.8 ? 0.6 : 0)); else ctl.home.set(-0.3, 0.3, w / h < 0.8 ? 0.2 : -0.4);
     if (!ctl.moved) ctl.target.copy(ctl.home);
     updateCamera();
   }
@@ -1424,7 +1496,7 @@ export function createWorld(canvas) {
   return {
     renderer, scene, camera, ctl, DEF, tiles, beds, obs, stand, rack, market, barrel, still, setStill, teastand, setTea, press, fruitstand, setCraft, addOrchardTree, setOrchardTree, removeOrchardTree, orchardTrees, makeFruitTree, parking, setParking, windmill, billboard, setBillboard, spotGhosts, setSpotGhosts, bedTargets, setBedTargets, barrels, addBarrel, removeBarrel, gutters, setGutter, setBarrelInfo, hives, addHive, removeHive, setBeeBeds, tincture, setTincture, cars, frameHooks,
     updateCamera, resize, glide, intro, pick, project, tileWorld, sickleSweep, plowFurrows, fxCount: () => fxs.length,
-    setObstacle, chop, clearObstacle, addBed, setGhosts, setLotOwned, setStandStock, setMarketOpen, setRack, appear, spawnCar, spawnTruck, poof,
+    setObstacle, chop, clearObstacle, addBed, setGhosts, setLotOwned, setLocation, orchardScene, orchardShed, setStandShelf, standShelf, setStandStock, setMarketOpen, setRack, appear, spawnCar, spawnTruck, poof,
     setPlant, attachPlant, setIcon, setShade, bgTrees, setIrrigation, irrigPulse, irrig, select, splash, render, textSprite, relabel, groundAt,
     buildAnim, makeBlueprint, setBlueprint, setMarketState, addLoot, removeLoot, addDecor, removeDecor, addGrown, setGrown, removeGrown, loots, decors,
     iconWorld(i) { const t = tiles[i]; t.icon.updateWorldMatrix(true, false); return new THREE.Vector3().setFromMatrixPosition(t.icon.matrixWorld); },

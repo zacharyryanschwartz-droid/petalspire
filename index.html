@@ -30,6 +30,8 @@
       <button class="icon-btn" id="btn-settings" aria-label="Settings"><i data-icon="gear"></i></button>
     </div>
   </header>
+  <button id="btn-map" class="map-btn" aria-label="Map"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6.5 9 4l6 2.5L21 4v13.5L15 20l-6-2.5L3 20z" fill="#F7F1E3" stroke="#3D5A40" stroke-width="1.6" stroke-linejoin="round"/><path d="M9 4v13.5M15 6.5V20" stroke="#3D5A40" stroke-width="1.4"/><circle cx="17.5" cy="9.5" r="1.8" fill="#C2513F"/></svg><b>Map</b></button>
+  <div id="loc-chip" class="loc-chip hidden">The Orchard</div>
   <div id="goal" class="goal hidden"></div>
   <div id="tip" class="tip hidden"><img src="assets/emblem.png" alt="" /><p id="tip-text"></p></div>
   <div id="tile-sheet" class="sheet tile-sheet hidden"></div>
@@ -39,6 +41,12 @@
       <div id="panel-body" class="panel-body"></div>
     </div>
   </section>
+  <section id="map" class="map-screen hidden" aria-modal="true" aria-label="Map">
+    <div class="map-head"><h2>Map</h2><button class="close-btn" id="map-close" aria-label="Close map">×</button></div>
+    <div id="map-body" class="map-body"></div>
+    <div id="map-card" class="map-card-wrap"></div>
+  </section>
+  <div id="travel-fade" class="travel-fade"></div>
   <div id="buildbar" class="buildbar hidden"><p id="buildbar-text"></p><button class="btn sm" id="buildbar-cancel">Cancel</button></div>
   <div id="tooldock" class="tooldock hidden"><button id="tool-sickle" class="tool hidden" aria-label="Harvest Sickle: harvest a whole raised bed"><span class="tool-art"></span><b>Sickle</b><em></em></button><button id="tool-plow" class="tool hidden" aria-label="Hand Plow: plant a whole raised bed"><span class="tool-art"></span><b>Plow</b><em></em></button></div>
   <nav id="tabbar">

@@ -5,7 +5,7 @@ import { buildPlant } from './plants.js';
 import { parkLv, hydroId, HYDROSOL, NON_CARDS, ROAD_SCRAP, TINC_DUP_COINS, SPECIES, FANTASY_SPECIES, PLANT_TIERS, cardTier, FEATURE_TIER_FROM_OLD, TIER_ORDER, PACK_W, DRYING, rollSeeds, FEATURES, CARDS, RARITY, ITEMS, SELL_ORDER, TIPS, RESALE, PACKS, PACK_JEWELS, JEWEL_EXCHANGE, JEWEL_DROP, PARKING, BILLBOARD, WINDMILL, DUP_COINS, SUPPLY_CARDS, SUPPLY_DUP, WATER_TRUCK, CARD_LEVELS, RACK_SLOTS, DRY_S, BARREL, BASES, TINCTURE, STILL, oilId, tinctureId, TINCTURE_NAMES,
   WOOD, BED_COSTS, STAND_CAP, MARKET_GOAL, WATER_REGEN_S, WATER_REGEN_MAX, STARTER, STARTER_FILL, STARTER_JEWELS,
   BUILDS, FINDS, FIND_IDS, FIND_CHANCE, SAPLING_CHANCE, RESTORE_HURRY_JEWELS, ATMOS_STEP, ATMOS_MAX, TREE, SHOP, JEWEL_BUNDLES, NO_ADS_BUNDLE, ADS, ADS_MODE, OTHER_GAMES, SHADE, TEA, teaInfo, teaId, teaSps, registerTea, DRY_TIER_S, PACK_W_ORCH, TREES, TREE_IDS, PRESS, FRUITSTAND, SEED_BAGS, bagId } from './data.js';
-import { ROAD, LOTS, SIGNS, LOT_FOR_SALE, LOT_PRICES, SITES, OBSTACLES, SPOTS, PARK_X, BEHIND, FRONT, BED_N, TILE, SITE_HALF, siteById, obstacleById, inSite, lotCenter, lotAt, ORCHARD_TREE_SPOTS } from './layout.js';
+import { ROAD, LOTS, SIGNS, LOT_FOR_SALE, LOT_PRICES, SITES, OBSTACLES, SPOTS, PARK_X, BEHIND, FRONT, BED_N, TILE, SITE_HALF, siteById, obstacleById, inSite, lotCenter, lotAt, ORCHARD_TREE_SPOTS, OWNABLE_LOTS, LOCATIONS, ORCHARD_PRICE, ORCH_X } from './layout.js';
 import { ICONS, itemIcon, FEATURE_ART, findIcon, decorIcon } from './icons.js';
 import { Payments } from './payments.js';
 import { createAds, gameArt } from './ads.js';
@@ -52,7 +52,7 @@ function freshState() {
     cards: {},   // v0.4: card stacks { id: { n: copies, lv } }
     hives: {}, hiveInv: 0,   // v0.4: placeable Honeybee Skeps, one per plot ({ lot: { x, z } }); the boost only reaches beds on that plot
     discovered: {},
-    lots: { home: true }, lotsBought: 0, obs: {}, beds: [], tiles: [],
+    lots: { home: true }, loc: 'home', lotsBought: 0, obs: {}, beds: [], tiles: [],
     rack: Array(RACK_SLOTS).fill(null),
     stand: {}, starterOpened: false, waterAt: 0,
     // v0.3: things are built, not unlocked
@@ -131,7 +131,29 @@ const siteClear = (id) => SITE_OBS[id].every((o) => obsState(o) === 'gone') && !
 const siteLeft = (id) => SITE_OBS[id].filter((o) => obsState(o) !== 'gone').length + siteThings(id).length;
 const bedCost = () => BED_COSTS[Math.min(S.beds.length, BED_COSTS.length - 1)];
 const standCount = () => Object.values(S.stand).reduce((a, b) => a + b, 0);
-const standCap = () => STAND_CAP + (S.bonus.crate ? 4 : 0);
+// v0.6: the Crate Shelf is an item you install on (and take back off) the Farm Stand: +4 shelf space while installed
+const SHELF_BONUS = 4;
+const shelfOn = () => !!(S.bonus.crate && S.shelfOn && S.standBuilt);
+const standCap = () => STAND_CAP + (shelfOn() ? SHELF_BONUS : 0);
+function syncShelf() { W.setStandShelf?.(shelfOn(), standCount() > STAND_CAP); }
+function installShelf() {
+  if (!S.bonus.crate || S.shelfOn) return false;
+  if (!S.standBuilt) { toast('Build the Roadside Farm Stand first, then install the Crate Shelf on it'); return false; }
+  S.shelfOn = true; save(); syncShelf(); renderPanel(); hud();
+  W.poof?.(V3(SPOTS.stand[0] - 1.75, 0.8, SPOTS.stand[1] + 0.2), '#F5D07A', 16, 1.5);
+  toast(`Crate Shelf installed on your Farm Stand · shelf space ${STAND_CAP} → ${standCap()}`); return true;
+}
+// taking the shelf out puts everything that no longer fits back in the bag (last-listed products first)
+function uninstallShelf(quiet) {
+  if (!S.shelfOn) return { back: 0 };
+  S.shelfOn = false; let over = standCount() - STAND_CAP, back = 0;
+  if (over > 0) for (const id of [...SELL_ORDER].reverse().concat(Object.keys(S.stand))) { if (over <= 0) break; const q = Math.min(over, S.stand[id] || 0); if (!q) continue;
+    if (ITEMS[id]?.antique) { for (let n = 0; n < q; n++) giveRestored(ITEMS[id].antique); } else S.inv[id] = (S.inv[id] || 0) + q;
+    S.stand[id] -= q; if (!S.stand[id]) delete S.stand[id]; over -= q; back += q; }
+  save(); syncStand(); syncShelf(); hud(); if (panel) renderPanel();
+  if (!quiet) toast(`Crate Shelf taken out — back in your Bag${back ? ` · ${back} item${back > 1 ? 's' : ''} moved from the stand to your Bag` : ''} · shelf space ${standCap()}`);
+  return { back };
+}
 const lotPrice = () => LOT_PRICES[Math.min(S.lotsBought, LOT_PRICES.length - 1)];
 const tileName = (i) => { const b = Math.floor(i / PER_BED), k = i % PER_BED; return `Bed ${b + 1} · ${'ABC'[Math.floor(k / BED_N)]}${(k % BED_N) + 1}`; };
 // v0.52 Windmill: every connected barrel refills faster (60 → 20 s at Lv1, 18/17/15 s at Lv2–4; was 40 s); multiplies with the Brass Watering Can (×½)
@@ -177,10 +199,11 @@ function handSource(i) {
 // v0.41: a barrel only collects rain through a gutter from a roof on the SAME plot. Connection is automatic: any roofed
 // building on that plot (Farm Stand, Supply Market — even boarded up —, Tincture Stand, Essential Oil Stand). The Home
 // barrel uses the Farm Stand once built, and the Market roof before that, so the starter barrel always works.
-const ROOF_NAMES = { stand: 'Farm Stand', market: 'Supply Market', tincture: 'Tincture Stand', still: 'Essential Oil Stand', teastand: 'Tea Stand', press: 'Pressed Oil Stand', fruitstand: 'Fruit Stand' };
+const ROOF_NAMES = { stand: 'Farm Stand', market: 'Supply Market', tincture: 'Tincture Stand', still: 'Essential Oil Stand', teastand: 'Tea Stand', press: 'Pressed Oil Stand', fruitstand: 'Fruit Stand', orchardshed: 'Orchard Shed' };
 function lotRoofs(lot) {
   const out = [];
   if (lot === 'home') { if (S.standBuilt) out.push('stand'); out.push('market'); }
+  if (lot === 'orchard' && S.lots.orchard) out.push('orchardshed');   // v0.6: the Orchard's own shed roof
   if (S.tinctureBuilt && (S.tincPos?.lot || 'home') === lot) out.push('tincture');
   if (S.stillBuilt && S.stillPos?.lot === lot) out.push('still');
   if (S.teaBuilt && S.teaPos?.lot === lot) out.push('teastand');
@@ -193,13 +216,13 @@ function lotRoofs(lot) {
 const BARREL_STANDS_MAX = 2;
 function barrelStands(lot) {
   const b = S.barrels[lot]; if (!b) return []; const rs = lotRoofs(lot); if (!rs.length) return [];
-  const st = rs.filter((r) => r !== 'market'); if (!st.length) return ['market'];
+  const st = rs.filter((r) => r !== 'market' && r !== 'orchardshed'); if (!st.length) return [rs.includes('orchardshed') ? 'orchardshed' : 'market'];
   const d = (p) => (p === 'stand' ? -1 : Math.hypot(SPOTS[p][0] - b.x, SPOTS[p][1] - b.z));   // the Farm Stand first, then nearest
   return st.sort((p, q) => d(p) - d(q)).slice(0, BARREL_STANDS_MAX);
 }
 const barrelPerTick = (lot) => barrelStands(lot).length;
 function barrelRoof(lot) { return barrelStands(lot)[0] || null; }
-const standsLine = (lot) => { const n = barrelStands(lot).filter((r) => r !== 'market').length; return n ? `${n} stand${n > 1 ? 's' : ''} connected • +${barrelPerTick(lot)} per tick` : `Supply Market roof • +1 per tick`; };
+const standsLine = (lot) => { const n = barrelStands(lot).filter((r) => r !== 'market' && r !== 'orchardshed').length; return n ? `${n} stand${n > 1 ? 's' : ''} connected • +${barrelPerTick(lot)} per tick` : `${lot === 'orchard' ? 'Orchard Shed' : 'Supply Market'} roof • +1 per tick`; };
 const NOT_COLLECTING = 'Not collecting: connect to a stand on this plot';
 function regenBarrels() {
   let ch = false; const rs = regenS() * 1000, max = regenMax();
@@ -377,6 +400,9 @@ let sunflowerRefund = 0;
   for (const [id, v] of Object.entries(OLD)) for (const box of [S.inv, S.stand || {}]) { const n = box[id] || 0; if (n > 0) sunflowerRefund += n * v; delete box[id]; }
   if (Array.isArray(S.rack)) S.rack = S.rack.map((r) => { if (r?.sp === 'sunflower') { sunflowerRefund += OLD.dried_sunflower; return null; } return r; });
   if (sunflowerRefund) { S.coins += sunflowerRefund; S.stats.sunflowerRefund = (S.stats.sunflowerRefund || 0) + sunflowerRefund; writeSave(); } }
+// v0.6: shelves used to switch on the moment they were restored. Keep it installed where it already worked (a built stand);
+// a shelf that was stuck in the bag (no stand yet) becomes an installable item.
+if (S.shelfOn === undefined) { S.shelfOn = !!(S.bonus.crate && S.standBuilt); }
 W.makeBlueprint(W.tincture, 'tincture', `Blueprint · ${BUILDS.tincture.wood} Wood`, 2.2, 1.4);
 for (const o of OBSTACLES) W.setObstacle(o.id, obsState(o.id));
 for (const id of LOT_FOR_SALE) W.setLotOwned(id, !!S.lots[id]);
@@ -435,7 +461,7 @@ function syncStand() {
   const box = { heart: 0, sun: 0, moon: 0 }, names = ['heart', 'sun', 'moon'];
   for (const [id, n] of Object.entries(S.stand)) { if (!n) continue; const m = /^(seed|flower|dried)_(.+)$/.exec(id); if (!m || SP_IDX[m[2]] == null) continue;
     box[names[SP_IDX[m[2]] % 3]] += n; if (id === 'dried_lavender') box.moon += n; }
-  W.setStandStock(box);
+  W.setStandStock(box); syncShelf();
 }
 bgCasters = W.bgTrees.map((b, n) => ({ id: 'bg' + n, x: b.x, z: b.z, w: SHADE.bgTree.w * b.s, reach: SHADE.bgTree.reach * b.s }));
 catchUpIrrigation(); catchUpShade(); worldReady = true; applyShade(); shadeSig = shadeSignature();
@@ -803,7 +829,7 @@ function takeRestored(k) {
   const f = FINDS[k];
   if (f.into.decor) { if (!(S.decorInv[f.into.decor] > 0)) return false; if (!--S.decorInv[f.into.decor]) delete S.decorInv[f.into.decor]; return true; }
   if (!S.bonus[f.into.bonus]) return false;
-  if (f.into.bonus === 'crate' && standCount() > STAND_CAP) { toast(`Take ${standCount() - STAND_CAP} item${standCount() - STAND_CAP > 1 ? 's' : ''} off your stand first — without the Crate Shelf it holds ${STAND_CAP}`); return false; }
+  if (f.into.bonus === 'crate') uninstallShelf(true);
   S.bonus[f.into.bonus] = false;
   if (f.into.bonus === 'can') { const max = regenMax(); for (const b of Object.values(S.barrels)) if (b.w > max) b.w = max; }
   return true;
@@ -846,7 +872,8 @@ function sellPlaced(f) {
 }
 function finishRestore(r) {
   S.restoring = S.restoring.filter((x) => x !== r); const f = FINDS[r.kind]; S.stats.restored++;
-  if (f.into.bonus) { S.bonus[f.into.bonus] = true; toast(`<i data-icon="sparkle"></i> Restored: <b>${f.into.name}</b> · ${f.into.blurb}`); }
+  if (f.into.bonus === 'crate') { S.bonus.crate = true; S.shelfOn = false; toast(`<i data-icon="sparkle"></i> Restored: <b>${f.into.name}</b> · install it on your Farm Stand from Bag → Finds (+${SHELF_BONUS} shelf space)`); }
+  else if (f.into.bonus) { S.bonus[f.into.bonus] = true; toast(`<i data-icon="sparkle"></i> Restored: <b>${f.into.name}</b> · ${f.into.blurb}`); }
   else { S.decorInv[f.into.decor] = (S.decorInv[f.into.decor] || 0) + 1; toast(`<i data-icon="sparkle"></i> Restored: <b>${f.into.name}</b> · place it from Bag → Finds`); }
   save(); hud(); checkGoals(); if (panel === 'bag') renderPanel();
 }
@@ -905,12 +932,12 @@ function openStarterPack() {
 // ---------------- Structures you build ----------------
 const useOpt = { stand: true, market: true, tincture: true };
 const marketCoins = () => BUILDS.market.coins - (useOpt.market && S.scrap >= BUILDS.market.opt.scrap ? BUILDS.market.opt.save : 0);
-function glideTo(k) { W.ctl.moved = true; W.glide({ target: V3(SPOTS[k][0] * 0.85, 0.3, SPOTS[k][1] - 0.8), zoom: Math.min(W.ctl.zoom, 1.0) }, 0.8); }
+function glideTo(k) { W.ctl.moved = true; glideW({ target: V3(SPOTS[k][0] > 150 ? SPOTS[k][0] : SPOTS[k][0] * 0.85, 0.3, SPOTS[k][1] - 0.8), zoom: Math.min(W.ctl.zoom, 1.0) }, 0.8); }
 function buildStand() {
   const B = BUILDS.stand;
   if (S.standBuilt || building.stand || !S.beds.length || S.wood < B.wood) return false;
   S.wood -= B.wood;
-  let crate = false; if (useOpt.stand && S.finds.old_crate > 0 && !S.bonus.crate) { S.finds.old_crate--; if (!S.finds.old_crate) delete S.finds.old_crate; S.bonus.crate = true; crate = true; }
+  let crate = false; if (useOpt.stand && S.finds.old_crate > 0 && !S.bonus.crate) { S.finds.old_crate--; if (!S.finds.old_crate) delete S.finds.old_crate; S.bonus.crate = true; S.shelfOn = true; crate = true; }
   S.standBuilt = true; building.stand = true; save(); closePanel(); syncBlueprints(); glideTo('stand');
   setTimeout(() => W.buildAnim(W.stand, [2.3, 2.2, 1.5], () => {
     building.stand = false; popAt(spotV('stand'), 'Farm Stand built!'); if (crate) setTimeout(() => toast('The Old Crate became a display shelf · +4 shelf space'), 600);
@@ -1205,7 +1232,7 @@ const baseOpen = (b) => !!S.unlocked[b] && standOpenForBases();
 const baseNeeds = (b) => [!S.unlocked[b] && `Find the ${BASES[b].name} card`, !standOpenForBases() && 'Unlocks with Tincture Stand'].filter(Boolean);
 const tincBase = () => { const b = S.tincBase === 'vinegar' ? 'vinegar' : 'glycerin', o = b === 'glycerin' ? 'vinegar' : 'glycerin'; return S.inv[b] > 0 || !(S.inv[o] > 0) ? b : o; };
 const tincCost = () => BUILDS.tincture.wood;   // v0.52: 0 — the stand is a free goal reward
-const tincLots = () => LOT_FOR_SALE.filter((l) => S.lots[l]);
+const tincLots = () => OWNABLE_LOTS.filter((l) => S.lots[l]);
 // Can the Tincture Stand go here? Whole footprint must be on cleared ground of one bought neighbouring plot.
 const BED_HALF = TILE * BED_N / 2;   // v0.41: stands may not cover a bed patch
 function tincProblem(x, z, what) {
@@ -1276,7 +1303,7 @@ function startBuy(id) {
   }
   if ((id === 'tincture' || id === 'still') && !tincLots().length) { toast(`Buy a neighbouring plot first — the ${FEATURES[id].name} is built on one of your other plots`); return false; }
   if (id === 'beehive' && !hiveLots().length) { toast('Every plot you own already has a beehive (one per plot)'); return false; }
-  if (B.tree && !S.lots.orchard) { toast('Buy the Orchard plot first — fruit trees grow only there'); return false; }
+  if (B.tree && !S.lots.orchard) { toast('Buy The Orchard on the Map first — fruit trees grow only there'); return false; }
   buyIntent = { id };
   try { if (id === 'tincture' || id === 'still' || id === 'teastand' || CRAFT[id]) startStandPlace(id, FEATURES[id].name, c.wood); else if (B.tree) startTreePlace(B.tree); else enterPlace(B.what); } finally { buyIntent = null; }
   if (!placing || placing.what !== B.what) return false;
@@ -1291,7 +1318,7 @@ function startStandPlace(what, title, c) {
   placing = { what, spots }; W.setSpotGhosts(spots);
   $('#buildbar-text').innerHTML = ok.length ? `<b>${title}</b> · tap a <b>green spot</b> on ${ANY_PLOT.has(what) ? 'any plot you own' : lots.map(lotName).join(' or ')}${buyIntent ? '' : ' · ' + woodTag(c)}` : `<b>${title}</b> · no clear spot yet — clear trees on ${lots.map(lotName).join(' or ')} first`;
   fillIcons($('#buildbar')); $('#buildbar').classList.remove('hidden');
-  const L = LOTS[(ANY_PLOT.has(what) ? (ok[0]?.lot || 'home') : lots[0])]; W.ctl.moved = true; W.glide({ target: V3((L.x0 + L.x1) / 2, 0.3, (L.z0 + L.z1) / 2), zoom: Math.max(W.ctl.zoom, 1.0) }, 0.8);
+  const L = LOTS[(ANY_PLOT.has(what) ? ((ok.find((p) => (p.lot === 'orchard') === (curLoc() === 'orchard')) || ok[0])?.lot || 'home') : (lots.includes(curLoc()) ? curLoc() : lots[0]))]; W.ctl.moved = true; glideW({ target: V3((L.x0 + L.x1) / 2, 0.3, (L.z0 + L.z1) / 2), zoom: Math.max(W.ctl.zoom, 1.0) }, 0.8);
   return true;
 }
 function placeTincture(x, z) {
@@ -1436,7 +1463,7 @@ function startTreePlace(sp) {
   placing = { what: 'orchardtree', sp, spots }; W.setSpotGhosts(spots);
   $('#buildbar-text').innerHTML = ok.length ? `<b>${TREES[sp].name} sapling</b> · tap a <b>green spot</b> in the Orchard` : `<b>${TREES[sp].name} sapling</b> · no free spot — clear the old trees in the Orchard`;
   fillIcons($('#buildbar')); $('#buildbar').classList.remove('hidden');
-  W.ctl.moved = true; W.glide({ target: V3(0, 0.3, -24.5), zoom: Math.max(W.ctl.zoom, 1.0) }, 0.8);
+  W.ctl.moved = true; glideW({ target: V3(ORCH_X, 0.3, -4.2), zoom: Math.max(W.ctl.zoom, 1.0) }, 0.8);
   return true;
 }
 function plantOrchard(k, sp, at = now()) {
@@ -1509,7 +1536,7 @@ function stillHTML() {
   const rows = Object.entries(STILL.recipes).filter(([sp, r]) => r.in ? (S.unlocked[sp] || S.inv[r.in] > 0) : recipeOpen(sp)).map(([sp, r]) => { const id = oilId(sp), inId = r.in || 'seed_' + sp, have = S.inv[inId] || 0, ok = free && have >= r.n, sd = SPECIES[sp];
     const hy = hydroId(sp);
     return `<div class="row still-recipe" data-recipe="${sp}"><div class="ico two-ico">${itemSvg(id)}${itemSvg(hy)}</div><div class="meta"><b>${ITEMS[id].name}</b><small class="yields">Makes <b>1 ${ITEMS[id].name}</b> (${sellOf(id)}) <b>+ 1 ${ITEMS[hy].name}</b> (${sellOf(hy)})</small><small>${r.in ? `${r.n} ${ITEMS[inId].name}` : `${r.n} ${sd.name} seeds`} · ${fmtTime(r.s * 1000)} <span class="oil-vs">${r.in ? `(the leaves sell for ${r.n * sellOf(inId)})` : `(seeds sell for ${r.n * sd.seedSell}, cost ${r.n * sd.seedPrice} new)`}</span> · you have ${have}</small></div><div class="acts"><button class="btn btn-gold sm" data-distill="${sp}" ${ok ? '' : 'disabled'}>Distill</button></div></div>`; }).join('');
-  return `<div class="hero"><img src="assets/still.jpg" alt=""/><p>Essential oils — and their hydrosols — from your seeds</p></div>
+  return `<div class="hero tea-hero">${FEATURE_ART.still}<p>Essential oils — and their hydrosols — from your seeds</p></div>
     <div class="sec-title">Stills · ${S.stills.filter(Boolean).length}/${S.stills.length}</div><div class="tslots">${slots}</div>
     <div class="sec-title">Recipes · seeds${Object.values(STILL.recipes).some((r) => r.in) ? ' (and eucalyptus leaves)' : ''}</div><div class="list">${rows}</div>
     <p class="muted" style="margin:10px 4px 0">Every distillation gives two products: the essential oil and its hydrosol, the scented water left in the still (Damask Rose gives Rose Water). Each oil is worth far more than selling its seeds — but those seeds won’t be planted. Stills keep running while the game is closed. Sell oils at the Farm Stand.</p>`;
@@ -1533,7 +1560,7 @@ function tinctureHTML() {
       : `<div class="tslot">${itemSvg(id)}<span><b>${ITEMS[id].name}</b><small>Steeping · <em data-tleft="${k}">${fmtTime(left)}</em></small></span></div>`; }).join('');
   const rows = Object.entries(TINCTURE.recipes).filter(([sp]) => recipeOpen(sp)).map(([sp, r]) => { const id = tinctureId(sp, base), have = S.inv['flower_' + sp], ok = has && free && have >= r.n;
     return `<div class="row"><div class="ico">${itemSvg(id)}</div><div class="meta"><b>${ITEMS[id].name}</b><small>${r.n} ${TINCTURE_NAMES[sp]} + 1 ${BASES[base].name} · ${fmtTime(r.s * 1000)} · sells for ${r.sell[base]} · you have ${have}</small></div><div class="acts"><button class="btn btn-gold sm" data-craft="${sp}" ${ok ? '' : 'disabled'}>Steep</button></div></div>`; }).join('');
-  return `<div class="hero"><img src="assets/tincture.jpg" alt=""/><p>Tinctures &amp; dried herbs</p></div>
+  return `<div class="hero tea-hero">${FEATURE_ART.tincture}<p>Tinctures &amp; dried herbs</p></div>
     <div class="sec-title">Base</div>${seg}
     ${has ? '' : `<p class="need-base">Needs Glycerin or Vinegar: buy at the Market${SUPPLY_CARDS.some((b) => S.unlocked[b]) ? '' : ' · find the Glycerin or Vinegar card in a Card Pack first'}</p>${S.marketBuilt ? '<div class="ts-actions" style="margin:0 0 8px"><button class="btn" data-act="open-market">Visit Supply Market</button></div>' : ''}`}
     <div class="sec-title">Flasks · ${S.tinc.filter(Boolean).length}/${S.tinc.length}</div><div class="tslots">${slots}</div>
@@ -1623,7 +1650,9 @@ function findsHTML() {
       <div class="find-acts"><button class="btn btn-primary sm" data-restore="${k}" ${ok ? '' : 'disabled'}>Restore ${costHTML(f.restore)} · ${fmtTime(f.restore.s * 1000)}</button>
       <button class="btn sm" data-recycle="${k}"><i data-icon="recycle"></i> Recycle ${gainHTML(f.recycle)}</button></div></div>`; }).join('');
   const decor = Object.entries(S.decorInv).filter(([, n]) => n > 0).map(([t, n]) => `<div class="find-row"><div class="ico">${decorIcon(t)}</div><div class="meta"><b>${DECOR_INFO[t].name}${n > 1 ? ` ×${n}` : ''}</b><small>Restored decor · +${DECOR_INFO[t].atm} atmosphere when placed</small></div><div class="acts"><button class="btn btn-gold sm" data-place="${t}">Place</button><button class="btn sm" data-sell-restored="${kindOfDecor(t)}">Sell ${coin(buyback(RESALE.antique[kindOfDecor(t)]))}</button></div></div>`).join('');
-  const bon = Object.values(FINDS).filter((f) => f.into.bonus && S.bonus[f.into.bonus]).map((f) => `<div class="row"><div class="ico">${findIcon(Object.keys(FINDS).find((k) => FINDS[k] === f))}</div><div class="meta"><b>${f.into.name}</b><small>${f.into.blurb} · <span class="ok-tag">Active</span></small></div><div class="acts"><button class="btn sm" data-sell-restored="${kindOfBonus(f.into.bonus)}">Sell ${coin(buyback(RESALE.antique[kindOfBonus(f.into.bonus)]))}</button></div></div>`).join('');
+  const shelfRow = (f) => { const on = shelfOn(), k = kindOfBonus('crate');
+    return `<div class="row shelf-row${on ? ' on' : ''}" data-shelf-row><div class="ico">${findIcon(k)}</div><div class="meta"><b>${f.into.name}</b><small>${on ? `<span class="ok-tag">Installed</span> on your Farm Stand · +${SHELF_BONUS} shelf space (${standCount()}/${standCap()} used)` : S.standBuilt ? `In your Bag · install it on your Farm Stand for +${SHELF_BONUS} shelf space` : `In your Bag · build the Farm Stand to install it (+${SHELF_BONUS} shelf space)`}</small></div><div class="acts">${on ? `<button class="btn sm" data-uninstall-shelf>Take out</button>` : `<button class="btn btn-gold sm" data-install-shelf ${S.standBuilt ? '' : 'disabled'}>Install</button>`}<button class="btn sm" data-sell-restored="${k}">Sell ${coin(buyback(RESALE.antique[k]))}</button></div></div>`; };
+  const bon = Object.values(FINDS).filter((f) => f.into.bonus && S.bonus[f.into.bonus]).map((f) => f.into.bonus === 'crate' ? shelfRow(f) : `<div class="row"><div class="ico">${findIcon(Object.keys(FINDS).find((k) => FINDS[k] === f))}</div><div class="meta"><b>${f.into.name}</b><small>${f.into.blurb} · <span class="ok-tag">Active</span></small></div><div class="acts"><button class="btn sm" data-sell-restored="${kindOfBonus(f.into.bonus)}">Sell ${coin(buyback(RESALE.antique[kindOfBonus(f.into.bonus)]))}</button></div></div>`).join('');
   const placed = S.decor.length ? `<p class="muted" style="margin:10px 4px 0">${S.decor.length} decor placed in your garden — tap one to move it back to your bag or sell it. Restored finds can also go on your <b>Farm Stand</b> as antiques (collectors pay more).</p>` : '';
   if (!raw && !restoring && !decor && !bon) return head + `<div class="empty">Nothing found yet. About one in five trees, stumps, bushes and rocks hides something — watch for a <b>sparkle</b> when you clear.</div>${placed}`;
   return head + (restoring ? `<div class="sec-title">In the workshop</div><div class="list">${restoring}</div>` : '') +
@@ -1759,7 +1788,7 @@ function projectCard(id) {
       <button class="btn btn-gold" data-act="build-teastand" ${S.wood >= c ? '' : 'disabled'}><i data-icon="build"></i> Choose a spot &amp; build</button><small class="opt-note">Goes on any plot you own</small>`);
   }
   if (id === 'still') {
-    const art = `<img src="assets/card-still.jpg" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:10px"/>`, sub = 'Distill seeds in copper stills into essential oils that sell for a premium.', nm = 'Essential Oil Stand', c = BUILDS.still.wood;
+    const art = FEATURE_ART.still, sub = 'Distill seeds in copper stills into essential oils that sell for a premium.', nm = 'Essential Oil Stand', c = BUILDS.still.wood;
     if (S.stillBuilt) return card(art, nm, sub, status('done', `Built · ${lotName(S.stillPos?.lot || 'home')}`));
     if (!S.unlocked.still) return card(art, nm, sub, status('lock', '<i data-icon="lock"></i> Find the Essential Oil Stand card in a Card Pack'), true);
     if (!S.owned.still) return buyBuildCard('still', art, nm, sub, tincLots().length ? '' : 'Buy a neighbouring plot first — it’s built on one of your other plots');
@@ -1768,7 +1797,7 @@ function projectCard(id) {
       <button class="btn btn-gold" data-act="build-still" ${S.wood >= c ? '' : 'disabled'}><i data-icon="build"></i> Choose a spot &amp; build</button><small class="opt-note">Goes on one of your other plots (${tincLots().map(lotName).join(', ')})</small>`);
   }
   if (id === 'tincture') {
-    const art = `<img src="assets/card-tincture.jpg" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:10px"/>`, sub = 'Steep flowers with Glycerin or Vinegar into tinctures that sell for far more.';
+    const art = FEATURE_ART.tincture, sub = 'Steep flowers with Glycerin or Vinegar into tinctures that sell for far more.';
     if (S.tinctureBuilt) return card(art, 'Tincture Stand', sub, status('done', 'Built'));
     if (!S.owned.tincture) return card(art, 'Tincture Stand', sub, status('lock', `<i data-icon="lock"></i> Free goal reward: ${GOALS.find((g) => g.reward === 'tincture').text.split(' · ')[0]}`), true);
     if (!tincLots().length) return card(art, 'Tincture Stand', sub, status('lock', '<i data-icon="lock"></i> Yours! Buy a neighbouring plot first — it’s placed on one of your other plots'), true);
@@ -1846,7 +1875,7 @@ function standHTML() {
   const prog = !S.marketAvail ? `<div class="goal-mini"><small>Earn ${MARKET_GOAL} coins here to start rebuilding the Supply Market</small><span class="gbar"><em style="width:${Math.min(100, (S.stats.standEarned / MARKET_GOAL) * 100)}%"></em></span><small>${Math.min(S.stats.standEarned, MARKET_GOAL)} / ${MARKET_GOAL}</small></div>` : `<p class="muted" style="margin:0 4px 8px">Earned at your stand: ${coin(S.stats.standEarned)}${atmosphere() ? ` · atmosphere ${atmosphere()}` : ''}</p>`;
   return `<div class="hero"><img src="assets/market.jpg" alt=""/><p>Fresh flowers by the road</p></div>
     <div class="stand-status"><i data-icon="stand"></i><span id="stand-status">${status}</span></div>${prog}${rewardHTML()}
-    <div class="sec-title">On your stand · ${used}/${cap}${S.bonus.crate ? ' · crate shelf' : ''}</div>
+    <div class="sec-title">On your stand · ${used}/${cap}${shelfOn() ? ' · crate shelf' : ''}</div>${S.bonus.crate ? `<div class="shelf-strip" data-shelf-strip>${findIcon('old_crate')}<span><b>Crate Shelf</b> ${shelfOn() ? `installed · +${SHELF_BONUS} space` : 'in your Bag'}</span>${shelfOn() ? '<button class="btn sm" data-uninstall-shelf>Take out</button>' : '<button class="btn btn-gold sm" data-install-shelf>Install</button>'}</div>` : ''}
     ${onStand ? `<div class="list">${onStand}</div>` : '<div class="empty">The stand is empty.</div>'}
     ${antiquesHTML(used >= cap)}
     <div class="sec-title">From your satchel</div>
@@ -1962,7 +1991,7 @@ function fillBarrels() {
   const pl = (n) => `${n} barrel${n === 1 ? '' : 's'}`;
   toast(`🚚 Water truck on its way to fill ${pl(lots.length)}`);
   if (truck && truck.state !== 'out') truck.leave();
-  W.ctl.moved = true; W.glide({ target: V3(-5.5, 0.3, 3.6), zoom: Math.max(W.ctl.zoom, 1.05) }, 1.0);
+  W.ctl.moved = true; glideW({ target: V3(-5.5, 0.3, 3.6), zoom: Math.max(W.ctl.zoom, 1.05) }, 1.0);
   const c = truck = W.spawnTruck({ stopX: -10.6, onPark: (car) => {
     W.poof(car.group.position.clone().setY(1.3), '#8EC5E0', 22, 2.2);
     lots.forEach((l, k) => setTimeout(() => { const b = S.barrels[l]; if (!b) return; W.poof(V3(b.x, 1.0, b.z), '#8EC5E0', 18, 2); popAt(V3(b.x, 1.6, b.z), `<i data-icon="water"></i>Filled ${q.max}/${q.max}`); }, 300 + k * 320));
@@ -2003,7 +2032,7 @@ function packsHTML() {
     <small class="pack-note">You have ${S.jewels} <i data-icon="jewel"></i> · Jewels come from the Jewel Shop or, rarely, the woods</small></div></div>
     <div class="odds">${odds}</div>
     <p class="pack-guarantee" data-guarantee><b>Every pack has at least one Epic or better.</b> Odds above are per card; if all 3 cards roll Basic (${+(Math.pow(tierOdds('basic') / 100, 3) * 100).toFixed(1)}% of packs), the last one is redrawn from Epic-or-better with the same relative odds.</p>
-    ${S.lots.orchard ? `<p class="pack-orchard" data-orchard-pool><b>Orchard owned:</b> the 14 fruit-tree cards are in the pack now (2 per tier).</p>` : `<p class="pack-orchard" data-orchard-pool>Buy the <b>Orchard</b> (the last plot) to add 14 fruit-tree cards to the pack.</p>`}
+    ${S.lots.orchard ? `<p class="pack-orchard" data-orchard-pool><b>Orchard owned:</b> the 14 fruit-tree cards are in the pack now (2 per tier).</p>` : `<p class="pack-orchard" data-orchard-pool>Buy <b>The Orchard</b> on the <b>Map</b> (after every Home plot) to add 14 fruit-tree cards to the pack.</p>`}
     <div class="sec-title">Your collection · ${disc.length}/${collIds().length}</div>
     ${TIER_ORDER.map((t) => { const pl = Object.keys(SPECIES).filter((k) => SPECIES[k].tier === t), fe = Object.keys(FEATURES).filter((k) => FEATURES[k].rarity === t && CARDS[k]), tr = collIds().filter((k) => TREES[k] && TREES[k].tier === t);
       return group(`<em class="tier-tag t-${t}">${PLANT_TIERS[t].label}</em> ${+tierOdds(t).toFixed(2)}% a card · ${pl.length} plants${tr.length ? ` + ${tr.length} tree${tr.length > 1 ? 's' : ''}` : ''}${fe.length ? ` + ${fe.length} feature${fe.length > 1 ? 's' : ''}` : ''}`, [...pl, ...tr, ...fe], 't-' + t); }).join('')}`;
@@ -2033,14 +2062,14 @@ const hang = (k, sp = rackPick()) => { const f = 'flower_' + sp; if (S.rack[k] |
 function collect(k) { const r = S.rack[k]; if (!r || now() - r.start < r.ms) return; const sp = r.sp || 'lavender', id = 'dried_' + sp; S.rack[k] = null; S.inv[id] = (S.inv[id] || 0) + 1; toast(`+1 ${ITEMS[id].name}`); }
 function afterRack() { save(); hud(); renderPanel(); syncRack(); }
 
-const orchardLocked = () => LOT_FOR_SALE.some((l) => l !== 'orchard' && !S.lots[l]);
+const orchardLocked = () => LOT_FOR_SALE.some((l) => !S.lots[l]);   // v0.6: every Home plot first (incl. the Back Woods)
 function lotHTML(id) {
   const owned = !!S.lots[id]; const price = lotPrice();
-  if (id === 'orchard' && !owned) { const left = LOT_FOR_SALE.filter((l) => l !== 'orchard' && !S.lots[l]);
+  if (id === 'orchard' && !owned) { const left = LOT_FOR_SALE.filter((l) => !S.lots[l]);
     return `<div class="lot-card"><i data-icon="sign" style="width:54px;height:54px"></i><div><b>The Orchard · For sale</b><small>Room for 2 raised beds and ${ORCHARD_TREE_SPOTS.length} fruit trees</small></div></div>
     <p class="muted" style="margin:10px 4px">The last plot. Buying it unlocks fruit trees: tree cards join the Card Pack odds, and the Supply Market sells saplings for every tree card you find. Trees grow slowly, then fruit again and again without replanting.</p>
     ${left.length ? `<p class="muted orchard-lock" style="margin:8px 4px 0;text-align:center"><i data-icon="lock"></i> Buy every other plot first · ${left.map(lotName).join(', ')} still for sale</p>`
-      : `<div class="ts-actions"><button class="btn btn-gold" data-act="buy-lot" data-lot="${id}" ${S.coins >= price ? '' : 'disabled'}>Buy the Orchard · ${coin(price)}</button></div>${S.coins < price ? `<p class="muted" style="margin:8px 4px 0;text-align:center">You need ${price - S.coins} more coins.</p>` : ''}`}`; }
+      : `<div class="ts-actions"><button class="btn btn-gold" data-act="buy-lot" data-lot="${id}" ${canPay(ORCHARD_PRICE) ? '' : 'disabled'}>Buy the Orchard · ${coin(ORCHARD_PRICE.coins)} + ${woodTag(ORCHARD_PRICE.wood)}</button></div>${!canPay(ORCHARD_PRICE) ? `<p class="muted" style="margin:8px 4px 0;text-align:center">You need ${missingText(ORCHARD_PRICE)}.</p>` : ''}`}`; }
   const trees = OBSTACLES.filter((o) => o.lot === id && o.type === 'tree').length;
   return `<div class="lot-card"><i data-icon="sign" style="width:54px;height:54px"></i><div><b>${owned ? 'Your land' : 'Wooded plot · For sale'}</b>
     <small>${trees} trees (about ${trees * WOOD.tree + trees * WOOD.stump} Wood) · room for 4 raised beds</small></div></div>
@@ -2050,14 +2079,131 @@ function lotHTML(id) {
 }
 function openLot(id) { openPanel('lot', id); }
 function buyLot(id) {
-  const price = lotPrice(); if (S.lots[id] || S.coins < price) return false;
-  if (id === 'orchard' && orchardLocked()) { toast('Buy every other plot first — the Orchard is the last one'); return false; }
+  if (id === 'orchard') return buyOrchard();
+  const price = lotPrice(); if (S.lots[id] || S.coins < price || !LOT_FOR_SALE.includes(id)) return false;
   S.coins -= price; S.lots[id] = true; S.lotsBought++; save();
-  closePanel(); W.setLotOwned(id, true); if (id === 'orchard') setTimeout(() => { tip('orchard'); syncOrchard(); }, 1700);
+  closePanel(); W.setLotOwned(id, true);
   const [cx, cz] = lotCenter(id); W.poof(new THREE.Vector3(cx, 0.6, cz), '#F5D07A', 26, 3);
-  W.ctl.moved = true; W.glide({ target: new THREE.Vector3(cx * 0.6, 0.3, cz * 0.6 + 0.6), zoom: 1.15 }, 1.4);
+  W.ctl.moved = true; glideW({ target: new THREE.Vector3(cx * 0.6, 0.3, cz * 0.6 + 0.6), zoom: 1.15 }, 1.4);
   toast(`${LOTS[id].name} is yours!`); tip('plotbought'); hud(); checkGoals(); return true;
 }
+
+// ---------------- v0.6: the Map — Home, The Orchard, and places coming soon ----------------
+const curLoc = () => (S.loc === 'orchard' && S.lots.orchard ? 'orchard' : 'home');
+function setLoc(loc, quiet) {
+  if (loc === 'orchard' && !S.lots.orchard) return false;
+  S.loc = loc; PAN = PANS[loc]; W.setLocation(loc === 'home' ? null : LOCATIONS[loc].target);
+  document.body.dataset.loc = loc; $('#btn-map b').textContent = loc === 'home' ? 'Map' : 'Map'; $('#loc-chip').textContent = LOCATIONS[loc].name;
+  $('#loc-chip').classList.toggle('hidden', loc === 'home');
+  if (!quiet) save();
+  return true;
+}
+// every camera glide that crosses between places switches location first (e.g. planting a sapling from Home)
+function glideW(to, dur, cb) { const loc = to.target && to.target.x > 150 ? 'orchard' : 'home'; if (loc !== curLoc()) { if (!setLoc(loc)) return; fadeFlash(); } W.glide(to, dur, cb); }
+function fadeFlash() { const f = $('#travel-fade'); f.classList.remove('go'); void f.offsetWidth; f.classList.add('go'); }
+function travel(loc) {
+  if (loc === curLoc()) { closeMap(); return true; }
+  if (loc === 'orchard' && !S.lots.orchard) return false;
+  if (placing) exitPlace(); if (buildMode) exitBuild(); deselect(); closePanel();
+  const f = $('#travel-fade'); f.classList.remove('go'); void f.offsetWidth; f.classList.add('go');
+  setTimeout(() => { setLoc(loc); closeMap(); toast(loc === 'home' ? 'Back home' : `Welcome to ${LOCATIONS[loc].name}`); if (loc === 'orchard') { tip('orchard'); syncOrchard(); } }, 260);
+  return true;
+}
+function buyOrchard() {
+  if (S.lots.orchard) return false;
+  if (orchardLocked()) { toast('Buy every Home plot first — then the Orchard opens on the Map'); return false; }
+  if (!canPay(ORCHARD_PRICE)) { toast(`You need ${missingText(ORCHARD_PRICE)}`); return false; }
+  S.coins -= ORCHARD_PRICE.coins; S.wood -= ORCHARD_PRICE.wood; S.lots.orchard = true; save();
+  closePanel(); hud(); renderMap(); toast('The Orchard is yours!'); checkGoals();
+  setTimeout(() => travel('orchard'), 600);
+  return true;
+}
+const MAP_PLACES = [
+  { id: 'home', name: 'Home', x: 188, y: 548, line: 'Your cottage garden: raised beds, stands and the roadside market.' },
+  { id: 'orchard', name: 'The Orchard', x: 300, y: 408, line: 'A sunny field of fruit trees, with room for raised beds and its own shed.' },
+  { id: 'vegfarm', name: 'Vegetable Farm', x: 84, y: 402, soon: true, line: 'Long rows of vegetables, from tomatoes to giant pumpkins.' },
+  { id: 'grain', name: 'Grain Fields', x: 96, y: 236, soon: true, line: 'Golden wheat, oats and barley rolling in the wind.' },
+  { id: 'ranch', name: 'Livestock Ranch', x: 292, y: 240, soon: true, line: 'A red barn with hens, goats and a gentle dairy cow.' },
+  { id: 'factory', name: 'Full Production', x: 196, y: 128, soon: true, line: 'A processing facility that turns your harvests into finished goods.' },
+  { id: 'grocery', name: 'Grocery Store', x: 312, y: 70, soon: true, line: 'Your own shop in town, stocked with everything you grow and make.' },
+];
+const MAP_ART = {
+  home: `<path d="M-26 6h52v20h-52z" fill="#F2E2C4" stroke="#7A5A3C" stroke-width="2"/><path d="M-32 8 0-18 32 8z" fill="#C86F4E" stroke="#7A5A3C" stroke-width="2" stroke-linejoin="round"/><rect x="-6" y="12" width="12" height="14" fill="#8E6040"/><rect x="-21" y="11" width="9" height="8" fill="#9FC7D9" stroke="#7A5A3C"/><rect x="12" y="11" width="9" height="8" fill="#9FC7D9" stroke="#7A5A3C"/><g fill="#B98BD6"><circle cx="-36" cy="26" r="4"/><circle cx="-28" cy="29" r="4"/><circle cx="36" cy="26" r="4"/></g><g fill="#F2B04C"><circle cx="-32" cy="22" r="3.5"/><circle cx="30" cy="30" r="3.5"/></g>`,
+  orchard: `<g stroke="#7A5A3C" stroke-width="2"><path d="M-22 26v-12M0 22v-14M22 26v-12" /></g><g stroke="#4F7A45" stroke-width="1.5"><circle cx="-22" cy="6" r="13" fill="#7FB069"/><circle cx="22" cy="6" r="13" fill="#8DBB6E"/><circle cx="0" cy="-2" r="15" fill="#6FA35F"/></g><g fill="#E0584A"><circle cx="-26" cy="4" r="3"/><circle cx="-17" cy="10" r="3"/><circle cx="4" cy="-6" r="3"/><circle cx="-5" cy="4" r="3"/></g><g fill="#F2B04C"><circle cx="20" cy="2" r="3"/><circle cx="27" cy="10" r="3"/></g>`,
+  vegfarm: `<g stroke="#7A5A3C" stroke-width="1.2"><path d="M-30 4h60M-32 12h64M-34 20h68" stroke="#A97C50" stroke-width="5" stroke-linecap="round"/></g><g fill="#6FA35F"><circle cx="-20" cy="0" r="4"/><circle cx="-4" cy="0" r="4"/><circle cx="12" cy="0" r="4"/><circle cx="-12" cy="8" r="4"/><circle cx="4" cy="8" r="4"/><circle cx="20" cy="8" r="4"/></g><ellipse cx="0" cy="-12" rx="12" ry="9" fill="#E98A3C" stroke="#7A5A3C" stroke-width="1.5"/><path d="M0-21v-5" stroke="#4F7A45" stroke-width="3" stroke-linecap="round"/>`,
+  grain: `<path d="M-38 20Q0-6 38 20z" fill="#E9C66A" stroke="#B88C38" stroke-width="1.5"/><g stroke="#C99A3E" stroke-width="1.5"><path d="M-26 18q8-12 16-16M-8 16q8-12 16-16M10 18q8-10 14-12"/></g><g fill="#D9A93F" stroke="#9C7430" stroke-width="1"><ellipse cx="0" cy="-8" rx="5" ry="12"/><ellipse cx="-8" cy="-4" rx="4" ry="10" transform="rotate(-20 -8 -4)"/><ellipse cx="8" cy="-4" rx="4" ry="10" transform="rotate(20 8 -4)"/></g><path d="M-10 4h20" stroke="#9C7430" stroke-width="3"/>`,
+  ranch: `<path d="M-24 0h48v26h-48z" fill="#C2513F" stroke="#7A3A2C" stroke-width="2"/><path d="M-28 2 0-20 28 2z" fill="#9C3E30" stroke="#7A3A2C" stroke-width="2" stroke-linejoin="round"/><path d="M-8 26V10h16v16M-8 10l16 16M8 10l-16 16" fill="none" stroke="#F2E2C4" stroke-width="2"/><g stroke="#8E6040" stroke-width="2"><path d="M30 26V12M42 26V12M30 16h12M30 22h12"/></g><ellipse cx="-38" cy="22" rx="7" ry="5" fill="#F7F1E3" stroke="#7A5A3C"/>`,
+  factory: `<path d="M-30 26V2l14 8V2l14 8V2l14 8V-14h10v40z" fill="#B9A68C" stroke="#6E5A44" stroke-width="2" stroke-linejoin="round"/><g fill="#F5D35A"><rect x="-24" y="14" width="7" height="6"/><rect x="-10" y="14" width="7" height="6"/><rect x="4" y="14" width="7" height="6"/></g><g fill="#E6E0D4" opacity=".9"><circle cx="28" cy="-22" r="5"/><circle cx="34" cy="-30" r="6"/><circle cx="42" cy="-36" r="5"/></g><circle cx="-36" cy="10" r="9" fill="none" stroke="#6E5A44" stroke-width="2.5" stroke-dasharray="4 3"/>`,
+  grocery: `<path d="M-28 2h56v24h-56z" fill="#F2E2C4" stroke="#7A5A3C" stroke-width="2"/><path d="M-32 2h64l-4-12h-56z" fill="#5E8C6A" stroke="#3D5A40" stroke-width="1.5"/><g fill="#F7F1E3"><path d="M-24 2h8l-2-12h-6zM-8 2h8l-1-12h-6zM8 2h8l0-12h-6zM24 2h8l-3-12h-6z" opacity=".9"/></g><rect x="-6" y="12" width="12" height="14" fill="#8E6040"/><rect x="-22" y="9" width="12" height="9" fill="#9FC7D9" stroke="#7A5A3C"/><rect x="10" y="9" width="12" height="9" fill="#9FC7D9" stroke="#7A5A3C"/><g fill="#E0584A"><circle cx="-36" cy="22" r="3"/><circle cx="-32" cy="24" r="3"/></g>`,
+};
+const LOCK_SVG = `<g class="lock"><circle r="11" fill="#FBF6EA" stroke="#7A5A3C" stroke-width="1.5"/><path d="M-4.5-1v-3a4.5 4.5 0 0 1 9 0v3" fill="none" stroke="#7A5A3C" stroke-width="2"/><rect x="-6" y="-1" width="12" height="9" rx="2" fill="#D9A93F" stroke="#7A5A3C" stroke-width="1.2"/></g>`;
+function placeState(p) {
+  if (p.soon) return 'soon';
+  if (p.id === 'home') return 'open';
+  return S.lots.orchard ? 'open' : orchardLocked() ? 'locked' : 'forsale';
+}
+function mapSVG() {
+  const here = curLoc();
+  const roads = [['home', 'orchard'], ['home', 'vegfarm'], ['vegfarm', 'grain'], ['orchard', 'ranch'], ['grain', 'factory'], ['ranch', 'factory'], ['factory', 'grocery']];
+  const P = Object.fromEntries(MAP_PLACES.map((p) => [p.id, p]));
+  const road = ([a, b]) => { const A = P[a], B = P[b], mx = (A.x + B.x) / 2 + (A.y - B.y) * 0.12, my = (A.y + B.y) / 2 + (B.x - A.x) * 0.12; const open = !A.soon && !B.soon && (a !== 'orchard' && b !== 'orchard' || S.lots.orchard); return `<path d="M${A.x} ${A.y + 20}Q${mx} ${my} ${B.x} ${B.y + 20}" class="road${open ? ' open' : ''}"/>`; };
+  const place = (p) => { const st = placeState(p);
+    return `<g class="map-place st-${st}${p.id === here ? ' here' : ''}" data-place="${p.id}" transform="translate(${p.x} ${p.y})" role="button" aria-label="${p.name}">
+      <ellipse cx="0" cy="24" rx="50" ry="13" fill="#000" opacity=".08"/><ellipse class="hit" cx="0" cy="6" rx="56" ry="44" fill="transparent"/>
+      <g class="art" filter="url(#paint)">${MAP_ART[p.id]}</g>
+      ${st === 'soon' || st === 'locked' ? `<ellipse class="fog" cx="0" cy="4" rx="52" ry="34" fill="url(#fogG)"/>` : ''}
+      ${st === 'soon' || st === 'locked' ? `<g transform="translate(30 -20)">${LOCK_SVG}</g>` : ''}
+      ${p.id === here ? `<g class="you" transform="translate(0 -34)"><path d="M0 10-7-2a8 8 0 1 1 14 0z" fill="#C2513F" stroke="#fff" stroke-width="1.5"/><circle cy="-4" r="3" fill="#fff"/></g>` : ''}
+      <g transform="translate(0 46)"><rect x="${-p.name.length * 3.6 - 10}" y="-11" width="${p.name.length * 7.2 + 20}" height="20" rx="10" class="ribbon"/><text y="4" text-anchor="middle">${p.name}</text></g>
+      ${st === 'soon' ? `<text class="soon-tag" y="64" text-anchor="middle">Coming soon</text>` : ''}
+    </g>`; };
+  return `<svg class="map-svg" viewBox="0 0 390 640" preserveAspectRatio="xMidYMid meet" aria-label="Map of Petalspire">
+    <defs>
+      <filter id="paint" x="-20%" y="-20%" width="140%" height="140%"><feTurbulence type="fractalNoise" baseFrequency=".9" numOctaves="2" seed="4" result="n"/><feDisplacementMap in="SourceGraphic" in2="n" scale="2.2"/></filter>
+      <filter id="wash"><feTurbulence type="fractalNoise" baseFrequency=".012 .02" numOctaves="3" seed="9"/><feColorMatrix values="0 0 0 0 .55  0 0 0 0 .62  0 0 0 0 .38  0 0 0 .22 0"/><feComposite in2="SourceGraphic" operator="in"/></filter>
+      <radialGradient id="fogG"><stop offset="0" stop-color="#FBF6EA" stop-opacity=".72"/><stop offset=".7" stop-color="#FBF6EA" stop-opacity=".45"/><stop offset="1" stop-color="#FBF6EA" stop-opacity="0"/></radialGradient>
+      <radialGradient id="edgeFog" cx=".5" cy=".5" r=".75"><stop offset=".6" stop-color="#F3EAD3" stop-opacity="0"/><stop offset="1" stop-color="#F3EAD3" stop-opacity=".95"/></radialGradient>
+      <linearGradient id="landG" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#DCE3B0"/><stop offset=".55" stop-color="#CFDDA0"/><stop offset="1" stop-color="#BFD68E"/></linearGradient>
+    </defs>
+    <rect width="390" height="640" fill="#F3EAD3"/>
+    <path d="M14 30Q60 8 140 20T300 14 380 40 384 300 376 620 200 630 10 610 8 300z" fill="url(#landG)"/>
+    <rect width="390" height="640" fill="#BFD68E" filter="url(#wash)"/>
+    <path d="M384 150Q330 170 340 220T300 330 350 470 330 640" fill="none" stroke="#9FC7D9" stroke-width="14" stroke-linecap="round" opacity=".75"/>
+    <path d="M384 150Q330 170 340 220T300 330 350 470 330 640" fill="none" stroke="#C9E1EA" stroke-width="5" stroke-linecap="round" opacity=".8"/>
+    <g fill="#A9C78A" opacity=".55"><ellipse cx="40" cy="560" rx="60" ry="26"/><ellipse cx="360" cy="560" rx="50" ry="22"/><ellipse cx="200" cy="330" rx="70" ry="22"/><ellipse cx="30" cy="140" rx="40" ry="60"/></g>
+    <g fill="#7FB069" stroke="#5E8C4F" stroke-width="1" opacity=".8">${[[30, 480], [46, 492], [356, 330], [368, 344], [150, 470], [250, 480], [60, 320], [240, 330], [140, 60], [36, 70], [252, 590], [124, 600]].map(([x, y]) => `<circle cx="${x}" cy="${y}" r="7"/>`).join('')}</g>
+    <g class="roads">${roads.map(road).join('')}</g>
+    ${MAP_PLACES.map(place).join('')}
+    <rect width="390" height="640" fill="url(#edgeFog)" pointer-events="none"/>
+    <g transform="translate(40 604)" class="compass"><circle r="14" fill="#FBF6EA" stroke="#7A5A3C"/><path d="M0-11 4 0 0 11-4 0z" fill="#C2513F"/><text y="-17" text-anchor="middle">N</text></g>
+  </svg>`;
+}
+function mapCard(id) {
+  const p = MAP_PLACES.find((q) => q.id === id); if (!p) return '';
+  const st = placeState(p), here = curLoc() === id;
+  let act = '';
+  if (st === 'soon') act = `<div class="soon-pill">Coming soon</div>`;
+  else if (here) act = `<button class="btn sm" disabled>You are here</button>`;
+  else if (st === 'open') act = `<button class="btn btn-primary" data-travel="${id}">Travel to ${p.name}</button>`;
+  else if (st === 'locked') { const left = LOT_FOR_SALE.filter((l) => !S.lots[l]); act = `<p class="muted">Opens after you buy every Home plot · <b>${left.length} left</b> (${left.map(lotName).join(', ')})</p><p class="muted">Then: ${coin(ORCHARD_PRICE.coins)} + ${woodTag(ORCHARD_PRICE.wood)}</p>`; }
+  else act = `<button class="btn btn-primary" data-buy-orchard ${canPay(ORCHARD_PRICE) ? '' : 'disabled'}>Buy The Orchard · ${coin(ORCHARD_PRICE.coins)} + ${woodTag(ORCHARD_PRICE.wood)}</button>${canPay(ORCHARD_PRICE) ? '' : `<p class="muted">You need ${missingText(ORCHARD_PRICE)}.</p>`}`;
+  return `<div class="map-card st-${st}" data-card="${id}"><svg viewBox="-60 -40 120 80" class="mc-art"><g filter="url(#paint)">${MAP_ART[id]}</g></svg><div class="mc-meta"><b>${p.name}</b><p>${p.line}</p>${act}</div></div>`;
+}
+let mapSel = null;
+function renderMap() {
+  const m = $('#map'); if (m.classList.contains('hidden')) return;
+  $('#map-body').innerHTML = mapSVG(); $('#map-card').innerHTML = mapSel ? mapCard(mapSel) : `<p class="muted map-hint">Tap a place. Everything keeps growing while you are away.</p>`;
+  fillIcons($('#map'));
+}
+function openMap() { closePanel(); if (placing) exitPlace(); if (buildMode) exitBuild(); deselect(); mapSel = null; $('#map').classList.remove('hidden'); renderMap(); }
+function closeMap() { $('#map').classList.add('hidden'); mapSel = null; }
+$('#btn-map').addEventListener('click', (e) => { e.stopPropagation(); $('#map').classList.contains('hidden') ? openMap() : closeMap(); });
+$('#map-close').addEventListener('click', closeMap);
+$('#map').addEventListener('click', (e) => {
+  const t = e.target.closest('[data-travel]'); if (t) { travel(t.dataset.travel); return; }
+  if (e.target.closest('[data-buy-orchard]')) { buyOrchard(); return; }
+  const g = e.target.closest('[data-place]'); if (g) { mapSel = g.dataset.place; renderMap(); }
+});
 
 // ---------------- Jewel Shop (prototype: purchases are simulated, see js/payments.js) ----------------
 function tradeJewel(what) {
@@ -2110,6 +2256,8 @@ $('#panel-body').addEventListener('click', (e) => {
   if (b.dataset.upgrade) { upgradeCard(b.dataset.upgrade); return; }
   if (b.dataset.stockAntique) return stockAntique(b.dataset.stockAntique);
   if (b.dataset.sellRestored) return sellRestored(b.dataset.sellRestored);
+  if (b.hasAttribute('data-install-shelf')) return installShelf();
+  if (b.hasAttribute('data-uninstall-shelf')) return uninstallShelf();
   if (b.dataset.stock) return stock(b.dataset.stock, b.dataset.n);
   if (b.dataset.unstock) return unstock(b.dataset.unstock);
   if (b.dataset.buy) return buy(b.dataset.buy, +b.dataset.price);
@@ -2437,7 +2585,8 @@ $('#btn-settings').addEventListener('click', (e) => { e.stopPropagation(); panel
 // ---------------- Input: drag to pan, pinch to zoom, twist to turn, tap ----------------
 const canvas = $('#scene');
 const ptrs = new Map(); let gesture = null;
-const PAN = { x0: -13, x1: 13, z0: -28, z1: 5 };   // v0.6: reaches the Orchard
+const PANS = { home: { x0: -13, x1: 13, z0: -28, z1: 5 }, orchard: { x0: ORCH_X - 9, x1: ORCH_X + 9, z0: -13, z1: 6 } };   // v0.6: per Map location
+let PAN = PANS.home;
 canvas.addEventListener('contextmenu', (e) => e.preventDefault());
 canvas.addEventListener('pointerdown', (e) => {
   canvas.setPointerCapture?.(e.pointerId);
@@ -2519,6 +2668,8 @@ function handleTap(x, y) {
   else if (hit.kind === 'hive') focusThing({ kind: 'hive', lot: hit.lot });
 }
 
+setLoc(curLoc(), true);   // v0.6: resume where the player left off (Home or the Orchard)
+
 // ---------------- Title & intro ----------------
 if (S.introDone) $('#btn-start').textContent = 'Continue';
 $('#btn-start').addEventListener('click', () => {
@@ -2598,10 +2749,10 @@ const V = (x, y, z) => new THREE.Vector3(x, y, z);
 window.__ps = {
   BUILD, get fromBuild() { return fromBuild; },
   TIPS, JEWEL_DROP, obsState, PACKS,
-  hud, syncBarrels, casterIds: () => casters().map((c) => c.id + (c.h != null ? ":box" : ":tree")), checkGoals, regenBarrels, feedLot, reachLots,  get barrelReachTargets() { return W.bedTargets.children.map((g) => ({ b: g.userData.b, ok: g.userData.ok })); }, barrelRoof, lotRoofs, barrelStands, barrelPerTick, get gutterLots() { return [...W.gutters.keys()]; }, gutterPipes(lot) { return W.gutters.get(lot)?.userData.pipes || 0; },
+  hud, syncBarrels, lotRoofs, standsLine, buildBarrelAt: (lot, x, z) => buildBarrel(lot, x, z), openMap, closeMap, travel, buyOrchard, setLoc, loc: () => curLoc(), orchardLocked, mapPlaces: () => MAP_PLACES.map((p) => ({ id: p.id, name: p.name, soon: !!p.soon, state: placeState(p) })), ORCHARD_PRICE, casterIds: () => casters().map((c) => c.id + (c.h != null ? ":box" : ":tree")), checkGoals, regenBarrels, feedLot, reachLots,  get barrelReachTargets() { return W.bedTargets.children.map((g) => ({ b: g.userData.b, ok: g.userData.ok })); }, barrelRoof, lotRoofs, barrelStands, barrelPerTick, get gutterLots() { return [...W.gutters.keys()]; }, gutterPipes(lot) { return W.gutters.get(lot)?.userData.pipes || 0; },
   get tincGrandfathered() { return tincGrandfathered; }, tincProblem, tincSpots, buildTincture, placeTincture, buildStill, placeStill, distill, collectOil, STILL, TEA, teaInfo, teaId, teaSps, registerTea, buildTea, placeTea, brewTea, collectTea, teaAdd, teaRemove, get teaPick() { return [...teaPick]; }, set teaPick(v) { teaPick = [...v]; }, teaHTML, syncTea, DRY_TIER_S,
   CRAFT, PRESS, FRUITSTAND, TREES, TREE_IDS, SEED_BAGS, bagId, bagSeeds, buildCraft, placeCraft, craftMake, craftCollect, craftHTML, syncCraft, orchardSpots, orchardProblem, plantOrchard, pickTree, syncOrchard, orchStage, orchRipe, orchardTreeHTML, startTreePlace, orchardLocked, packW, cardOdds, tierOdds, featureOdds, drawNonBasic, collIds, get sunflowerRefund() { return sunflowerRefund; }, ORCHARD_TREE_SPOTS,
-  RESALE, sellPlaced, stockAntique, sellRestored, focusThing, get atmosphere() { return atmosphere(); }, get standCap() { return standCap(); },
+  RESALE, sellPlaced, stockAntique, sellRestored, installShelf, uninstallShelf, shelfOn, syncShelf, SHELF_BONUS, STAND_CAP, focusThing, get atmosphere() { return atmosphere(); }, get standCap() { return standCap(); },
   maybeClosing() { closingAfter = 0; maybeClosing(); return !!closingEl; }, closeClosing() { closeClosing(); }, get GOALS() { return GOALS.map((g) => g.id); },
   get state() { return S; }, get selected() { return selected; }, get focus() { return focus; }, get placing() { return placing; }, get panel() { return panel; },
   get customer() { const c = custs[0]; return c && { wants: c.wants, parked: c.car.state === 'park' }; }, get customers() { return custs.map((c) => ({ wants: c.wants, slot: c.slot, parked: c.car.state === 'park', x: c.car.x })); }, get buildMode() { return buildMode; }, W, THREE, TREE_MS,
