@@ -1,8 +1,9 @@
 // Petalspire v0.4: scene, environment, lots & woods, raised beds, roadside buildings, cars, effects
 import * as THREE from 'three';
 import { mat, glowSprite, glowTexture } from './plants.js';
-import { TILE, BED_N, ROAD, SPOTS, PARK_X, LOTS, LOT_FOR_SALE, SIGNS, SITES, OBSTACLES, siteById } from './layout.js';
-import { FIND_COLORS } from './data.js';
+import { TILE, BED_N, ROAD, SPOTS, PARK_X, LOTS, LOT_FOR_SALE, SIGNS, SITES, OBSTACLES, siteById, ORCHARD_TREE_SPOTS } from './layout.js';
+import { FIND_COLORS, TREES } from './data.js';
+import { drawBillboard } from './billboard.js';
 
 const shadowy = (m, cast = true) => { m.castShadow = cast; m.receiveShadow = true; return m; };
 function hash(x, z) { const s = Math.sin(x * 127.1 + z * 311.7) * 43758.5453; return s - Math.floor(s); }
@@ -97,13 +98,15 @@ export function createWorld(canvas) {
   const fill = new THREE.DirectionalLight('#F7C5C5', 0.35); fill.position.set(8, 5, 8); scene.add(fill);
 
   // ---------- Ground (flat building area, road, rolling hills beyond) ----------
+  // v0.6: the flat area reaches back to z ≈ −31 behind the middle plots for the Orchard (smoothly back to −21 at the sides)
+  function flatBack(x) { return 21 + 10 * (1 - THREE.MathUtils.smoothstep(Math.abs(x), 6, 13)); }
   const gg = new THREE.PlaneGeometry(200, 200, 140, 140); gg.rotateX(-Math.PI / 2);
   const gp = gg.attributes.position; const cols = new Float32Array(gp.count * 3);
   const cNear = new THREE.Color('#ADCB98'), cPatch = new THREE.Color('#C9D9A4'), cFar = new THREE.Color('#93B585'), cWarm = new THREE.Color('#E2D08E'), cWood = new THREE.Color('#9DB884');
   const tmp = new THREE.Color();
   for (let i = 0; i < gp.count; i++) {
     const x = gp.getX(i), z = gp.getZ(i);
-    const ox = Math.max(0, Math.abs(x) - 17), oz = Math.max(0, z > 0 ? z - 14 : -z - 21);
+    const ox = Math.max(0, Math.abs(x) - 17), oz = Math.max(0, z > 0 ? z - 14 : -z - flatBack(x));
     const out = Math.hypot(ox, oz), hill = THREE.MathUtils.smoothstep(out, 0, 18);
     const nearRoad = z > ROAD.z0 - 0.6 && z < ROAD.z1 + 0.6;
     const y = nearRoad ? -0.03 : (noise(x * 0.07, z * 0.07) * 6 + noise(x * 0.2, z * 0.2) * 1.4) * hill + noise(x * 0.6, z * 0.6) * 0.05;
@@ -208,9 +211,9 @@ export function createWorld(canvas) {
     if (side === 0) { x = -40 + rnd() * 80; z = ROAD.z1 + 4 + rnd() * 16; }
     else if (side === 1) { x = -16 - rnd() * 16; z = -24 + rnd() * 28; }
     else if (side === 2) { x = 16 + rnd() * 16; z = -24 + rnd() * 28; }
-    else { x = -30 + rnd() * 60; z = -20 - rnd() * 14; }
+    else { x = -30 + rnd() * 60; z = -20 - rnd() * 14; if (Math.abs(x) < 7.5 && z > -31) z = -31.5 - rnd() * 4; }   // v0.6: keep the Orchard clear
     const bs = 1.0 + rnd() * 0.8; const t = makeTree(bs, Math.floor(rnd() * 8), rnd, 2); t.position.set(x, 0, z); bgTrees.push({ x, z, s: bs });
-    const yy = (noise(x * 0.07, z * 0.07) * 6) * THREE.MathUtils.smoothstep(Math.hypot(Math.max(0, Math.abs(x) - 17), Math.max(0, z > 0 ? z - 14 : -z - 21)), 0, 18);
+    const yy = (noise(x * 0.07, z * 0.07) * 6) * THREE.MathUtils.smoothstep(Math.hypot(Math.max(0, Math.abs(x) - 17), Math.max(0, z > 0 ? z - 14 : -z - flatBack(x))), 0, 18);
     t.position.y = yy - 0.1; decor.add(t);
   }
 
@@ -499,17 +502,22 @@ export function createWorld(canvas) {
   function removeBarrel(lot) { const g = barrels.get(lot); if (!g) return; setGutter(lot, null); poof(g.position.clone().setY(0.5), '#E9D9B8', 12, 1); scene.remove(g); barrels.delete(lot); }
   // v0.41: a gutter + downspout from a roof on the same plot into the barrel (a barrel only collects rain when connected)
   const gutters = new Map(); const gutterM = mat('#8E979C', { roughness: 0.45, metalness: 0.35 });
-  function setGutter(lot, from) {
-    const g = barrels.get(lot), key = g && from ? `${from[0].toFixed(2)},${from[1].toFixed(2)}>${g.position.x.toFixed(2)},${g.position.z.toFixed(2)}` : '';
+  // v0.52: one pipe per connected stand (a barrel takes up to 2); `froms` is a list of roof [x, z] (a single pair still works)
+  function setGutter(lot, froms) {
+    if (froms && froms.length && !Array.isArray(froms[0])) froms = [froms]; froms = (froms || []).filter((f) => f && f.length === 2);
+    const g = barrels.get(lot), key = g && froms.length ? froms.map((f) => `${f[0].toFixed(2)},${f[1].toFixed(2)}`).join('+') + `>${g.position.x.toFixed(2)},${g.position.z.toFixed(2)}` : '';
     const old = gutters.get(lot); if (old?.userData.key === key) return; if (old) { scene.remove(old); old.traverse((m) => m.geometry?.dispose()); gutters.delete(lot); }
     if (!key) return;
-    const bx = g.position.x, bz = g.position.z, dx = bx - from[0], dz = bz - from[1], d = Math.hypot(dx, dz) || 1, ux = dx / d, uz = dz / d, off = Math.min(0.85, d * 0.45), H = 1.75;
-    const P = (x, y, z) => new THREE.Vector3(x, y, z), a = P(from[0] + ux * off, H, from[1] + uz * off), b = P(bx, H, bz), c = P(bx, 0.86, bz);
-    const grp = new THREE.Group(); grp.userData.key = key; grp.userData.gutter = lot;
-    const path = new THREE.CurvePath(); if (a.distanceTo(b) > 0.05) path.add(new THREE.LineCurve3(a, b)); path.add(new THREE.LineCurve3(b, c));
-    grp.add(shadowy(new THREE.Mesh(new THREE.TubeGeometry(path, 24, 0.04, 6), gutterM)));
-    for (const p of [a, b]) { const e = new THREE.Mesh(new THREE.SphereGeometry(0.06, 8, 6), gutterM); e.position.copy(p); grp.add(e); }
-    const trough = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.06, 0.16), gutterM); trough.position.copy(a); grp.add(trough);
+    const grp = new THREE.Group(); grp.userData.key = key; grp.userData.gutter = lot; grp.userData.pipes = froms.length;
+    const bx = g.position.x, bz = g.position.z;
+    froms.forEach((from, k) => {
+      const dx = bx - from[0], dz = bz - from[1], d = Math.hypot(dx, dz) || 1, ux = dx / d, uz = dz / d, off = Math.min(0.85, d * 0.45), H = 1.75 - k * 0.12;
+      const P = (x, y, z) => new THREE.Vector3(x, y, z), a = P(from[0] + ux * off, H, from[1] + uz * off), b = P(bx + (k ? 0.08 : 0), H, bz + (k ? 0.08 : 0)), c = P(bx + (k ? 0.08 : 0), 0.86, bz + (k ? 0.08 : 0));
+      const path = new THREE.CurvePath(); if (a.distanceTo(b) > 0.05) path.add(new THREE.LineCurve3(a, b)); path.add(new THREE.LineCurve3(b, c));
+      grp.add(shadowy(new THREE.Mesh(new THREE.TubeGeometry(path, 24, 0.04, 6), gutterM)));
+      for (const p of [a, b]) { const e = new THREE.Mesh(new THREE.SphereGeometry(0.06, 8, 6), gutterM); e.position.copy(p); grp.add(e); }
+      const trough = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.06, 0.16), gutterM); trough.position.copy(a); grp.add(trough);
+    });
     scene.add(grp); gutters.set(lot, grp);
   }
   frameHooks.push(() => { for (const [lot, grp] of gutters) grp.visible = !!barrels.get(lot)?.visible; });
@@ -620,6 +628,188 @@ export function createWorld(canvas) {
   frameHooks.push(() => { const tt = performance.now() / 1000;
     for (const t of stillSlots) t.steam.forEach((sp, i) => { if (!t.active || !still.visible) { sp.visible = false; return; } const ph = (tt * 0.55 + i / 3) % 1; sp.visible = true;
       sp.position.set(0.03 + ph * 0.15 + Math.sin(tt * 2 + i) * 0.04, 0.6 + ph * 0.9, ph * 0.95); sp.scale.setScalar(0.2 + ph * 0.55); sp.material.opacity = 0.9 * Math.sin(Math.PI * Math.min(1, ph * 1.15)); }); });
+  // ---------- v0.52: Tea Stand — a sage-striped stall with a copper kettle, tins and two brewing teapots ----------
+  const teastand = new THREE.Group(); teastand.position.set(SPOTS.teastand[0], 0, SPOTS.teastand[1]); teastand.rotation.y = -0.2; teastand.scale.setScalar(0.8); scene.add(teastand);
+  const teaSlots = [];
+  {
+    const counter = shadowy(new THREE.Mesh(new THREE.BoxGeometry(2.1, 0.9, 0.8), mat('#B9895A', { roughness: 0.85 }))); counter.position.y = 0.45; teastand.add(counter);
+    for (let k = 0; k < 3; k++) { const pl = new THREE.Mesh(new THREE.BoxGeometry(2.12, 0.04, 0.02), woodD); pl.position.set(0, 0.2 + k * 0.25, 0.41); teastand.add(pl); }
+    const top = shadowy(new THREE.Mesh(new THREE.BoxGeometry(2.3, 0.08, 0.95), woodL)); top.position.y = 0.94; teastand.add(top);
+    for (const x of [-1.0, 1.0]) for (const z of [-0.32, 0.38]) { const post = shadowy(new THREE.Mesh(new THREE.BoxGeometry(0.1, 2.2, 0.1), woodD)); post.position.set(x, 1.1, z); teastand.add(post); }
+    // striped awning (cream + sage), scalloped front edge
+    const stripeC = document.createElement('canvas'); stripeC.width = 256; stripeC.height = 16; { const g = stripeC.getContext('2d'); for (let i = 0; i < 8; i++) { g.fillStyle = i % 2 ? '#F7F3E6' : '#7FA47D'; g.fillRect(i * 32, 0, 32, 16); } }
+    const stripeT = new THREE.CanvasTexture(stripeC); stripeT.colorSpace = THREE.SRGBColorSpace;
+    const awn = shadowy(new THREE.Mesh(new THREE.BoxGeometry(2.45, 0.06, 1.2), new THREE.MeshStandardMaterial({ map: stripeT, roughness: 0.85 }))); awn.position.set(0, 2.2, 0.1); awn.rotation.x = 0.2; teastand.add(awn);
+    for (let i = 0; i < 8; i++) { const sc = new THREE.Mesh(new THREE.SphereGeometry(0.16, 10, 6, 0, Math.PI * 2, 0, Math.PI / 2), mat(i % 2 ? '#F7F3E6' : '#7FA47D')); sc.rotation.x = Math.PI; sc.scale.set(1, 0.6, 0.35); sc.position.set(-1.07 + i * 0.306, 2.07, 0.7); teastand.add(sc); }
+    // shelf of tea tins
+    const shelf = shadowy(new THREE.Mesh(new THREE.BoxGeometry(1.9, 0.06, 0.28), woodL)); shelf.position.set(0, 1.5, -0.3); teastand.add(shelf);
+    ['#E58F94', '#B79AD6', '#F2B54A', '#7FA47D', '#6C7FD0', '#E58F94'].forEach((c, k) => { const tin = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.09, 0.22, 12), mat(c, { roughness: 0.4, metalness: 0.2 })); tin.position.set(-0.7 + k * 0.28, 1.64, -0.3); teastand.add(tin);
+      const lid = new THREE.Mesh(new THREE.CylinderGeometry(0.095, 0.095, 0.05, 12), mat('#B0603A', { metalness: 0.3, roughness: 0.4 })); lid.position.set(tin.position.x, 1.77, -0.3); teastand.add(lid); });
+    // copper kettle in the middle
+    const copper = mat('#D0824A', { roughness: 0.32, metalness: 0.35, emissive: '#5A2A10', emissiveIntensity: 0.12 });
+    const kettle = shadowy(new THREE.Mesh(new THREE.SphereGeometry(0.2, 16, 12), copper)); kettle.scale.y = 0.8; kettle.position.set(0, 1.13, 0.05); teastand.add(kettle);
+    const spout = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.04, 0.2, 8), copper); spout.position.set(0.2, 1.18, 0.05); spout.rotation.z = -0.9; teastand.add(spout);
+    const handle = new THREE.Mesh(new THREE.TorusGeometry(0.12, 0.018, 6, 14, Math.PI), mat('#3A2A20')); handle.position.set(0, 1.27, 0.05); teastand.add(handle);
+    const steamMat = () => new THREE.SpriteMaterial({ map: glowTexture(), color: '#FFFFFF', transparent: true, opacity: 0, depthWrite: false });
+    for (let k = 0; k < 2; k++) {   // two teapots = two brewing slots
+      const g = new THREE.Group(); g.position.set(-0.62 + k * 1.24, 0.98, 0.12); teastand.add(g);
+      const pot = shadowy(new THREE.Mesh(new THREE.SphereGeometry(0.17, 14, 10), mat(k ? '#F7F3E6' : '#E7C3C0', { roughness: 0.35 }))); pot.scale.y = 0.85; pot.position.y = 0.15; g.add(pot);
+      const lid = new THREE.Mesh(new THREE.SphereGeometry(0.07, 10, 6), mat('#B0603A')); lid.position.y = 0.3; g.add(lid);
+      const sp = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.035, 0.16, 8), pot.material); sp.position.set(0.17, 0.18, 0); sp.rotation.z = -0.9; g.add(sp);
+      const cup = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.05, 0.08, 10), mat('#FFFFFF', { roughness: 0.3 })); cup.position.set(0.32, 0.04, 0.12); g.add(cup);
+      const tin = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 0.2, 12), mat('#F2B54A', { emissive: '#7A5A10', emissiveIntensity: 0.4 })); tin.position.set(-0.28, 0.1, 0.1); tin.visible = false; g.add(tin);
+      const gl = glowSprite('#FFD27A', 0.8, 0.45); gl.position.set(-0.28, 0.2, 0.1); gl.visible = false; g.add(gl);
+      const steam = [0, 1, 2].map(() => { const s2 = new THREE.Sprite(steamMat()); s2.userData.steam = true; s2.renderOrder = 6; s2.visible = false; g.add(s2); return s2; });
+      teaSlots.push({ g, tin, gl, steam, active: false });
+    }
+    const label = label_('Tea Stand', { h: 0.5 }); label.position.set(0, 2.95, 0.2); teastand.add(label); teastand.userData.label = label;
+    const hit = new THREE.Mesh(new THREE.BoxGeometry(2.5, 2.8, 1.4), new THREE.MeshBasicMaterial({ visible: false })); hit.position.y = 1.3; teastand.add(hit);
+  }
+  teastand.userData.kind = 'teastand'; teastand.visible = false;
+  function setTea(slots) { slots.forEach((s, k) => { const t = teaSlots[k]; if (!t) return; t.active = !!s && !s.done; t.tin.visible = !!s && s.done; t.gl.visible = !!s && s.done; if (s?.color) t.tin.material.color.set(s.color); }); }
+  frameHooks.push(() => { const tt = performance.now() / 1000;
+    for (const t of teaSlots) t.steam.forEach((sp, i) => { if (!t.active || !teastand.visible) { sp.visible = false; return; } const ph = (tt * 0.6 + i / 3) % 1; sp.visible = true;
+      sp.position.set(0.17 + ph * 0.12 + Math.sin(tt * 2 + i) * 0.04, 0.3 + ph * 0.8, ph * 0.5); sp.scale.setScalar(0.16 + ph * 0.45); sp.material.opacity = 0.85 * Math.sin(Math.PI * Math.min(1, ph * 1.15)); }); });
+  // ---------- v0.6: Pressed Oil Stand (screw press, barrels, bottles) and Fruit Stand (awning, jars, crates, a jam pot) ----------
+  const craftSlots = { press: [], fruitstand: [] };
+  const steamMat2 = () => new THREE.SpriteMaterial({ map: glowTexture(), color: '#FFFFFF', transparent: true, opacity: 0, depthWrite: false });
+  const press = new THREE.Group(); press.position.set(SPOTS.press[0], 0, SPOTS.press[1]); press.rotation.y = -0.2; press.scale.setScalar(0.8); scene.add(press);
+  {
+    const iron = mat('#6E777A', { roughness: 0.45, metalness: 0.5 }), oak = mat('#9A6B44', { roughness: 0.85 });
+    const base = shadowy(new THREE.Mesh(new THREE.BoxGeometry(2.3, 0.3, 1.1), woodD)); base.position.y = 0.15; press.add(base);
+    for (const x of [-0.55, 0.55]) { const post = shadowy(new THREE.Mesh(new THREE.BoxGeometry(0.2, 2.1, 0.24), oak)); post.position.set(x - 0.35, 1.2, 0); press.add(post); }
+    const beam = shadowy(new THREE.Mesh(new THREE.BoxGeometry(1.5, 0.26, 0.3), oak)); beam.position.set(-0.35, 2.2, 0); press.add(beam);
+    const screw = shadowy(new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.07, 1.3, 10), iron)); screw.position.set(-0.35, 1.5, 0); press.add(screw);
+    for (let i = 0; i < 9; i++) { const th = new THREE.Mesh(new THREE.TorusGeometry(0.085, 0.018, 4, 10), iron); th.rotation.x = Math.PI / 2 + 0.2; th.position.set(-0.35, 1.0 + i * 0.12, 0); press.add(th); }
+    const wheel = new THREE.Group(); wheel.position.set(-0.35, 2.5, 0); press.add(wheel); press.userData.wheel = wheel;
+    const rim = shadowy(new THREE.Mesh(new THREE.TorusGeometry(0.42, 0.04, 6, 24), iron)); rim.rotation.x = Math.PI / 2; wheel.add(rim);
+    for (let i = 0; i < 4; i++) { const sp = new THREE.Mesh(new THREE.BoxGeometry(0.84, 0.03, 0.03), iron); sp.rotation.y = i * Math.PI / 4; wheel.add(sp); }
+    const plate = shadowy(new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.42, 0.08, 18), iron)); plate.position.set(-0.35, 0.86, 0); press.add(plate);
+    const basket = shadowy(new THREE.Mesh(new THREE.CylinderGeometry(0.45, 0.5, 0.5, 18, 1, true), oak)); basket.position.set(-0.35, 0.56, 0); press.add(basket);
+    for (let i = 0; i < 12; i++) { const sl = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.52, 0.04), woodL); const a = (i / 12) * Math.PI * 2; sl.position.set(-0.35 + Math.cos(a) * 0.48, 0.56, Math.sin(a) * 0.48); sl.rotation.y = -a; press.add(sl); }
+    const spout = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.05, 0.3), woodL); spout.position.set(-0.35, 0.33, 0.6); press.add(spout);
+    const drip = new THREE.Mesh(new THREE.CylinderGeometry(0.015, 0.015, 0.16, 6), mat('#F2C53D', { emissive: '#8A6418', emissiveIntensity: 0.4 })); drip.position.set(-0.35, 0.22, 0.72); drip.visible = false; press.add(drip); press.userData.drip = drip;
+    const barrel = (x, z, sc) => { const b = shadowy(new THREE.Mesh(new THREE.CylinderGeometry(0.3 * sc, 0.26 * sc, 0.7 * sc, 14), oak)); b.position.set(x, 0.3 + 0.35 * sc, z); press.add(b);
+      for (const y of [-0.22, 0.22]) { const h = new THREE.Mesh(new THREE.TorusGeometry(0.295 * sc, 0.018, 4, 18), iron); h.rotation.x = Math.PI / 2; h.position.set(x, 0.3 + 0.35 * sc + y * sc, z); press.add(h); } };
+    barrel(0.75, -0.2, 1); barrel(0.7, 0.35, 0.8);
+    for (let k = 0; k < 2; k++) {   // two pressing slots = two finished-bottle spots on the bench
+      const g = new THREE.Group(); g.position.set(0.25 + k * 0.38, 0.3, 0.42); press.add(g);
+      const b = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.09, 0.3, 10), mat('#F2C53D', { roughness: 0.25, emissive: '#8A6418', emissiveIntensity: 0.3 })); b.position.y = 0.15; b.visible = false; g.add(b);
+      const neck = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.04, 0.1, 8), mat('#8A6545')); neck.position.y = 0.34; b.add(neck); neck.position.y = 0.19;
+      const gl = glowSprite('#FFD27A', 0.7, 0.45); gl.position.y = 0.25; gl.visible = false; g.add(gl);
+      craftSlots.press.push({ g, item: b, gl, active: false });
+    }
+    const label = label_('Pressed Oil Stand', { h: 0.5 }); label.position.set(0, 3.1, 0.2); press.add(label); press.userData.label = label;
+    const hit = new THREE.Mesh(new THREE.BoxGeometry(2.5, 3.0, 1.4), new THREE.MeshBasicMaterial({ visible: false })); hit.position.y = 1.4; press.add(hit);
+  }
+  press.userData.kind = 'press'; press.visible = false;
+  const fruitstand = new THREE.Group(); fruitstand.position.set(SPOTS.fruitstand[0], 0, SPOTS.fruitstand[1]); fruitstand.rotation.y = -0.2; fruitstand.scale.setScalar(0.8); scene.add(fruitstand);
+  {
+    const counter = shadowy(new THREE.Mesh(new THREE.BoxGeometry(2.1, 0.9, 0.8), mat('#C99A6B', { roughness: 0.85 }))); counter.position.y = 0.45; fruitstand.add(counter);
+    const top = shadowy(new THREE.Mesh(new THREE.BoxGeometry(2.3, 0.08, 0.95), woodD)); top.position.y = 0.94; fruitstand.add(top);
+    for (const x of [-1.0, 1.0]) for (const z of [-0.32, 0.38]) { const post = shadowy(new THREE.Mesh(new THREE.BoxGeometry(0.1, 2.2, 0.1), woodD)); post.position.set(x, 1.1, z); fruitstand.add(post); }
+    const cv = document.createElement('canvas'); cv.width = 128; cv.height = 8; const cx = cv.getContext('2d');
+    for (let i = 0; i < 8; i++) { cx.fillStyle = i % 2 ? '#FFF6E6' : '#D9473B'; cx.fillRect(i * 16, 0, 16, 8); }
+    const stripeT = new THREE.CanvasTexture(cv); stripeT.colorSpace = THREE.SRGBColorSpace;
+    const awn = shadowy(new THREE.Mesh(new THREE.BoxGeometry(2.45, 0.06, 1.2), new THREE.MeshStandardMaterial({ map: stripeT, roughness: 0.85 }))); awn.position.set(0, 2.2, 0.1); awn.rotation.x = 0.2; fruitstand.add(awn);
+    for (let i = 0; i < 8; i++) { const sc = new THREE.Mesh(new THREE.SphereGeometry(0.16, 10, 6, 0, Math.PI * 2, 0, Math.PI / 2), mat(i % 2 ? '#FFF6E6' : '#D9473B')); sc.rotation.x = Math.PI; sc.scale.set(1, 0.6, 0.35); sc.position.set(-1.07 + i * 0.305, 2.08, 0.7); fruitstand.add(sc); }
+    const shelf = shadowy(new THREE.Mesh(new THREE.BoxGeometry(1.9, 0.06, 0.28), woodL)); shelf.position.set(0, 1.5, -0.3); fruitstand.add(shelf);
+    ['#B8203A', '#F5D547', '#6A3A7A', '#F6A46B', '#8A4A22', '#E9C27A'].forEach((c, k) => { const j = new THREE.Mesh(new THREE.CylinderGeometry(0.085, 0.085, 0.2, 12), mat(c, { roughness: 0.25 })); j.position.set(-0.7 + k * 0.28, 1.63, -0.3); fruitstand.add(j);
+      const lid = new THREE.Mesh(new THREE.CylinderGeometry(0.095, 0.095, 0.04, 12), mat('#F7E3E3')); lid.position.set(j.position.x, 1.75, -0.3); fruitstand.add(lid); });
+    const crate = (x, z, c) => { const b = shadowy(new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.32, 0.42), woodL)); b.position.set(x, 0.16, z); fruitstand.add(b);
+      for (let i = 0; i < 6; i++) { const f = new THREE.Mesh(new THREE.SphereGeometry(0.08, 8, 6), mat(c, { roughness: 0.5 })); f.position.set(x - 0.16 + (i % 3) * 0.16, 0.36, z - 0.08 + Math.floor(i / 3) * 0.16); fruitstand.add(f); } };
+    crate(-0.75, 0.75, '#D9473B'); crate(-0.15, 0.8, '#F6A46B'); crate(0.5, 0.75, '#F5D547');
+    const stove = shadowy(new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.28, 0.12, 14), mat('#3A3A3A', { roughness: 0.6 }))); stove.position.set(0, 1.04, 0.05); fruitstand.add(stove);
+    const pot = shadowy(new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.18, 0.24, 16), mat('#D0824A', { roughness: 0.32, metalness: 0.35 }))); pot.position.set(0, 1.22, 0.05); fruitstand.add(pot);
+    for (let k = 0; k < 2; k++) {
+      const g = new THREE.Group(); g.position.set(-0.62 + k * 1.24, 0.98, 0.12); fruitstand.add(g);
+      const j = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 0.24, 12), mat('#B8203A', { roughness: 0.25, emissive: '#3A0A10', emissiveIntensity: 0.3 })); j.position.y = 0.12; j.visible = false; g.add(j);
+      const lid = new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.11, 0.05, 12), mat('#F7E3E3')); lid.position.y = 0.15; j.add(lid);
+      const gl = glowSprite('#FFD27A', 0.7, 0.45); gl.position.y = 0.2; gl.visible = false; g.add(gl);
+      const steam = [0, 1, 2].map(() => { const s2 = new THREE.Sprite(steamMat2()); s2.userData.steam = true; s2.renderOrder = 6; s2.visible = false; fruitstand.add(s2); return s2; });
+      craftSlots.fruitstand.push({ g, item: j, gl, steam, active: false });
+    }
+    const label = label_('Fruit Stand', { h: 0.5 }); label.position.set(0, 2.95, 0.2); fruitstand.add(label); fruitstand.userData.label = label;
+    const hit = new THREE.Mesh(new THREE.BoxGeometry(2.5, 2.8, 1.6), new THREE.MeshBasicMaterial({ visible: false })); hit.position.y = 1.3; fruitstand.add(hit);
+  }
+  fruitstand.userData.kind = 'fruitstand'; fruitstand.visible = false;
+  // slots: [{ done, color } | null]
+  function setCraft(kind, slots) { slots.forEach((s, k) => { const t = craftSlots[kind][k]; if (!t) return; t.active = !!s && !s.done; t.item.visible = !!s && s.done; t.gl.visible = !!s && s.done && !!s.glow; if (s?.color) { t.item.material = t.item.material.clone(); t.item.material.color.set(s.color); } }); }
+  frameHooks.push(() => { const tt = performance.now() / 1000;
+    const pressing = craftSlots.press.some((t) => t.active); if (press.visible) { if (pressing) press.userData.wheel.rotation.y = tt * 1.4; press.userData.drip.visible = pressing; if (pressing) press.userData.drip.scale.y = 0.6 + 0.4 * Math.abs(Math.sin(tt * 3)); }
+    const cooking = craftSlots.fruitstand.some((t) => t.active);
+    craftSlots.fruitstand.forEach((t, k) => t.steam.forEach((sp, i) => { if (!cooking || !fruitstand.visible || k) { sp.visible = false; return; } const ph = (tt * 0.6 + i / 3) % 1; sp.visible = true;
+      sp.position.set(Math.sin(tt * 2 + i) * 0.06, 1.35 + ph * 0.8, 0.05 + ph * 0.3); sp.scale.setScalar(0.16 + ph * 0.45); sp.material.opacity = 0.85 * Math.sin(Math.PI * Math.min(1, ph * 1.15)); })); });
+
+  // ---------- v0.6: Orchard trees — one stylized procedural model per tree card ----------
+  const orchardG = new THREE.Group(); scene.add(orchardG);
+  const orchardTrees = new Map();
+  function rainbowBark() {
+    const cv = document.createElement('canvas'); cv.width = 64; cv.height = 128; const c = cv.getContext('2d');
+    const cols = ['#5BA06A', '#E07A5A', '#7A6ACF', '#E9B83E', '#4FA0B8', '#C85A8A', '#8FBF5A'];
+    for (let i = 0; i < 26; i++) { c.fillStyle = cols[i % cols.length]; const x = (i * 23) % 64; c.beginPath(); c.ellipse(x, (i * 37) % 128, 8 + (i % 4) * 3, 22 + (i % 5) * 6, 0, 0, Math.PI * 2); c.fill(); }
+    const t = new THREE.CanvasTexture(cv); t.colorSpace = THREE.SRGBColorSpace; t.wrapS = t.wrapT = THREE.RepeatWrapping; return t;
+  }
+  let barkRainbow = null;
+  function makeFruitTree(def) {
+    const root = new THREE.Group(), grow = new THREE.Group(), fruits = new THREE.Group(); root.add(grow); grow.add(fruits);
+    const rnd = ((seed) => () => (seed = (seed * 16807) % 2147483647) / 2147483647)(def.id.split('').reduce((a, ch) => a * 31 + ch.charCodeAt(0), 7) % 2147483646 + 1);
+    const glow = def.glow >= 1, leafM = mat(def.leaf, { roughness: 0.8, ...(glow ? { emissive: def.leaf, emissiveIntensity: 0.25 } : {}) });
+    const barkM = def.shape === 'eucalyptus' ? new THREE.MeshStandardMaterial({ map: (barkRainbow ||= rainbowBark()), roughness: 0.6 }) : mat(def.trunk, { roughness: 0.9 });
+    const fruitM = mat(def.fruitC, { roughness: 0.35, ...(glow ? { emissive: def.fruitC, emissiveIntensity: 0.7 } : {}) });
+    const blobs = [];
+    const trunk = (h, r0 = 0.1, r1 = 0.15, x = 0, z = 0, tilt = 0) => { const m = shadowy(new THREE.Mesh(new THREE.CylinderGeometry(r0, r1, h, 9), barkM)); m.position.set(x, h / 2, z); m.rotation.z = tilt; grow.add(m); return m; };
+    const blob = (x, y, z, r, sx = 1, sy = 1, sz = 1, m = leafM, detail = 1) => { const g = new THREE.IcosahedronGeometry(r, detail); const b = shadowy(new THREE.Mesh(g, m)); b.position.set(x, y, z); b.scale.set(sx, sy, sz); grow.add(b); blobs.push({ x, y, z, r, sx, sy, sz }); return b; };
+    const branch = (x0, y0, x1, y1, z1 = 0, r = 0.05) => { const a = new THREE.Vector3(x0, y0, 0), b = new THREE.Vector3(x1, y1, z1), d = b.clone().sub(a); const m = shadowy(new THREE.Mesh(new THREE.CylinderGeometry(r * 0.7, r, d.length(), 7), barkM)); m.position.copy(a).add(b).multiplyScalar(0.5); m.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), d.normalize()); grow.add(m); };
+    let fruitN = 9, fr = 0.09, fruitGeo = null, onTrunk = false;
+    switch (def.shape) {
+      case 'round': trunk(1.4); blob(0, 2.0, 0, 0.95); blob(-0.45, 1.75, 0.3, 0.55); blob(0.5, 1.8, -0.2, 0.55); break;
+      case 'spread': trunk(1.0, 0.11, 0.17); branch(0, 0.9, -0.7, 1.35); branch(0, 0.9, 0.75, 1.3, 0.2); blob(0, 1.6, 0, 1.15, 1, 0.42, 1); blob(-0.7, 1.5, 0.2, 0.55, 1, 0.6, 1); blob(0.7, 1.5, -0.1, 0.55, 1, 0.6, 1); fr = 0.1; break;
+      case 'oval': trunk(1.5, 0.08, 0.12); blob(0, 2.3, 0, 0.7, 1, 1.55, 1); fruitN = 12; fr = 0.06; fruitGeo = 'pair'; break;
+      case 'weep': trunk(1.6, 0.1, 0.15); blob(0, 2.15, 0, 0.9, 1.1, 0.55, 1.1);
+        for (let i = 0; i < 9; i++) { const a = (i / 9) * Math.PI * 2, c = new THREE.Mesh(new THREE.ConeGeometry(0.16, 1.1, 6), leafM); c.position.set(Math.cos(a) * 0.85, 1.55, Math.sin(a) * 0.85); c.rotation.x = Math.PI; c.castShadow = true; grow.add(c); blobs.push({ x: c.position.x, y: 1.35, z: c.position.z, r: 0.16, sx: 1, sy: 1, sz: 1 }); } fr = 0.085; break;
+      case 'lollipop': trunk(1.5, 0.06, 0.09); { const pot = shadowy(new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.32, 0.4, 14), mat('#C98B5E'))); pot.position.y = 0.2; grow.add(pot); } blob(0, 2.0, 0, 0.75, 1, 1, 1, leafM, 2); fr = 0.1; break;
+      case 'broad': trunk(1.2, 0.12, 0.18); branch(0, 1.1, -0.6, 1.6); branch(0, 1.1, 0.6, 1.6); blob(-0.65, 1.85, 0, 0.7); blob(0.65, 1.85, 0.1, 0.7); blob(0, 2.2, -0.1, 0.75); fr = 0.09; break;
+      case 'olive': trunk(1.0, 0.09, 0.14, -0.08, 0, 0.18); trunk(1.1, 0.08, 0.13, 0.1, 0.05, -0.2); for (let i = 0; i < 7; i++) blob(-0.7 + rnd() * 1.4, 1.35 + rnd() * 0.8, -0.5 + rnd() * 1.0, 0.32 + rnd() * 0.15, 1, 0.7, 1, mat(i % 2 ? '#9DB08A' : '#8EA27A'), 0); fruitN = 14; fr = 0.045; break;
+      case 'blossom': trunk(1.3, 0.08, 0.12); blob(0, 1.95, 0, 0.9, 1.05, 0.8, 1.05);
+        for (let i = 0; i < 26; i++) { const a = rnd() * Math.PI * 2, e = rnd() * 1.2 - 0.3, p = new THREE.Mesh(new THREE.SphereGeometry(0.07, 6, 4), mat('#F7D4E2', { emissive: '#F7D4E2', emissiveIntensity: 0.15 })); p.position.set(Math.cos(a) * Math.cos(e) * 0.93, 1.95 + Math.sin(e) * 0.72, Math.sin(a) * Math.cos(e) * 0.93); grow.add(p); } fr = 0.065; fruitGeo = 'almond'; break;
+      case 'vase': trunk(0.8, 0.1, 0.14); branch(0, 0.75, -0.55, 1.7); branch(0, 0.75, 0.55, 1.7); branch(0, 0.75, 0, 1.8, -0.5); blob(-0.6, 1.95, 0, 0.5, 1, 1.25, 1); blob(0.6, 1.95, 0, 0.5, 1, 1.25, 1); blob(0, 2.1, -0.5, 0.5, 1, 1.25, 1); fr = 0.12; fruitN = 8; fruitGeo = 'crown'; break;
+      case 'lantern': trunk(1.4); blob(0, 2.0, 0, 0.9, 1, 1, 1, mat('#D98A3A', { roughness: 0.8 })); blob(-0.3, 2.3, 0.3, 0.5, 1, 1, 1, mat('#E8A24A', { roughness: 0.8 })); fr = 0.12; fruitGeo = 'lantern'; break;
+      case 'eucalyptus': trunk(2.6, 0.1, 0.17); branch(0, 1.9, -0.6, 2.5); branch(0, 2.1, 0.55, 2.8, 0.2); blob(-0.6, 2.65, 0, 0.45, 1.2, 0.6, 1, mat('#7FB0A0')); blob(0.55, 2.95, 0.2, 0.5, 1.2, 0.6, 1, mat('#8FC0AE')); blob(0, 3.0, -0.2, 0.55, 1.2, 0.55, 1, mat('#7AA898')); fr = 0.07; fruitGeo = 'leaf'; break;
+      case 'cacao': trunk(1.9, 0.12, 0.17); blob(0, 2.3, 0, 0.95, 1.1, 0.6, 1.1, mat('#4F7A45')); onTrunk = true; fruitN = 7; break;
+      case 'moon': trunk(1.4); blob(0, 2.0, 0, 0.92, 1, 1, 1, leafM, 2); blob(-0.4, 2.35, 0.25, 0.45, 1, 1, 1, mat('#7A8AC4', { emissive: '#7A8AC4', emissiveIntensity: 0.3 })); fr = 0.11; break;
+      case 'crystal': trunk(1.3, 0.07, 0.11); { const cm = new THREE.MeshStandardMaterial({ color: '#BFE3D9', roughness: 0.12, metalness: 0.1, transparent: true, opacity: 0.82, emissive: '#5A9AB0', emissiveIntensity: 0.25, flatShading: true });
+        blob(0, 2.0, 0, 0.9, 1, 1.1, 1, cm, 0); blob(-0.5, 1.75, 0.2, 0.45, 1, 1, 1, cm, 0); blob(0.5, 1.8, -0.2, 0.45, 1, 1, 1, cm, 0); } fr = 0.1; fruitGeo = 'octa'; break;
+      default: trunk(1.4); blob(0, 2.0, 0, 0.9);
+    }
+    // fruit, placed on the outside of the canopy (or, for cacao, straight on the trunk)
+    const geo = fruitGeo === 'octa' ? new THREE.OctahedronGeometry(fr) : fruitGeo === 'leaf' ? new THREE.SphereGeometry(fr, 6, 4) : new THREE.SphereGeometry(fr, 10, 8);
+    const fm = fruitGeo === 'leaf' ? mat('#E07A5A', { roughness: 0.6 }) : fruitM;
+    for (let i = 0; i < fruitN; i++) {
+      let m;
+      if (onTrunk) { m = new THREE.Mesh(new THREE.SphereGeometry(0.1, 10, 8), fruitM); m.scale.set(0.8, 1.6, 0.8); const a = i * 2.4; m.position.set(Math.cos(a) * 0.17, 0.5 + (i / fruitN) * 1.2, Math.sin(a) * 0.17); m.rotation.z = Math.cos(a) * 0.3; }
+      else { const b = blobs[i % blobs.length], a = rnd() * Math.PI * 2, e = -0.5 + rnd() * 0.9;
+        m = new THREE.Mesh(geo, fm); m.position.set(b.x + Math.cos(a) * Math.cos(e) * b.r * b.sx * 0.97, b.y + Math.sin(e) * b.r * b.sy * 0.97, b.z + Math.sin(a) * Math.cos(e) * b.r * b.sz * 0.97);
+        if (fruitGeo === 'pair') { const m2 = new THREE.Mesh(geo, fm); m2.position.set(0.09, -0.02, 0); m.add(m2); }
+        if (fruitGeo === 'lantern' || fruitGeo === 'crown') m.scale.set(1, 0.85, 1);
+        if (fruitGeo === 'almond') m.scale.set(0.8, 1.2, 0.8); }
+      m.castShadow = true; fruits.add(m);
+    }
+    if (glow) for (let i = 0; i < 4; i++) { const g = glowSprite(def.fruitC, 0.9, 0.45); const b = blobs[i % blobs.length]; g.position.set(b.x, b.y, b.z + b.r * 0.6); fruits.add(g); }
+    const hit = new THREE.Mesh(new THREE.CylinderGeometry(1.0, 1.0, 3.2, 8), new THREE.MeshBasicMaterial({ visible: false })); hit.position.y = 1.6; root.add(hit);
+    root.userData = { grow, fruits };
+    return root;
+  }
+  const STAGE_SCALE = [0.28, 0.5, 0.75, 1];
+  function addOrchardTree(k, sp) {
+    removeOrchardTree(k); const def = TREES[sp], spot = ORCHARD_TREE_SPOTS[k]; if (!def || !spot) return null;
+    const t = makeFruitTree(def); t.position.set(spot.x, 0, spot.z); t.rotation.y = (k * 1.7) % (Math.PI * 2);
+    Object.assign(t.userData, { kind: 'orchardtree', k, sp }); orchardG.add(t); orchardTrees.set(k, t); return t;
+  }
+  function setOrchardTree(k, stage, ripe) { const t = orchardTrees.get(k); if (!t) return; const s = STAGE_SCALE[Math.max(0, Math.min(3, stage))]; t.userData.grow.scale.setScalar(s); t.userData.fruits.visible = stage >= 3 && !!ripe; t.userData.stage = stage; t.userData.ripe = !!ripe; }
+  function removeOrchardTree(k) { const t = orchardTrees.get(k); if (t) { orchardG.remove(t); orchardTrees.delete(k); } }
+  frameHooks.push(() => { const tt = performance.now() / 1000; for (const t of orchardTrees.values()) if (t.userData.ripe) t.userData.grow.rotation.z = Math.sin(tt * 0.8 + t.userData.k) * 0.012; });
+
   // ---------- v0.41: Parking Lot — painted bays along the near lane by the Farm Stand, plus a P sign ----------
   const parking = new THREE.Group(); parking.position.set(PARK_X[1], 0, ROAD.near); parking.visible = false; scene.add(parking);   // children are relative to the middle bay
   const paintM = new THREE.MeshStandardMaterial({ color: '#FFFFFF', roughness: 0.9, transparent: true, opacity: 0.92, depthWrite: false });
@@ -635,7 +825,7 @@ export function createWorld(canvas) {
     const sign = new THREE.Mesh(new THREE.PlaneGeometry(0.62, 0.62), new THREE.MeshStandardMaterial({ map: t, roughness: 0.6 })); sign.position.set(2.15 - PARK_X[1], 1.55, 4.84 - ROAD.near); sign.rotation.y = 0.15; parking.add(sign);
     const hit = new THREE.Mesh(new THREE.BoxGeometry(0.9, 1.9, 0.6), new THREE.MeshBasicMaterial({ visible: false })); hit.position.set(2.15 - PARK_X[1], 0.95, 4.8 - ROAD.near); parking.add(hit); }
   parking.userData.kind = 'parking';
-  function setParking(cap) { parking.visible = cap > 1; parkBays.forEach((b, k) => (b.visible = k < cap)); }
+  function setParking(cap) { parking.visible = cap > 1; parkBays.forEach((b, k) => (b.visible = k < cap)); parking.userData.spots = cap; }
 
   // ---------- v0.41: Windmill (placed once anywhere on owned ground; sails turn gently) ----------
   const windmill = new THREE.Group(); windmill.position.set(SPOTS.windmill[0], 0, SPOTS.windmill[1]); windmill.rotation.y = 0.35; windmill.visible = false; scene.add(windmill);
@@ -659,23 +849,51 @@ export function createWorld(canvas) {
   const bulbs = [], bbGlow = glowSprite('#FFD27A', 5.2, 0.0);
   { for (const x of [-1.25, 1.25]) { const p = shadowy(new THREE.Mesh(new THREE.BoxGeometry(0.16, 2.4, 0.16), woodD)); p.position.set(x, 1.2, 0); billboard.add(p); }
     const back = shadowy(new THREE.Mesh(new THREE.BoxGeometry(3.4, 1.75, 0.12), woodM)); back.position.set(0, 2.85, -0.05); billboard.add(back);
-    const c = document.createElement('canvas'); c.width = 512; c.height = 256; const g = c.getContext('2d');
-    g.fillStyle = '#FFF6E6'; g.fillRect(0, 0, 512, 256); g.strokeStyle = '#7FA47D'; g.lineWidth = 14; g.strokeRect(10, 10, 492, 236);
-    for (const [x, y, col] of [[70, 120, '#E58F94'], [112, 92, '#B79AD6'], [104, 160, '#F2B54A']]) { g.fillStyle = col; for (let k = 0; k < 6; k++) { const a = k * Math.PI / 3; g.beginPath(); g.arc(x + Math.cos(a) * 17, y + Math.sin(a) * 17, 14, 0, 7); g.fill(); } g.fillStyle = '#FFE08A'; g.beginPath(); g.arc(x, y, 11, 0, 7); g.fill(); }
-    g.fillStyle = '#3D5A40'; g.textAlign = 'left'; g.textBaseline = 'middle'; g.font = '700 64px Fraunces, Georgia, serif'; g.fillText('Petalspire', 168, 100);
-    g.font = '800 34px Nunito, sans-serif'; g.fillStyle = '#B0603A'; g.fillText('Fresh flowers ahead →', 168, 170);
+    // v0.52: the face is a live canvas ad (brand palette, Fraunces/Nunito) — redrawn only when its content changes
+    const c = document.createElement('canvas'); c.width = 1024; c.height = 512;
     const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4;
-    const face = new THREE.Mesh(new THREE.PlaneGeometry(3.2, 1.6), new THREE.MeshStandardMaterial({ map: t, roughness: 0.7, emissive: '#FFFFFF', emissiveMap: t, emissiveIntensity: 0.0 })); face.position.set(0, 2.85, 0.02); billboard.add(face); billboard.userData.face = face;
+    const face = new THREE.Mesh(new THREE.PlaneGeometry(3.2, 1.6), new THREE.MeshStandardMaterial({ map: t, roughness: 0.75, emissive: '#FFFFFF', emissiveMap: t, emissiveIntensity: 0.05 })); face.position.set(0, 2.85, 0.02); billboard.add(face); billboard.userData.face = face;
+    const backFace = new THREE.Mesh(face.geometry, face.material); backFace.position.set(0, 2.85, -0.12); backFace.rotation.y = Math.PI; billboard.add(backFace);   // never a blank board from behind
+    // shimmer: a soft diagonal light band sliding across the face while the ad runs (texture offset only, no redraw)
+    const sc = document.createElement('canvas'); sc.width = 256; sc.height = 16; { const sg = sc.getContext('2d'), gr = sg.createLinearGradient(0, 0, 256, 0);
+      gr.addColorStop(0, 'rgba(255,240,200,0)'); gr.addColorStop(0.42, 'rgba(255,240,200,0)'); gr.addColorStop(0.5, 'rgba(255,246,220,0.85)'); gr.addColorStop(0.58, 'rgba(255,240,200,0)'); gr.addColorStop(1, 'rgba(255,240,200,0)'); sg.fillStyle = gr; sg.fillRect(0, 0, 256, 16); }
+    const st = new THREE.CanvasTexture(sc); st.wrapS = THREE.RepeatWrapping; st.repeat.set(0.5, 1);
+    const shimmer = new THREE.Mesh(new THREE.PlaneGeometry(3.2, 1.6), new THREE.MeshBasicMaterial({ map: st, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false }));
+    shimmer.position.set(0, 2.85, 0.03); shimmer.rotation.z = 0; billboard.add(shimmer); billboard.userData.shimmer = shimmer;
+    billboard.userData.bb = { c, t, mode: '', panel: 0, draws: 0, key: '' };
     const bulbOff = mat('#E9DFC8', { roughness: 0.4 });
-    for (let k = 0; k < 14; k++) { const top = k < 7, i = k % 7; const b = new THREE.Mesh(new THREE.SphereGeometry(0.08, 8, 6), bulbOff.clone()); b.position.set(-1.5 + i * 0.5, top ? 3.78 : 1.92, 0.08); billboard.add(b); bulbs.push(b); }
+    const bulbAt = [];   // v0.52: bulbs all the way round the frame (chasing while the ad runs)
+    for (let i = 0; i < 7; i++) bulbAt.push([-1.5 + i * 0.5, 3.78]);
+    for (let i = 1; i < 4; i++) bulbAt.push([1.62, 3.78 - i * 0.465]);
+    for (let i = 6; i >= 0; i--) bulbAt.push([-1.5 + i * 0.5, 1.92]);
+    for (let i = 3; i > 0; i--) bulbAt.push([-1.62, 3.78 - i * 0.465]);
+    for (const [x, y] of bulbAt) { const b = new THREE.Mesh(new THREE.SphereGeometry(0.08, 8, 6), bulbOff.clone()); b.position.set(x, y, 0.08); billboard.add(b); bulbs.push(b); }
     bbGlow.position.set(0, 2.85, 0.4); billboard.add(bbGlow);
     const hit = new THREE.Mesh(new THREE.BoxGeometry(3.6, 4.0, 0.8), new THREE.MeshBasicMaterial({ visible: false })); hit.position.y = 2.0; billboard.add(hit); }
   const bbLabel = label('Billboard', { h: 0.5 }); bbLabel.position.set(0, 4.35, 0.1); billboard.add(bbLabel); billboard.userData.label = bbLabel; billboard.userData.kind = 'billboard';
   let bbOn = false;
-  function setBillboard(on, text) { bbOn = !!on; if (text) setLabel(bbLabel, text); }
-  frameHooks.push(() => { if (!billboard.visible) return; const t = performance.now() / 1000;
-    bulbs.forEach((b, k) => { const lit = bbOn && ((Math.floor(t * 4) + k) % 3 !== 0); b.material.emissive.set(lit ? '#FFC94A' : '#000000'); b.material.emissiveIntensity = lit ? 1.6 : 0; b.material.color.set(lit ? '#FFF2B0' : '#E9DFC8'); });
-    billboard.userData.face.material.emissiveIntensity = bbOn ? 0.3 + 0.1 * Math.sin(t * 3) : 0; bbGlow.material.opacity = bbOn ? 0.75 + 0.2 * Math.sin(t * 3) : 0; });
+  let bbInfo = { time: '', top: null };
+  const BB_PANEL_MS = 4500, BB_PANELS = 3;
+  function bbRedraw(force) {
+    const d = billboard.userData.bb, panel = bbOn ? d.panel : 0;
+    const key = [bbOn ? 'on' : 'off', panel, bbOn ? bbInfo.time : '', bbInfo.top?.name || ''].join('|');
+    if (!force && key === d.key) return; d.key = key; d.mode = bbOn ? 'ad' : 'rent'; d.shown = panel; d.draws++;
+    drawBillboard(d.c.getContext('2d'), { on: bbOn, panel, time: bbInfo.time, top: bbInfo.top }); d.t.needsUpdate = true;
+  }
+  function setBillboard(on, text, info) {
+    const was = bbOn; bbOn = !!on; if (text) setLabel(bbLabel, text);
+    if (info) bbInfo = { ...bbInfo, ...info };
+    if (bbOn && !was) { billboard.userData.bb.panel = 0; billboard.userData.bb.since = performance.now(); }
+    bbRedraw();
+  }
+  if (document.fonts?.ready) document.fonts.ready.then(() => bbRedraw(true));
+  document.fonts?.addEventListener?.('loadingdone', () => bbRedraw(true));
+  bbRedraw(true);
+  frameHooks.push(() => { if (!billboard.visible) return; const t = performance.now() / 1000, d = billboard.userData.bb;
+    if (bbOn && performance.now() - (d.since || 0) > BB_PANEL_MS) { d.since = performance.now(); d.panel = (d.panel + 1) % BB_PANELS; bbRedraw(); }
+    bulbs.forEach((b, k) => { const lit = bbOn && ((Math.floor(t * 5) + k) % 3 !== 0); b.material.emissive.set(lit ? '#FFC94A' : '#000000'); b.material.emissiveIntensity = lit ? 1.7 : 0; b.material.color.set(lit ? '#FFF2B0' : '#D9CFBA'); });
+    billboard.userData.face.material.emissiveIntensity = bbOn ? 0.32 + 0.08 * Math.sin(t * 3) : 0.04; bbGlow.material.opacity = bbOn ? 0.6 + 0.15 * Math.sin(t * 3) : 0;
+    const sh = billboard.userData.shimmer; sh.material.opacity = bbOn ? 0.55 : 0; if (bbOn) sh.material.map.offset.x = ((t * 0.28) % 1.6) - 0.8; });
 
   function setStandStock(f) { crates[0].visible = !!f.heart; crates[1].visible = !!f.sun; crates[2].visible = !!f.moon; }
 
@@ -823,7 +1041,7 @@ export function createWorld(canvas) {
       case 'gnome': g.add(M(new THREE.ConeGeometry(0.11, 0.24, 8), cm, 0, 0.1, 0, 0, 0, 1.4), M(new THREE.SphereGeometry(0.075, 8, 6), mat('#E9CDB4'), -0.14, 0.09, 0), M(new THREE.ConeGeometry(0.07, 0.18, 8), mat('#D99A9A'), -0.27, 0.1, 0, 0, 0, 1.5)); break;
       case 'fencing': g.add(M(new THREE.TorusGeometry(0.2, 0.014, 4, 18), metal, 0, 0.1, 0, 1.2, 0.3), M(new THREE.TorusGeometry(0.15, 0.014, 4, 16), metal, 0.08, 0.12, 0.05, 0.6, 1.1), M(new THREE.TorusGeometry(0.12, 0.012, 4, 14), metal, -0.08, 0.08, -0.04, 1.6, 0.4)); break;
       case 'bottles': g.add(M(new THREE.CylinderGeometry(0.05, 0.06, 0.24, 8), glass, 0, 0.12), M(new THREE.CylinderGeometry(0.05, 0.06, 0.2, 8), mat('#A9CCB0', { transparent: true, opacity: 0.85, roughness: 0.2 }), 0.14, 0.06, 0.04, 0, 0, 1.4), M(new THREE.CylinderGeometry(0.045, 0.055, 0.2, 8), mat('#C8E0E8', { transparent: true, opacity: 0.85, roughness: 0.2 }), -0.12, 0.1, 0.06)); break;
-      case 'scrap_metal': g.add(M(new THREE.BoxGeometry(0.38, 0.03, 0.22), metal, 0, 0.06, 0, 0.2, 0.4, 0.15), M(new THREE.BoxGeometry(0.28, 0.03, 0.16), rust, 0.06, 0.12, -0.04, -0.3, 1.2, 0.2), M(new THREE.CylinderGeometry(0.03, 0.03, 0.34, 6), metal, -0.1, 0.05, 0.1, 0, 0, 1.5)); break;
+      case 'roadscrap': case 'scrap_metal': g.add(M(new THREE.BoxGeometry(0.38, 0.03, 0.22), metal, 0, 0.06, 0, 0.2, 0.4, 0.15), M(new THREE.BoxGeometry(0.28, 0.03, 0.16), rust, 0.06, 0.12, -0.04, -0.3, 1.2, 0.2), M(new THREE.CylinderGeometry(0.03, 0.03, 0.34, 6), metal, -0.1, 0.05, 0.1, 0, 0, 1.5)); break;
       default: g.add(M(new THREE.BoxGeometry(0.3, 0.2, 0.3), cm, 0, 0.1));
     }
     return g;
@@ -981,11 +1199,35 @@ export function createWorld(canvas) {
     g.userData.wheels = wheels;
     return g;
   }
-  function spawnCar({ stopX = null, onPark, dir = 1, color } = {}) {
+  function spawnCar({ stopX = null, onPark, dir = 1, color, behind = 0 } = {}) {   // v0.52: behind = car lengths back (group arrivals drive in nose to tail)
     const g = makeCar(color || CAR_COLS[Math.floor(Math.random() * CAR_COLS.length)]);
-    const z = dir > 0 ? ROAD.near : ROAD.far; const x0 = dir > 0 ? -46 : 46;
+    const z = dir > 0 ? ROAD.near : ROAD.far; const x0 = (dir > 0 ? -46 : 46) - dir * behind * 3.2;
     g.position.set(x0, 0, z); g.rotation.y = dir > 0 ? 0 : Math.PI; scene.add(g);
     const car = { group: g, dir, stopX, onPark, state: stopX != null ? 'in' : 'pass', v: 9, x: x0, bob: Math.random() * 10, leave() { car.state = 'out'; car.v = 0.5; } };
+    cars.push(car); return car;
+  }
+  // v0.52: the water truck (Supply Market › Fill Rain Barrels) — a little tanker that drives up the near lane, parks, then leaves.
+  function makeTruck() {
+    const g = new THREE.Group(), wheels = [];
+    const chassis = shadowy(new THREE.Mesh(roundedBox(3.1, 0.3, 1.1, 0.1), mat('#5A6B70', { roughness: 0.6 }))); chassis.position.set(-0.15, 0.42, 0); g.add(chassis);
+    const cab = shadowy(new THREE.Mesh(roundedBox(0.95, 0.95, 1.08, 0.16), mat('#5E97AA', { roughness: 0.45 }))); cab.position.set(1.0, 0.98, 0); g.add(cab);
+    const glass = mat('#CFE6EE', { roughness: 0.15, metalness: 0.1 });
+    const wind = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.36, 0.86), glass); wind.position.set(1.48, 1.18, 0); g.add(wind);
+    const side = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.32, 1.1), glass); side.position.set(1.05, 1.2, 0); g.add(side);
+    const tankG = new THREE.CylinderGeometry(0.58, 0.58, 2.0, 22); tankG.rotateZ(Math.PI / 2);
+    const tank = shadowy(new THREE.Mesh(tankG, mat('#EEF2EE', { roughness: 0.35, metalness: 0.15 }))); tank.position.set(-0.55, 1.12, 0); g.add(tank);
+    const bandG = new THREE.CylinderGeometry(0.6, 0.6, 0.22, 22); bandG.rotateZ(Math.PI / 2);
+    for (const x of [-1.2, 0.1]) { const bd = new THREE.Mesh(bandG, mat('#5E97AA')); bd.position.set(x, 1.12, 0); g.add(bd); }
+    const drop = new THREE.Mesh(new THREE.SphereGeometry(0.2, 14, 10), mat('#7FB9D0', { roughness: 0.3 })); drop.scale.set(1, 1.3, 0.25); drop.position.set(-0.55, 1.12, 0.58); g.add(drop);
+    const hose = new THREE.Mesh(new THREE.TorusGeometry(0.2, 0.05, 8, 18), mat('#3B3330')); hose.position.set(-1.62, 0.95, 0); hose.rotation.y = Math.PI / 2; g.add(hose);
+    for (const z of [0.3, -0.3]) { const h = new THREE.Mesh(new THREE.SphereGeometry(0.075, 10, 8), mat('#FFF6D8', { emissive: '#FFE1A0', emissiveIntensity: 0.9 })); h.position.set(1.49, 0.7, z); g.add(h); }
+    for (const x of [1.0, -0.35, -1.15]) for (const z of [0.5, -0.5]) { const w = shadowy(new THREE.Mesh(wheelG, mat('#5A4A44'))); w.position.set(x, 0.2, z); g.add(w); const hb = new THREE.Mesh(hubG, mat('#FFF9F0')); w.add(hb); wheels.push(w); }
+    g.userData.wheels = wheels; g.userData.truck = true;
+    return g;
+  }
+  function spawnTruck({ stopX = -8, onPark, x0 = -34 } = {}) {
+    const g = makeTruck(); g.position.set(x0, 0, ROAD.near); scene.add(g);
+    const car = { group: g, dir: 1, stopX, onPark, state: 'in', v: 9, x: x0, bob: Math.random() * 10, truck: true, leave() { car.state = 'out'; car.v = 0.5; } };
     cars.push(car); return car;
   }
   function updateCars(dt, t) {
@@ -1049,7 +1291,7 @@ export function createWorld(canvas) {
     if (mode === 'build') { const h = raycaster.intersectObjects(ghostMeshes, false)[0]; return h ? h.object.userData : null; }
     if (mode === 'ground') { const p = raycaster.ray.intersectPlane(groundPlane, new THREE.Vector3()); return p ? { kind: 'ground', point: p } : null; }
     const targets = [...tiles.map((t) => t.mesh), ...tiles.map((t) => t.holder), woods, lootG, decorG, bpGroup];
-    if (stand.visible) targets.push(stand); if (rack.visible) targets.push(rack); if (tincture.visible) targets.push(tincture); if (still.visible) targets.push(still); if (parking.visible) targets.push(parking); if (windmill.visible) targets.push(windmill); if (billboard.visible) targets.push(billboard); targets.push(market); for (const g of barrels.values()) if (g.visible) targets.push(g); for (const g of hives.values()) if (g.visible) targets.push(g);
+    if (stand.visible) targets.push(stand); if (rack.visible) targets.push(rack); if (tincture.visible) targets.push(tincture); if (still.visible) targets.push(still); if (teastand.visible) targets.push(teastand); if (press.visible) targets.push(press); if (fruitstand.visible) targets.push(fruitstand); targets.push(orchardG); if (parking.visible) targets.push(parking); if (windmill.visible) targets.push(windmill); if (billboard.visible) targets.push(billboard); targets.push(market); for (const g of barrels.values()) if (g.visible) targets.push(g); for (const g of hives.values()) if (g.visible) targets.push(g);
     for (const id of Object.keys(lotFx)) if (lotFx[id].fx.visible) targets.push(lotFx[id].sign, lotFx[id].tag);
     const hits = raycaster.intersectObjects(targets, true);
     for (const h of hits) { if (h.object.userData?.tag && visibleChain(h.object)) return { kind: 'lot', id: h.object.userData.id }; }
@@ -1158,7 +1400,7 @@ export function createWorld(canvas) {
       if (tl.icon.visible) tl.icon.position.y = 1.35 + (tl.key.endsWith(':3') ? 0.2 : -0.5) + Math.sin(t * 2.5 + p.userData.phase) * 0.06;
     }
     for (const b of beds) if (b.group.userData.born) { const k = Math.min(1, (now - b.group.userData.born) / 700); b.group.scale.set(1, Math.max(0.01, elastic(k)), 1); if (k >= 1) b.group.userData.born = 0; }
-    for (const o of [stand, rack, market, tincture, still, parking, billboard, windmill, ...barrels.values(), ...hives.values()]) if (o.userData.appear && !builds.some((b) => b.obj === o && !b.shown)) { const k = Math.min(1, (now - o.userData.appear) / 750); o.scale.setScalar(Math.max(0.01, elastic(k)) * o.userData.baseScale); if (k >= 1) o.userData.appear = 0; }
+    for (const o of [stand, rack, market, tincture, still, teastand, press, fruitstand, parking, billboard, windmill, ...barrels.values(), ...hives.values()]) if (o.userData.appear && !builds.some((b) => b.obj === o && !b.shown)) { const k = Math.min(1, (now - o.userData.appear) / 750); o.scale.setScalar(Math.max(0.01, elastic(k)) * o.userData.baseScale); if (k >= 1) o.userData.appear = 0; }
     for (const o of obs.values()) if (o.stump?.userData.born) { const k = Math.min(1, (now - o.stump.userData.born) / 400); o.stump.scale.setScalar(Math.max(0.01, elastic(k)) * o.def.s * 0.95); if (k >= 1) o.stump.userData.born = 0; }
     sel.material.opacity = 0.65 + 0.3 * Math.sin(t * 4);
     const pulse = 0.5 + 0.5 * Math.sin(t * 4); ghostOk.opacity = 0.22 + 0.2 * pulse; barOk.opacity = 0.7 + 0.3 * pulse;
@@ -1180,9 +1422,9 @@ export function createWorld(canvas) {
   }
 
   return {
-    renderer, scene, camera, ctl, DEF, tiles, beds, obs, stand, rack, market, barrel, still, setStill, parking, setParking, windmill, billboard, setBillboard, spotGhosts, setSpotGhosts, bedTargets, setBedTargets, barrels, addBarrel, removeBarrel, gutters, setGutter, setBarrelInfo, hives, addHive, removeHive, setBeeBeds, tincture, setTincture, cars, frameHooks,
+    renderer, scene, camera, ctl, DEF, tiles, beds, obs, stand, rack, market, barrel, still, setStill, teastand, setTea, press, fruitstand, setCraft, addOrchardTree, setOrchardTree, removeOrchardTree, orchardTrees, makeFruitTree, parking, setParking, windmill, billboard, setBillboard, spotGhosts, setSpotGhosts, bedTargets, setBedTargets, barrels, addBarrel, removeBarrel, gutters, setGutter, setBarrelInfo, hives, addHive, removeHive, setBeeBeds, tincture, setTincture, cars, frameHooks,
     updateCamera, resize, glide, intro, pick, project, tileWorld, sickleSweep, plowFurrows, fxCount: () => fxs.length,
-    setObstacle, chop, clearObstacle, addBed, setGhosts, setLotOwned, setStandStock, setMarketOpen, setRack, appear, spawnCar, poof,
+    setObstacle, chop, clearObstacle, addBed, setGhosts, setLotOwned, setStandStock, setMarketOpen, setRack, appear, spawnCar, spawnTruck, poof,
     setPlant, attachPlant, setIcon, setShade, bgTrees, setIrrigation, irrigPulse, irrig, select, splash, render, textSprite, relabel, groundAt,
     buildAnim, makeBlueprint, setBlueprint, setMarketState, addLoot, removeLoot, addDecor, removeDecor, addGrown, setGrown, removeGrown, loots, decors,
     iconWorld(i) { const t = tiles[i]; t.icon.updateWorldMatrix(true, false); return new THREE.Vector3().setFromMatrixPosition(t.icon.matrixWorld); },

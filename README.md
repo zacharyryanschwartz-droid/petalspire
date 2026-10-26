@@ -1,4 +1,4 @@
-# Petalspire v0.51
+# Petalspire v0.6
 
 A cozy 3D flower-garden prototype for iPhone Safari (portrait, one thumb). Also plays on desktop with a mouse.
 This is a **prototype**: version numbers stay below 1.0 until the first official release.
@@ -10,16 +10,113 @@ This is a **prototype**: version numbers stay below 1.0 until the first official
 2. **Finds** (Bag → Finds). Each find can be **Restored** for a small cost and some waiting time (20–45 s, or 1 Jewel to finish now) or **Recycled** for Wood, coins or Scrap.
    - 10 kinds. Restored decor (planter, lantern, bench, gnome, trellis, bottle chime, weathervane) can be placed on your land and raises **atmosphere**, which brings customers sooner.
    - Watering Can: faster water. Wheelbarrow: +1 Wood per tree. Old Crate: +4 stand shelf.
-3. **Raised beds.** Build → Raised bed (12 Wood). The first bed brings the home rain barrel (filled by the Starter Seed Pack), so water can never run out. Other plots get their own barrel from the Supply Market.
+3. **Raised beds.** Build → Raised bed (12 Wood). The first bed brings the home rain barrel (filled by the Starter Seed Pack), so water can never run out. Other plots get their own barrel from the Build menu (40 coins, since v0.52).
 4. **Build it yourself.**
    - After your first bed, a glowing **Farm Stand blueprint** appears by the road. It costs 15 Wood; adding an Old Crate is optional. A scaffold rises, sawdust flies, and the stand is done.
    - The **Drying Rack** (10 Wood) becomes buildable after your first Lavender harvest.
    - The Build menu lists every structure with its cost and whether it is locked.
-5. **Rebuild the Supply Market.** Once you've earned 100 coins at the stand, the boarded-up market can be rebuilt for 30 Wood + 60 coins (3 Scrap saves 20 coins). It goes boarded → scaffold (60 s, or 2 Jewels) → open. It sells seeds, Rain Barrels for your plots, garden features, Card Packs (1 Jewel each), a **bundle of 5 Wood (12 coins)** and **saplings (20 coins)**.
+5. **Rebuild the Supply Market.** Once you've earned 100 coins at the stand, the boarded-up market can be rebuilt for 30 Wood + 60 coins (3 Scrap saves 20 coins). It goes boarded → scaffold (60 s, or 2 Jewels) → open. It sells seeds, a water truck that fills your rain barrels (v0.52), garden features, Card Packs (1 Jewel each), a **bundle of 5 Wood (12 coins)** and **saplings (20 coins)**.
 6. **Grow trees.** Plant a sapling on cleared ground you own (not in beds). It grows through four stages over **40 minutes of real time**, and keeps growing while the game is closed. Chop a mature tree for 6 Wood; it leaves a stump (+1) and has a 50% chance to drop a new sapling.
 7. **Land for sale.** Five wooded plots, each with a floating For Sale sign: 150 → 300 → 600 → 1000 → 1500 coins.
 
 Drag with one finger to pan, pinch to zoom, and twist with two fingers to turn. On desktop, right-drag or shift-drag turns the view.
+
+## New in v0.6 — Sunflower seeds, the Pressed Oil Stand, the Fruit Stand and the Orchard
+
+v0.6 (build `0.6`, label "v0.6 prototype") contains everything listed under v0.52 below, plus the items here.
+
+### Sunflower rework
+- A Sunflower harvest now gives **100 seeds and no flowers** (+10 seeds per beehive / card-level bonus). Sunflowers can no longer be dried.
+- Loose seeds sell for **1 coin** each. On the Farm Stand, a **"Bag your Sunflower seeds"** strip packs them: **bag of 50 → 85 coins**, **bag of 100 → 200 coins**. A bag takes one stand slot.
+- Save migration: Sunflower flowers and dried Sunflowers already owned (bag, stand, drying rack) are refunded at **54** and **132** coins each.
+
+### Pressed Oil Stand (Epic card, 140 coins + 20 Wood, 2 presses, any owned plot incl. the Roadside Lot)
+Price = raw value × (1.7 + 0.25 × (tier − 1)), butters ×1.06.
+
+| Product | Input | Raw value | Sells for | Time |
+|---|---|---|---|---|
+| Sunflower Oil | 30 Sunflower seeds | 30 | 110 | 60 s |
+| Sun Butter | 50 Sunflower seeds | 50 | 190 | 90 s |
+| Rosehip Oil | 3 Damask Rose seeds | 102 | 250 | 120 s |
+| Olive Oil | 6 olives | 120 | 294 | 120 s |
+| Almond Oil | 6 almonds | 132 | 323 | 120 s |
+| Almond Butter | 8 almonds | 176 | 457 | 150 s |
+| Cocoa Butter | 4 cacao pods | 300 | 938 | 180 s |
+| Sunpetal Oil (glows) | 2 Sunpetal seeds | 320 | 1600 | 240 s |
+
+Recipes stay locked until you have found the source card.
+
+### The Orchard (7th plot, 2500 coins)
+- Locked until all five wood plots are owned. 2 raised beds and **12 fruit-tree spots**; lighter woods to clear. Stands may not cover a tree spot.
+- Buying it adds **14 tree cards** (2 per tier) to the Card Pack pool; until then no tree card can be drawn. Tier totals stay Basic 34.615 · Epic 31.385 · Legendary 20.051 · Rare 8.718 · Super Rare 3.138 · Ultra 1.395 · Other World 0.697 %. Trees take ≈14.34% of draws: e.g. Apple 3.1469%, Cherry 1.4857%, Lemon 1.1568%, Olive 0.7265%, Pomegranate 0.3923%, Eucalyptus 0.1744%, Moonpeach 0.0872%; each Epic feature 3.0769% → 2.7856%.
+- Find a tree card → the Supply Market sells its sapling → tap a free tree spot. Trees grow sapling → young → tree → fruiting (25% / 60% / 100% of the grow time), then fruit again every cycle without replanting. Tap a ripe tree to pick it. Grown trees cast shade. Card levels shorten the times.
+
+| Tree | Tier | Sapling | First fruit | Then every | Fruit per pick | Fruit price |
+|---|---|---|---|---|---|---|
+| Apple / Peach | Basic | 30 | 5:00 | 2:30 | 6 | 6 / 8 |
+| Cherry / Plum | Epic | 70 | 7:00 | 3:00 | 5 | 14 / 16 |
+| Lemon / Fig | Legendary | 140 | 9:00 | 3:30 | 5 | 24 / 28 |
+| Olive / Almond | Rare | 240 | 11:00 | 4:00 | 4 | 20 / 22 |
+| Pomegranate / Persimmon | Super Rare | 400 | 14:00 | 4:40 | 4 | 60 / 64 |
+| Rainbow Eucalyptus / Cacao | Ultra | 650 | 17:00 | 5:20 | 3 | 70 / 75 |
+| Moonpeach / Crystal Apple | Other World | 1000 | 20:00 | 6:00 | 3 | 200 / 220 |
+
+Every tree has its own 3D model (rainbow bark, cacao pods on the trunk, glowing moonpeaches, crystal fruit…).
+Eucalyptus leaves go in the Essential Oil Stand: **3 leaves, 5 min → Eucalyptus Essential Oil (600) + Eucalyptus Hydrosol (66)**.
+
+### Fruit Stand (Epic card, 120 coins + 20 Wood, 2 jam pots, any owned plot)
+Price = raw × (1.6 + 0.25 × (tier − 1)); jelly ×1.08, butters/preserves ×1.12. Times 40 s (Basic) · 60 s · 80 s · 120 s · 160 s (Other World).
+
+| Product | Raw | Sells for | | Product | Raw | Sells for |
+|---|---|---|---|---|---|---|
+| Apple Sauce (4) | 24 | 38 | | Lemon Curd (3) | 72 | 163 |
+| Apple Butter (6) | 36 | 65 | | Lemon Marmalade (4) | 96 | 218 |
+| Canned Peaches (4) | 32 | 51 | | Fig Jam (3) | 84 | 191 |
+| Peach Butter (6) | 48 | 86 | | Fig Butter (4) | 112 | 263 |
+| Cherry Jelly (4) | 56 | 112 | | Pomegranate Jelly (3) | 180 | 505 |
+| Canned Cherries (5) | 70 | 130 | | Persimmon Butter (3) | 192 | 559 |
+| Plum Jelly (4) | 64 | 128 | | Moonpeach Preserves (2) | 400 | 1389 |
+| Plum Sauce (4) | 64 | 118 | | Crystal Apple Jelly (2) | 440 | 1473 |
+
+### Also since v0.51
+- **Tea Stand** (Epic card, any owned plot): blend 3 dried herbs. Price = round(Σ dried × (1.4 + 0.35 × (avg tier − 1)) × 1.1 if all different); brew 15 + 10 × (tier − 1) s. Lavender Tea 59 (vs 42 dried) · Lavender + Rosemary + Tulsi 689 (vs 316) · Moonflower Starlight 11319 (vs 3234) · Moonflower + Crystal Rose + Sunpetal 13583.
+- Shade fix (shadows follow the sun direction) and a live Billboard face.
+- On the Roadside Lot, crafting stands may stand on an unbuilt bed patch; that patch then can't take a bed until the stand moves.
+
+## New in v0.52 — supply cards, the water truck, Rain Barrel in Build
+
+- **Glycerin and Vinegar cards.** Both are new **Basic** cards with the shared Basic frame, 2% per card slot each. Their odds come out of the two Basic feature cards (Rain Barrel and Irrigation, 10% → 8% each), so each tier's total is unchanged (Basic 60%, Epic 20.5%, Legendary 11.5%, Rare 5%, Super Rare 1.8%, Ultra Rare 0.8%, Other World 0.4%) and so is every other card's odds. Finding a card unlocks that base at the Supply Market. Duplicates stack like other cards, and **each duplicate gives +2 free units** of that base.
+- **Glycerin and Vinegar are locked until the Tincture Stand is open (built).** A locked row says what is still missing: "Find the Glycerin card", "Unlocks with Tincture Stand", or both.
+- **Rain Barrel moved to the Build menu.** Build → Rain Barrel → Choose a spot & build. It costs 40 coins, charged when placed. The rules are unchanged: one per plot, up to 8 irrigated beds (see below), collects rain only when a stand roof is on the same plot, refills every 60 s (40 s with the Windmill), up to 10. It still needs the Rain Barrel card (every starter pack has one), but it no longer needs the Supply Market.
+- **Fill Rain Barrels (Supply Market).** A water truck drives up the road, parks, and fills your barrels to full. It bills **10 coins per barrel it filled**. Barrels that were already full cost nothing. If you can't pay for every barrel, it fills as many as you can afford (emptiest first) and tells you how many it left. If you have under 10 coins the button is disabled.
+- **Tree sapling is a plain market item.** Buy it at the Supply Market, then tap open ground to plant it. Saplings you own also get a **Plant** button on that row, which shows even while the market is still boarded up. The Build card and the Bag button for saplings are gone.
+- **Save migration.** Nothing is lost. Saves from before v0.52 that own the Tincture Stand get both cards and keep buying both bases, even if the stand isn't built yet. Glycerin and Vinegar already in the bag always stay. An unplaced Rain Barrel from an older save is placed for free from the Build card or the Bag.
+
+### More in v0.52
+
+- **Buy and place in one step.** Every placeable purchase (beehive, sapling, stands, windmill, decor) goes straight into spot picking. You pay only when you place it, and cancelling costs nothing. The Parking Lot and Billboard are built the moment you buy them.
+- **Windmill.** 160 coins + 20 Wood + **5 Scrap Metal**. Barrels refill every **20 s** at Lv1 (18 / 17 / 15 s at Lv2–4).
+- **Scrap Metal.** You get it from recycling finds, at the market (5 for 45 coins), or from the road: a piece of scrap turns up on the verge every 8–12 minutes of play, one at a time. Tap it to pick it up.
+- **Jewels from clearing.** The drop chance is now 1% (was 4%).
+- **The Tincture Stand is a free goal reward** for "Give a bought plot its own Rain Barrel". It is no longer a pack card or a purchase. Old saves: a found card becomes the stand, and each duplicate becomes 10 coins.
+- **Goals end with that reward.** The make-a-tincture, open-a-pack and distill-an-essential-oil goals are gone. After the last goal, a one-time closing card appears: "The garden is yours now. Have fun discovering new cards and planting!" A petal shower falls, and the goal pill then retires. Saves that were on or past a removed goal go straight to the closing card. Saves still on the Tincture Stand goal stay on it. The Essential Oil Stand is still a pack card.
+- **Pack guarantee.** Every pack has at least one Epic-or-better card. If all 3 cards roll Basic (about 4.1% of packs), the last one is redrawn from Epic-or-better.
+- **Bigger odds above Basic.** After the tincture card was removed, every tier above Basic got ×1.7 and Basic shrank to compensate: Basic 34.62% · Epic 31.38% · Legendary 20.05% · Rare 8.72% · Super Rare 3.14% · Ultra Rare 1.39% · Other World 0.7%. A full ×2 would have put Basic (23%) below Epic (37%).
+- **The big reveal.** A Super Rare, Ultra Rare or Other World card gets a build-up (shake, glow, burst, petals), then a full-screen hero card with rays, a holo sheen and a tier stamp. Other World adds a starfield and an aurora. Tap anywhere to skip.
+- **Open another pack.** After a bought pack is revealed, a big "Open another pack (1 Jewel)" button appears with your Jewel count, next to a smaller "Done". With 0 Jewels you see only Done and a "Get more Jewels" link.
+- **Hydrosol byproduct.** Every distillation gives the essential oil **plus** its hydrosol: Rose Water for Damask Rose, worth 15% of the oil; every other hydrosol is worth 11%. Lavender 8 · Calendula 10 · Chamomile 13 · Peppermint 17 · Rosemary 28 · Jasmine 46 · Rose Water 50 coins. Both sell at the Farm Stand.
+- **Parking Lot: customers come in groups.** With a lot, each arrival brings a group of cars, nose to tail, and each car is one customer. Stack Parking Lot cards to level the lot up:
+
+  | Level | Spots | Cars per arrival | Gap between arrivals (avg, before atmosphere) | Customers / min (vs ~2 with no lot) | Extra-item chance |
+  |---|---|---|---|---|---|
+  | Lv1 | 2 | 2 | ×1.4 (~32 s) | ~3.8 | 30% |
+  | Lv2 | 3 | 2 | ×1.2 (~27 s) | ~4.4 | 40% |
+  | Lv3 | 4 | 3 | ×1.25 (~28 s) | ~6.4 | 50% |
+  | Lv4 | 6 | 3 | ×1.15 (~26 s) | ~7.0 | 60% |
+
+  Painted spots appear on the lot as it levels up. Cars park front to back, shop, then leave. If the lot is partly full, a smaller group comes. The water truck now parks clear of the lot.
+- **Two stands per rain barrel.** Every stand on the barrel's plot connects automatically (Farm, Tincture or Essential Oil Stand, up to 2). Each connected stand adds 1 water per refill tick, so 2 stands give +2 per tick, and with the Windmill that is 2 water every 20 s. Capacity stays 10. Each connection gets its own gutter pipe. The barrel panel shows "2 stands connected • +2 per tick" along with the countdown. The Supply Market roof only feeds the Home barrel while there is no Farm Stand, and it doesn't count as a stand.
+- **A barrel feeds up to 8 beds.** That is its own plot's beds plus those on the plot directly **behind** it: Home → North Woods, West Woods → Hollow Woods, East Woods → Bramble Woods ("behind" = the owned plot one row further from the road). Irrigation and hand watering there use the barrel in front, so the plot behind doesn't need its own barrel, though it can still have one. A bed uses its own plot's barrel first. Selecting a barrel frames every bed it reaches in green, and the panel says "Feeds X/8 beds".
 
 ## New in v0.51 — one tier system for every card
 

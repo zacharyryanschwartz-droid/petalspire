@@ -51,7 +51,7 @@ export const SPECIES = {
   yarrow: P('yarrow', 'legendary', 'Yarrow', 'Plant · Meadow herb', [150, 40, 48, [2, 3]], '#F2BFC6', 'umbel', st(3, 4, 4, 3),
     'Feathery leaves under flat clusters of tiny blush flowers. A classic dried herb and tincture.', { dries: true }),
   sunflower: P('sunflower', 'legendary', 'Sunflower', 'Plant · Golden giant', [165, 44, 54, [2, 3]], '#F5C542', 'daisy', st(3, 5, 4, 4),
-    'A tall, cheerful giant with a honey-gold face and a dark seed disc. Sells well fresh — customers love it.'),
+    'A tall, cheerful giant whose whole worth is its seed disc: one plant gives 100 seeds a harvest (no cut flowers). Sell them in bags of 50 or 100, replant them, or press them into Sunflower Oil and Sun Butter.', { seedsFixed: 100, noFlower: true, seedSell: 1 }),
   // ---- Rare (soft glow) ----
   damaskrose: P('damaskrose', 'rare', 'Damask Rose', 'Plant · Old rose', [205, 68, 84, [2, 3]], '#F2A7B8', 'bloom', st(2, 5, 3, 5),
     'The perfumer’s rose: full, fragrant blush blooms. Its seeds distil into precious rose otto oil.'),
@@ -96,11 +96,47 @@ export const FANTASY_SPECIES = {
 for (const t of Object.keys(PLANT_TIERS)) { const ps = Object.values(SPECIES).filter((s) => s.tier === t);
   for (const s of ps) s.packW = PLANT_TIERS[t].pack * (s.packShare ?? 1 / ps.length); }
 
+// ---------------- v0.6 ORCHARD TREES ----------------
+// Tree cards join the pack pool only once the Orchard (the last plot) is bought. A tree is planted from a sapling (bought at
+// the Market once its card is found) on a tree spot in the Orchard, grows slowly by tier, then fruits again and again on a
+// long cycle — no replanting. Card levels work like plants: +10% fruit price and −5% grow/cycle time per level.
+//   by tier order o (1 Basic … 7 Other World): grow 300 · 420 · 540 · 660 · 840 · 1020 · 1200 s; fruit every 150 … 360 s;
+//   fruit per pick 6 · 5 · 5 · 4 · 4 · 3 · 3; sapling 30 · 70 · 140 · 240 · 400 · 650 · 1000 coins.
+export const TREE_TIER = {
+  growS: [300, 420, 540, 660, 840, 1020, 1200], cycleS: [150, 180, 210, 240, 280, 320, 360], yield: [6, 5, 5, 4, 4, 3, 3], sapling: [30, 70, 140, 240, 400, 650, 1000],
+  packShare: 0.5,   // a tree card's raw weight = half an average plant of its tier (then the tier is renormalised to the plan)
+};
+const T_ = (id, tier, name, fruit, fruitName, fruitSell, use, shape, leaf, fruitC, trunk, blurb, extra = {}) => {
+  const o = PLANT_TIERS[tier].order - 1;
+  return { id, tier, rarity: tier, kind: 'tree', name, type: `Tree · ${use}`, fruit, fruitName, fruitSell, shape, leaf, fruitC, trunk, blurb,
+    growS: TREE_TIER.growS[o], cycleS: TREE_TIER.cycleS[o], yield: TREE_TIER.yield[o], saplingPrice: TREE_TIER.sapling[o],
+    stats: st(1, Math.min(5, 3 + (o >> 1)), Math.min(5, 3 + (o > 2 ? 1 : 0)), Math.min(5, 3 + (o >> 1))), glow: PLANT_TIERS[tier].glow, ...extra };
+};
+export const TREES = {
+  apple:        T_('apple', 'basic', 'Apple Tree', 'fruit_apple', 'Apples', 6, 'Fruit', 'round', '#6FA35A', '#D9473B', '#7A5236', 'A sturdy, round-crowned tree hung with glossy red apples. Sauce, butter — or sell them by the bushel.'),
+  peach:        T_('peach', 'basic', 'Peach Tree', 'fruit_peach', 'Peaches', 8, 'Fruit', 'spread', '#7DAF5F', '#F6A46B', '#86593A', 'A low, spreading tree of narrow leaves and blushing, fuzzy peaches.'),
+  cherry:       T_('cherry', 'epic', 'Cherry Tree', 'fruit_cherry', 'Cherries', 14, 'Fruit', 'oval', '#5E9A55', '#B8203A', '#5E3B2C', 'A tall oval crown that drips with pairs of dark red cherries.'),
+  plum:         T_('plum', 'epic', 'Plum Tree', 'fruit_plum', 'Plums', 16, 'Fruit', 'weep', '#6A8F55', '#6A3A7A', '#5A3C30', 'A graceful tree with arching branches heavy with dusky purple plums.'),
+  lemon:        T_('lemon', 'legendary', 'Lemon Tree', 'fruit_lemon', 'Lemons', 24, 'Citrus', 'lollipop', '#3F7A45', '#F5D547', '#7A6A4A', 'A clipped, glossy-leaved citrus with bright lemons all year round.'),
+  fig:          T_('fig', 'legendary', 'Fig Tree', 'fruit_fig', 'Figs', 28, 'Fruit', 'broad', '#5C9A4A', '#6B4E7A', '#8A7A6A', 'Big, lobed leaves on pale branches, and soft purple figs full of honeyed seeds.'),
+  olive:        T_('olive', 'rare', 'Olive Tree', 'fruit_olive', 'Olives', 20, 'Press', 'olive', '#9DB39A', '#4E5A2A', '#8A7F6E', 'A gnarled, silver-leaved olive. Press its olives into golden Olive Oil.'),
+  almond:       T_('almond', 'rare', 'Almond Tree', 'fruit_almond', 'Almonds', 22, 'Press', 'blossom', '#7FA86A', '#C9A27A', '#6E4C3A', 'Clouds of pink-white blossom, then velvety almonds. Press them into Almond Oil or Almond Butter.'),
+  pomegranate:  T_('pomegranate', 'superrare', 'Pomegranate Tree', 'fruit_pomegranate', 'Pomegranates', 60, 'Fruit', 'vase', '#4F8A47', '#C0283A', '#7A5040', 'A many-stemmed little tree crowned with ruby, jewel-filled pomegranates.'),
+  persimmon:    T_('persimmon', 'superrare', 'Persimmon Tree', 'fruit_persimmon', 'Persimmons', 64, 'Fruit', 'lantern', '#6E9A4A', '#F08A24', '#4E3A2E', 'Orange persimmons hang like little lanterns along its branches.'),
+  eucalyptus:   T_('eucalyptus', 'ultra', 'Rainbow Eucalyptus', 'fruit_eucalyptus', 'Eucalyptus Leaves', 70, 'Essential oil', 'eucalyptus', '#8FC2B0', '#8FC2B0', '#E07A5A', 'A tall tree whose peeling bark streaks green, blue, purple and orange. Its leaves distil into eucalyptus oil + hydrosol.'),
+  cacao:        T_('cacao', 'ultra', 'Cacao Tree', 'fruit_cacao', 'Cacao Pods', 75, 'Press', 'cacao', '#3E7A3E', '#C9772E', '#6A4A32', 'A shady understorey tree with ribbed golden pods growing right on its trunk. Press the beans into Cocoa Butter.'),
+  moonpeach:    T_('moonpeach', 'otherworld', 'Moonpeach Tree', 'fruit_moonpeach', 'Moonpeaches', 200, 'Fruit', 'moon', '#9FB8D8', '#FFE9C9', '#6C6A8A', 'Silver-blue leaves and peaches that glow softly like little moons.'),
+  crystalapple: T_('crystalapple', 'otherworld', 'Crystal Apple Tree', 'fruit_crystalapple', 'Crystal Apples', 220, 'Fruit', 'crystal', '#BFE3FF', '#E8F6FF', '#8A9AB8', 'A tree of faceted glassy leaves bearing apples clear as crystal, glowing from within.'),
+};
+for (const t of Object.values(TREES)) t.packW = PLANT_TIERS[t.tier].pack / 3 * TREE_TIER.packShare;
+export const TREE_IDS = Object.keys(TREES);
+// tree spots in the Orchard (see layout.js ORCHARD_TREE_SPOTS)
+
 export const FEATURES = {
   rainbarrel: {
     id: 'rainbarrel', name: 'Rain Barrel', rarity: 'basic', type: 'Feature · Water',
     stats: { Growth: 3, Beauty: 2, Yield: 3, Atmosphere: 3 },
-    blurb: 'Unlocks the Rain Barrel at the Supply Market (40 coins): place it in a plot you bought to give that plot its own water — 1 a minute, up to 10, feeding up to 4 irrigated beds.',
+    blurb: 'Unlocks the Rain Barrel in the Build menu (40 coins): place it in a plot you bought to give that plot its own water — 1 a minute, up to 10, feeding up to 8 irrigated beds (its plot and the plot behind it).',
   },
   beehive: {
     id: 'beehive', name: 'Honeybee Skep', rarity: 'legendary', type: 'Feature · Pollinators',
@@ -114,13 +150,13 @@ export const FEATURES = {
   },
   tincture: {
     id: 'tincture', name: 'Tincture Stand', rarity: 'epic', type: 'Feature · Crafting', img: 'assets/card-tincture.jpg',
-    price: 120, stats: { Growth: 1, Beauty: 4, Yield: 5, Atmosphere: 4 },
-    blurb: 'A little wooden stall of glass bottles. Find it, buy it at the Supply Market, then build it: steep your blooms in Glycerin or Vinegar into tinctures that sell for far more.',
+    price: 0, packW: 0, reward: 'plotbarrel', stats: { Growth: 1, Beauty: 4, Yield: 5, Atmosphere: 4 },   // v0.52: a free goal reward, not a pack card or a purchase
+    blurb: 'A little wooden stall of glass bottles, given free when you give a bought plot its own Rain Barrel: steep your blooms in Glycerin or Vinegar into tinctures that sell for far more.',
   },
   still: {
     id: 'still', name: 'Essential Oil Stand', rarity: 'epic', type: 'Feature · Crafting', img: 'assets/card-still.jpg',
     price: 150, stats: { Growth: 1, Beauty: 4, Yield: 5, Atmosphere: 5 },
-    blurb: 'A little stall with gleaming copper stills. Find it, buy it at the Supply Market, build it on one of your other plots, then distill your seeds into essential oils that sell for a premium.',
+    blurb: 'A little stall with gleaming copper stills. Find it, buy it at the Supply Market, build it on one of your other plots, then distill your seeds: each run gives an essential oil that sells for a premium plus its hydrosol (Rose Water from Damask Rose).',
   },
   sickle: {
     id: 'sickle', name: 'Harvest Sickle', rarity: 'epic', type: 'Tool · Harvest',
@@ -140,12 +176,39 @@ export const FEATURES = {
   windmill: {
     id: 'windmill', name: 'Windmill', rarity: 'legendary', type: 'Feature · Water',
     price: 160, stats: { Growth: 3, Beauty: 4, Yield: 3, Atmosphere: 4 },
-    blurb: 'Pumps for every rain barrel on your land: connected barrels refill every 40 s instead of 60 s (faster with card levels, and it stacks with the Brass Watering Can). Build it once anywhere on your cleared ground for 20 Wood.',
+    blurb: 'Pumps for every rain barrel on your land: connected barrels refill every 20 s instead of 60 s (faster with card levels, and it stacks with the Brass Watering Can). Build it once anywhere on your cleared ground for 20 Wood + 5 Scrap Metal.',
+  },
+  teastand: {
+    id: 'teastand', name: 'Tea Stand', rarity: 'epic', type: 'Feature · Crafting',
+    price: 130, stats: { Growth: 1, Beauty: 4, Yield: 5, Atmosphere: 5 },   // v0.52
+    blurb: 'A little tea stall with a steaming kettle and tins. Find it, buy it at the Supply Market and place it on any plot you own, then blend any three dried herbs into a tea: the rarer the herbs, the bigger the multiplier — Other World teas sell for a fortune.',
+  },
+  press: {
+    id: 'press', name: 'Pressed Oil Stand', rarity: 'epic', type: 'Feature · Crafting',
+    price: 140, stats: { Growth: 1, Beauty: 3, Yield: 5, Atmosphere: 4 },   // v0.6
+    blurb: 'A wooden screw press. Press Sunflower seeds into Sunflower Oil or Sun Butter, Damask Rose seeds into Rosehip Oil, Spiral Sunpetal seeds into glowing Sunpetal Oil — and, with an Orchard, olives, almonds and cacao into Olive Oil, Almond Oil, Almond Butter and Cocoa Butter. Buy it and place it on any plot you own (20 Wood).',
+  },
+  fruitstand: {
+    id: 'fruitstand', name: 'Fruit Stand', rarity: 'epic', type: 'Feature · Crafting',
+    price: 120, stats: { Growth: 1, Beauty: 4, Yield: 5, Atmosphere: 5 },   // v0.6
+    blurb: 'A canning kitchen under a striped awning. Turn orchard fruit into Canned Fruit, Jelly, Fruit Butter and Sauce — Apple Sauce, Peach Butter, Cherry Jelly, Lemon Curd, glowing Moonpeach Preserves… Buy it and place it on any plot you own (20 Wood).',
   },
   billboard: {
     id: 'billboard', name: 'Roadside Billboard', rarity: 'epic', type: 'Feature · Advertising',
     price: 90, stats: { Growth: 1, Beauty: 3, Yield: 4, Atmosphere: 2 },
     blurb: 'A painted sign across the road. Tap it to Run ad: twice the traffic for 5 minutes. Free once an hour, or 1 Jewel to run it now. Build it by the road for 15 Wood.',
+  },
+  // v0.52: the two tincture bases are cards too. Finding one unlocks it at the Supply Market (buyable once the Tincture
+  // Stand is open); every duplicate copy gives SUPPLY_DUP free units of that base.
+  glycerin: {
+    id: 'glycerin', name: 'Glycerin', rarity: 'basic', type: 'Supply · Tincture base', packW: 2,
+    stats: { Growth: 1, Beauty: 3, Yield: 3, Atmosphere: 2 },
+    blurb: 'Unlocks Glycerin at the Supply Market (sold once your Tincture Stand is open): a sweet, gentle base for Glycerites. Each duplicate card gives +2 free Glycerin.',
+  },
+  vinegar: {
+    id: 'vinegar', name: 'Vinegar', rarity: 'basic', type: 'Supply · Tincture base', packW: 2,
+    stats: { Growth: 1, Beauty: 2, Yield: 3, Atmosphere: 2 },
+    blurb: 'Unlocks Vinegar at the Supply Market (sold once your Tincture Stand is open): a tangy base for Vinegar Tinctures. Each duplicate card gives +2 free Vinegar.',
   },
   sundial: {
     id: 'sundial', name: 'Golden Sundial', rarity: 'rare', type: 'Feature · Time',
@@ -154,7 +217,9 @@ export const FEATURES = {
   },
 };
 
-export const CARDS = { ...SPECIES, ...FEATURES };
+// v0.52: the Tincture Stand is a goal reward now, so it is not a collectable card (and never in packs).
+export const NON_CARDS = ['tincture'];
+export const CARDS = { ...SPECIES, ...TREES, ...Object.fromEntries(Object.entries(FEATURES).filter(([k]) => !NON_CARDS.includes(k))) };
 
 export const RARITY = {
   common:    { label: 'Common',    w: 46, color: '#8DB78A' },
@@ -176,9 +241,47 @@ export const cardTier = (c) => c.tier || c.rarity;
 // v0.51: feature cards use the plant tier names too (one tier system everywhere). Old feature ranks map in order, keeping
 // each card's rank and exact per-card odds: Uncommon → Basic (10% each), Rare → Epic (2.5%), Epic → Legendary (2.33%), Legendary → Rare (2%).
 export const FEATURE_TIER_FROM_OLD = { common: 'basic', uncommon: 'basic', rare: 'epic', epic: 'legendary', legendary: 'rare' };
-export const FEATURE_PACK_W = { basic: 10, epic: 2.5, legendary: 7 / 3, rare: 2 };
-for (const f of Object.values(FEATURES)) f.packW = FEATURE_PACK_W[f.rarity] ?? 0;
-export const PACK_W = Object.fromEntries(Object.entries(CARDS).map(([k, c]) => [k, c.packW || 0]));
+// v0.52: the Glycerin and Vinegar cards (Basic, 2% each) are carved out of the two Basic feature cards (Rain Barrel and
+// Irrigation 10% → 8% each), so every tier's total and every other card's odds stay exactly as in v0.51 (total 100%).
+export const FEATURE_PACK_W = { basic: 8, epic: 2.5, legendary: 7 / 3, rare: 2 };
+for (const f of Object.values(FEATURES)) f.packW ??= FEATURE_PACK_W[f.rarity] ?? 0;
+export const SUPPLY_CARDS = ['glycerin', 'vinegar'], SUPPLY_DUP = 2;
+// v0.52: the water truck (Supply Market › Fill Rain Barrels) tops every barrel up to full and bills per barrel it filled.
+export const WATER_TRUCK = { perBarrel: 10 };
+// v0.52: the Tincture Stand's 2.5% left the packs; every remaining weight is scaled by 100 / 97.5 so a pack slot still totals
+// exactly 100% and every card keeps its odds relative to the others.
+// v0.52 (later): cards added after the tier-odds plan (the Tea Stand) take their share from inside their own tier, so every
+// tier keeps exactly the planned odds below (Basic 34.62 … Other World 0.70) and the tier's other cards shrink in proportion.
+export const PLAN_LATE = ['teastand', 'press', 'fruitstand', ...Object.keys(TREES)];   // carved out of their tier: tier totals stay on the plan
+const RAW_ALL = Object.fromEntries(Object.entries(CARDS).map(([k, c]) => [k, c.packW || 0]));
+const RAW_W = Object.fromEntries(Object.entries(RAW_ALL).map(([k, w]) => [k, PLAN_LATE.includes(k) ? 0 : w]));
+const RAW_TOTAL = Object.values(RAW_W).reduce((a, b) => a + b, 0);
+export const PACK_SCALE = 100 / RAW_TOTAL;
+// v0.52 odds boost: every tier above Basic gets ×PACK_BOOST of its share (plants + features together, relative weights kept
+// inside each tier) and Basic shrinks to make the total exactly 100%. A full ×2 would push Basic (23%) below Epic (37%),
+// breaking the strictly decreasing tier order, so the boost is ×1.7: Basic 34.6 > Epic 31.4 > Legendary 20.1 > Rare 8.7 >
+// Super Rare 3.1 > Ultra Rare 1.4 > Other World 0.7 (%).
+export const PACK_BOOST = 1.7;
+const tierOfCard = (k) => CARDS[k].tier || CARDS[k].rarity;
+const NB_TOTAL = Object.entries(RAW_W).filter(([k]) => tierOfCard(k) !== 'basic').reduce((a, [, w]) => a + w * PACK_SCALE, 0);
+const B_TOTAL = 100 - NB_TOTAL, BASIC_K = (100 - NB_TOTAL * PACK_BOOST) / B_TOTAL;
+export const TIER_K = Object.fromEntries(Object.keys(PLANT_TIERS).map((t) => [t, PACK_SCALE * (t === 'basic' ? BASIC_K : PACK_BOOST)]));
+const tierSum = (W) => { const o = {}; for (const [k, w] of Object.entries(W)) { const t = tierOfCard(k); o[t] = (o[t] || 0) + w * TIER_K[t]; } return o; };
+const PLAN_T = tierSum(RAW_W);
+// v0.6: two pools. Before the Orchard is bought tree cards weigh 0; after, they join. Each pool is renormalised per tier,
+// so the per-tier odds are identical either way (the plan) and only the split inside a tier changes.
+const mkPool = (raw) => { const A = tierSum(raw), fix = Object.fromEntries(Object.keys(PLANT_TIERS).map((t) => [t, A[t] ? PLAN_T[t] / A[t] : 1]));
+  return { fix, w: Object.fromEntries(Object.entries(raw).map(([k, w]) => [k, w * TIER_K[tierOfCard(k)] * fix[tierOfCard(k)]])) }; };
+const RAW_NO_TREES = Object.fromEntries(Object.entries(RAW_ALL).map(([k, w]) => [k, TREES[k] ? 0 : w]));
+const POOL = mkPool(RAW_NO_TREES), POOL_ORCH = mkPool(RAW_ALL);
+export const TIER_FIX = POOL.fix, TIER_FIX_ORCH = POOL_ORCH.fix;
+export const PACK_W = POOL.w, PACK_W_ORCH = POOL_ORCH.w;
+for (const [k, w] of Object.entries(PACK_W)) CARDS[k].packW = w;
+for (const [t, T] of Object.entries(PLANT_TIERS)) T.pack = +(T.pack * TIER_K[t] * TIER_FIX[t]).toFixed(2);   // shown in the Market's locked-tier rows
+// v0.52: Scrap Metal also turns up on the road now and then — one tappable piece at a time, about every 8–12 minutes of play.
+export const ROAD_SCRAP = { minS: 480, maxS: 720, scrap: 1 };
+// v0.52: duplicate Tincture Stand cards in older saves become coins (the stand itself is kept).
+export const TINC_DUP_COINS = 10;
 
 // v0.4 CARD STACKS & UPGRADES (placeholder numbers). Every copy of a card you find stacks on one card (×n).
 // Copies are kept as progress (never consumed): at 3 / 6 / 10 copies the card can be upgraded to Lv2 / Lv3 / Lv4 with a tap.
@@ -190,22 +293,22 @@ export const CARD_LEVELS = {
   plant: { sell: 0.10, grow: 0.05, statPip: 1, bonusFlowerAt: 4 },
   tool: { cooldown: 0.15 },
   upgradable: (id, card) => !!card.tier || id === 'sickle' || id === 'plow' || id === 'parking' || id === 'windmill',
-  parking: { capAt: 2, extraItem: 0.10 },   // v0.41: Lv2+ fits 3 cars; each level adds +10% extra-item chance
+  parking: { extraItem: 0.10 },   // v0.52: spots / cars per arrival / gap per level live in PARKING; each level adds +10% extra-item chance
 };
 // v0.41: Card Packs cost Jewels, not coins (1 Jewel = one standard pack). Add more pack types here (e.g. a premium pack at 3 Jewels).
 export const PACKS = { standard: { name: 'Botanical Card Pack', jewels: 1, cards: 3 } };
 export const PACK_JEWELS = PACKS.standard.jewels;
 // v0.41: Jewel trades in the Jewel Shop, and the rare free Jewel hidden in the woods (so free players can still open packs now and then).
 export const JEWEL_EXCHANGE = { coins: 1000, wood: 250 };
-export const JEWEL_DROP = { clear: 0.04 };   // chance that clearing a tree, stump, bush or rock (without a find) turns up 1 Jewel
+export const JEWEL_DROP = { clear: 0.01 };   // v0.52: 1% (was 4%) — chance that clearing a tree, stump, bush or rock (without a find) turns up 1 Jewel
 export const DUP_COINS = 8;
 export const RACK_SLOTS = 3;
 export const DRY_S = 40;
 
 // ---------- v0.4: one rain barrel per plot ----------
 // Each owned plot gets ONE barrel (the home lot's arrives with your first bed; other plots: Build → Rain Barrel).
-// A barrel feeds at most maxBeds irrigated beds, and only beds in its own plot.
-export const BARREL = { price: 40, maxBeds: 4 };   // v0.4: bought at the Supply Market as a placeable barrel (water itself is never sold)
+// A barrel feeds at most maxBeds irrigated beds: its own plot's beds plus (v0.52) the beds of the owned plot directly behind it.
+export const BARREL = { price: 40, maxBeds: 8 };   // v0.52: 8 (was 4) — own plot + the plot behind   // v0.52: built from the Build menu for 40 coins (water itself is only sold by the truck load)
 
 // ---------- v0.4: Tincture Stand ----------
 // Bases are bought at the Supply Market. Every craft uses 1 base (Glycerin OR Vinegar) + flowers.
@@ -241,6 +344,8 @@ export const STILL = {
     rosemary:   { n: 4, s: 270, sell: 250 },
     damaskrose: { n: 3, s: 300, sell: 330 },
     jasmine:    { n: 2, s: 360, sell: 420 },
+    // v0.6: Rainbow Eucalyptus LEAVES (orchard tree) — 3 leaves → Eucalyptus Essential Oil + Eucalyptus Hydrosol
+    eucalyptus: { n: 3, s: 300, sell: 600, in: 'fruit_eucalyptus' },
   },
 };
 // v0.5 Drying Rack: which flowers dry, how long (s) and what the dried bundle sells for (Lavender is unchanged: 40 s, 14).
@@ -253,6 +358,11 @@ export const DRYING = {
   tulsi:       { s: 90, sell: 190 },
   elderflower: { s: 90, sell: 196 },
 };
+// v0.52: every plant dries now (the Tea Stand blends dried herbs). The new ones dry for a time set by their tier and sell
+// for 2.45× the fresh flower — the same ratio as the v0.5 dried herbs (Peppermint 70 / 28 = 2.5, Tulsi 190 / 78 = 2.44).
+export const DRY_TIER_S = { basic: 40, epic: 60, legendary: 75, rare: 90, superrare: 110, ultra: 130, otherworld: 150 };
+export const DRY_RATIO = 2.45;
+for (const sp of Object.values(SPECIES)) { if (sp.noFlower) { delete DRYING[sp.id]; sp.dries = false; continue; } DRYING[sp.id] ??= { s: DRY_TIER_S[sp.tier], sell: Math.round(sp.flowerSell * DRY_RATIO) }; sp.dries = true; }
 export const oilId = (sp) => 'oil_' + sp;
 export const tinctureId = (sp, base) => `tinc_${base === 'vinegar' ? 'v' : 'g'}_${sp}`;
 export const TINCTURE_NAMES = Object.fromEntries(Object.values(SPECIES).map((s) => [s.id, s.name]));
@@ -263,9 +373,9 @@ const shade = (hex, k) => { const n = parseInt(hex.slice(1), 16), f = (v) => Mat
 export const ITEMS = {};
 for (const sp of Object.values(SPECIES)) {
   ITEMS['seed_' + sp.id] = { name: `${sp.name} Seeds`, sell: sp.seedSell, icon: ['seed', sp.color] };
-  ITEMS['flower_' + sp.id] = { name: sp.name, sell: sp.flowerSell, icon: [sp.icon || 'daisy', sp.color] };
+  if (!sp.noFlower) ITEMS['flower_' + sp.id] = { name: sp.name, sell: sp.flowerSell, icon: [sp.icon || 'daisy', sp.color] };
   if (DRYING[sp.id]) ITEMS['dried_' + sp.id] = { name: `Dried ${sp.name}`, sell: DRYING[sp.id].sell, icon: ['bundle', shade(sp.color, 0.92)] };
-  if (STILL.recipes[sp.id]) ITEMS[oilId(sp.id)] = { name: `${sp.name} Essential Oil`, sell: STILL.recipes[sp.id].sell, icon: ['dropper', shade(sp.color, 0.75)] };
+  if (STILL.recipes[sp.id] && !STILL.recipes[sp.id].in) ITEMS[oilId(sp.id)] = { name: `${sp.name} Essential Oil`, sell: STILL.recipes[sp.id].sell, icon: ['dropper', shade(sp.color, 0.75)] };
   const tr = TINCTURE.recipes[sp.id];
   if (tr) { ITEMS[tinctureId(sp.id, 'glycerin')] = { name: `${sp.name} Glycerite`, sell: tr.sell.glycerin, icon: ['dropper', shade(sp.color, 1.05)] };
     ITEMS[tinctureId(sp.id, 'vinegar')] = { name: `${sp.name} Vinegar Tincture`, sell: tr.sell.vinegar, icon: ['dropper', shade(sp.color, 0.7)] }; }
@@ -290,8 +400,94 @@ Object.assign(ITEMS, {
   tinc_v_chamomile: { name: 'Chamomile Vinegar Tincture', sell: 72, icon: ['dropper', '#D2B67A'] },
 });
 // Most valuable first (oils, tinctures, dried, flowers, seeds) — the same order as v0.4 for the Basic items.
-const kindRank = (id) => ['oil_', 'tinc_', 'dried_', 'flower_', 'seed_'].findIndex((p) => id.startsWith(p));
+// v0.52 Hydrosols: like a real steam still, every essential-oil distillation gives two products: 1 oil + 1 hydrosol (the
+// scented water) named after its plant — Damask Rose gives Rose Water. Hydrosol sells for 11% of that oil's price, Rose Water
+// for 15% (a little more than other hydrosols, still far below rose oil). Only plants with an oil recipe can be distilled.
+export const HYDROSOL = { share: 0.11, roseWater: 'damaskrose', roseShare: 0.15 };
+export const hydroId = (sp) => 'hydro_' + sp;
+const hydroTint = (hex) => { const n = parseInt(hex.slice(1), 16), m = (v) => Math.round(v + (255 - v) * 0.55); return '#' + [n >> 16, (n >> 8) & 255, n & 255].map((v) => m(v).toString(16).padStart(2, '0')).join(''); };
+for (const [sp, r] of Object.entries(STILL.recipes)) {
+  const rose = sp === HYDROSOL.roseWater, src = SPECIES[sp] || TREES[sp], nm = sp === 'eucalyptus' ? 'Eucalyptus' : src.name;
+  if (r.in) ITEMS[oilId(sp)] = { name: `${nm} Essential Oil`, sell: r.sell, icon: ['dropper', shade(src.fruitC || src.color, 0.75)] };
+  ITEMS[hydroId(sp)] = { name: rose ? 'Rose Water' : `${nm} Hydrosol`, sell: Math.round(r.sell * (rose ? HYDROSOL.roseShare : HYDROSOL.share)), icon: ['hydrosol', hydroTint(src.fruitC || src.color)], hydrosol: true };
+}
+// ---------------- v0.6 Sunflower seed bags ----------------
+// A Sunflower harvest is 100 seeds (no flowers). Seeds sell for 1 coin each singly; a bag of 50 sells for 85 and a bag of 100
+// for 200 (2 a seed) — about a fair Legendary harvest (e.g. Rosemary: ~2.5 flowers × 46 + 4 seeds × 19 ≈ 191).
+export const SEED_BAGS = { sunflower: [{ n: 50, sell: 85 }, { n: 100, sell: 200 }] };
+export const bagId = (sp, n) => `bag${n}_${sp}`;
+for (const [sp, bags] of Object.entries(SEED_BAGS)) for (const b of bags) ITEMS[bagId(sp, b.n)] = { name: `${SPECIES[sp].name} Seeds · bag of ${b.n}`, sell: b.sell, icon: ['seedbag', SPECIES[sp].color], bag: b.n };
+// ---------------- v0.6 fruit + crafting stands ----------------
+for (const t of Object.values(TREES)) ITEMS[t.fruit] = { name: t.fruitName, sell: t.fruitSell, icon: [t.id === 'eucalyptus' ? 'leafbunch' : 'fruit', t.fruitC], fruit: t.id, glow: t.glow };
+// Pressed Oil Stand: sell = round(n × input price × (1.7 + 0.25·(tier order − 1))), a little more for butters; Sunpetal Oil is special.
+// Fruit Stand: sell = round(n × fruit price × (1.6 + 0.25·(tier order − 1)) × kind) with kind sauce/canned 1.0, jelly 1.08,
+// butter/preserves 1.12; time 40 + 20·(o − 1) s. No market ingredient — fruit alone (simpler on a phone; see README).
+const ordOf = (id) => PLANT_TIERS[(SPECIES[id] || TREES[id]).tier].order;
+const R_ = (id, name, src, input, n, kind, icon, color, extra = {}) => ({ id, name, src, in: input, n, kind, icon, color, ...extra });
+export const PRESS = { slots: 2, mult: (o) => 1.7 + 0.25 * (o - 1), kinds: { oil: 1, butter: 1.06 }, recipes: [
+  R_('sunoil', 'Sunflower Oil', 'sunflower', 'seed_sunflower', 30, 'oil', 'oilbottle', '#F2C53D', { sell: 110, s: 60 }),
+  R_('sunbutter', 'Sun Butter', 'sunflower', 'seed_sunflower', 50, 'butter', 'butterjar', '#D9A441', { sell: 190, s: 90 }),
+  R_('rosehip', 'Rosehip Oil', 'damaskrose', 'seed_damaskrose', 3, 'oil', 'oilbottle', '#D4553A', { s: 120 }),
+  R_('olive', 'Olive Oil', 'olive', 'fruit_olive', 6, 'oil', 'oilbottle', '#B5B03A', { s: 120 }),
+  R_('almondoil', 'Almond Oil', 'almond', 'fruit_almond', 6, 'oil', 'oilbottle', '#EAD3A8', { s: 120 }),
+  R_('almondbutter', 'Almond Butter', 'almond', 'fruit_almond', 8, 'butter', 'butterjar', '#B9895A', { s: 150 }),
+  R_('cocoa', 'Cocoa Butter', 'cacao', 'fruit_cacao', 4, 'butter', 'butterjar', '#F1E0C0', { s: 180 }),
+  R_('sunpetal', 'Sunpetal Oil', 'sunpetal', 'seed_sunpetal', 2, 'oil', 'oilbottle', '#FFD86A', { sell: 1600, s: 240, glow: 3 }),
+] };
+export const FRUITSTAND = { slots: 2, mult: (o) => 1.6 + 0.25 * (o - 1), kinds: { sauce: 1, canned: 1, jelly: 1.08, butter: 1.12, preserves: 1.12 }, recipes: [
+  R_('applesauce', 'Apple Sauce', 'apple', 'fruit_apple', 4, 'sauce', 'jar', '#E9C27A'),
+  R_('applebutter', 'Apple Butter', 'apple', 'fruit_apple', 6, 'butter', 'jar', '#8A4A22'),
+  R_('cannedpeach', 'Canned Peaches', 'peach', 'fruit_peach', 4, 'canned', 'can', '#F6A46B'),
+  R_('peachbutter', 'Peach Butter', 'peach', 'fruit_peach', 6, 'butter', 'jar', '#D9783A'),
+  R_('cherryjelly', 'Cherry Jelly', 'cherry', 'fruit_cherry', 4, 'jelly', 'jar', '#B8203A'),
+  R_('cannedcherry', 'Canned Cherries', 'cherry', 'fruit_cherry', 5, 'canned', 'can', '#8E1A30'),
+  R_('plumjam', 'Plum Jelly', 'plum', 'fruit_plum', 4, 'jelly', 'jar', '#6A3A7A'),
+  R_('plumsauce', 'Plum Sauce', 'plum', 'fruit_plum', 4, 'sauce', 'jar', '#8A3A4A'),
+  R_('lemoncurd', 'Lemon Curd', 'lemon', 'fruit_lemon', 3, 'jelly', 'jar', '#F5D547'),
+  R_('marmalade', 'Lemon Marmalade', 'lemon', 'fruit_lemon', 4, 'jelly', 'jar', '#F0B830'),
+  R_('figjam', 'Fig Jam', 'fig', 'fruit_fig', 3, 'jelly', 'jar', '#6B4E7A'),
+  R_('figbutter', 'Fig Butter', 'fig', 'fruit_fig', 4, 'butter', 'jar', '#7A5A3A'),
+  R_('pomjelly', 'Pomegranate Jelly', 'pomegranate', 'fruit_pomegranate', 3, 'jelly', 'jar', '#C0283A'),
+  R_('persbutter', 'Persimmon Butter', 'persimmon', 'fruit_persimmon', 3, 'butter', 'jar', '#E07A20'),
+  R_('moonpreserves', 'Moonpeach Preserves', 'moonpeach', 'fruit_moonpeach', 2, 'preserves', 'jar', '#FFE9C9', { glow: 3 }),
+  R_('crystaljelly', 'Crystal Apple Jelly', 'crystalapple', 'fruit_crystalapple', 2, 'jelly', 'jar', '#CFEAFF', { glow: 3 }),
+] };
+for (const [C, pre] of [[PRESS, 'press_'], [FRUITSTAND, 'jar_']]) for (const r of C.recipes) {
+  const o = ordOf(r.src), inSell = ITEMS[r.in].sell;
+  r.item = pre + r.id; r.sell ??= Math.round(r.n * inSell * C.mult(o) * C.kinds[r.kind]); r.s ??= 40 + 20 * (o - 1); r.raw = r.n * inSell;
+  ITEMS[r.item] = { name: r.name, sell: r.sell, icon: [r.icon, r.color], craft: true, glow: r.glow || (TREES[r.src] || SPECIES[r.src]).glow || 0 };
+}
+const kindRank = (id) => ['oil_', 'press_', 'jar_', 'tea_', 'tinc_', 'hydro_', 'dried_', 'fruit_', 'flower_', 'bag', 'seed_'].findIndex((p) => id.startsWith(p));
 export const SELL_ORDER = Object.keys(ITEMS).sort((a, b) => kindRank(a) - kindRank(b) || ITEMS[b].sell - ITEMS[a].sell || (a.startsWith('tinc_g') ? -1 : 1));
+
+// ---------------- v0.52 Tea Stand ----------------
+// Any THREE dried herbs (duplicates allowed) → one tea. o = the average tier order of the three (Basic 1 … Other World 7).
+//   tea price = round( Σ dried sell × mult(o) × (three different plants ? 1 + distinct : 1) ),  mult(o) = 1.4 + 0.35·(o − 1)
+//   → 3 Basic ×1.40 · 3 Epic ×1.75 · Legendary ×2.10 · Rare ×2.45 · Super Rare ×2.80 · Ultra ×3.15 · 3 Other World ×3.50
+//   brew time = 15 + 10·(o − 1) s  → 15 s for Basic … 75 s for Other World.
+export const TEA = { slots: 2, n: 3, distinct: 0.10, mult: (o) => 1.4 + 0.35 * (o - 1), brewS: (o) => Math.round(15 + 10 * (o - 1)) };
+export const teaId = (sps) => 'tea_' + [...sps].sort().join('-');
+export const teaSps = (id) => id.slice(4).split('-');
+export function teaInfo(sps) {
+  const sp = sps.map((k) => SPECIES[k]); if (sps.length !== TEA.n || sp.some((x) => !x || !DRYING[x.id])) return null;
+  const ord = (x) => PLANT_TIERS[x.tier].order, o = sp.reduce((a, x) => a + ord(x), 0) / sp.length;
+  const dried = sp.reduce((a, x) => a + DRYING[x.id].sell, 0), distinct = new Set(sps).size;
+  const mult = TEA.mult(o) * (distinct === 3 ? 1 + TEA.distinct : 1);
+  const counts = {}; for (const x of sps) counts[x] = (counts[x] || 0) + 1;
+  const names = Object.keys(counts).sort((a, b) => counts[b] - counts[a] || ord(SPECIES[b]) - ord(SPECIES[a]) || sps.indexOf(a) - sps.indexOf(b)).map((k) => SPECIES[k].name);
+  const top = [...sp].sort((a, b) => ord(b) - ord(a))[0];
+  const name = o >= 6.5 ? `${top.name} Starlight Tea` : o >= 5.5 ? `${top.name} Moonlit Blend`
+    : names.length === 1 ? `${names[0]} Tea` : names.length === 2 ? `${names[0]} & ${names[1]} Blend` : `${names[0]}, ${names[1]} & ${names[2]} Blend`;
+  return { id: teaId(sps), name, sell: Math.round(dried * mult), dried, mult, o, distinct, s: TEA.brewS(o), color: top.color, tier: Object.keys(PLANT_TIERS).find((t) => PLANT_TIERS[t].order === Math.round(o)) };
+}
+// teas are registered on demand (any 3 of 21 herbs = 1771 blends) so they behave like every other bag / stand item
+export function registerTea(id) {
+  if (ITEMS[id]) return ITEMS[id]; if (!id.startsWith('tea_')) return null;
+  const t = teaInfo(teaSps(id)); if (!t) return null;
+  ITEMS[id] = { name: t.name, sell: t.sell, icon: ['tin', t.color], tea: true };
+  SELL_ORDER.push(id); SELL_ORDER.sort((a, b) => kindRank(a) - kindRank(b) || ITEMS[b].sell - ITEMS[a].sell || (a.startsWith('tinc_g') ? -1 : 1));
+  return ITEMS[id];
+}
 
 export const WOOD = { tree: 3, stump: 1, bush: 0, rock: 0 };
 export const BED_COSTS = [12, 20, 28, 36, 44, 52];   // wood per raised bed, escalating
@@ -306,10 +502,13 @@ export const BUILDS = {
   stand:  { name: 'Roadside Farm Stand', wood: 15, coins: 0, opt: { find: 'old_crate', label: 'Use an Old Crate as a display shelf (+4 shelf space)' } },
   rack:   { name: 'Drying Rack', wood: 10, coins: 0 },
   still: { name: 'Essential Oil Stand', wood: 25, coins: 0 },
+  teastand: { name: 'Tea Stand', wood: 20, coins: 0 },   // v0.52
+  press: { name: 'Pressed Oil Stand', wood: 20, coins: 0 },   // v0.6
+  fruitstand: { name: 'Fruit Stand', wood: 20, coins: 0 },   // v0.6
   parking: { name: 'Parking Lot', wood: 20, coins: 0 },
-  windmill: { name: 'Windmill', wood: 20, coins: 0 },
+  windmill: { name: 'Windmill', wood: 20, coins: 0, scrap: 5 },   // v0.52: + 5 Scrap Metal (and the 160-coin card price when bought)
   billboard: { name: 'Roadside Billboard', wood: 15, coins: 0 },
-  tincture: { name: 'Tincture Stand', wood: 20, coins: 0, opt: { decor: 'chime', save: 6, label: 'Use your restored Glass Bottles (Bottle Chime) for the shelves (−6 Wood)' } },
+  tincture: { name: 'Tincture Stand', wood: 0, coins: 0 },   // v0.52: a free goal reward — placing it costs nothing
   market: { name: 'Rebuild the Supply Market', wood: 30, coins: 60, s: 60, opt: { scrap: 3, save: 20, label: 'Patch the roof with 3 Scrap (save 20 coins)' }, hurryJewels: 2 },
 };
 export const BUILD_ANIM_MS = 2450;
@@ -355,7 +554,7 @@ export const ATMOS_STEP = 0.04, ATMOS_MAX = 0.4;          // each atmosphere poi
 // ---------- v0.3: trees you grow ----------
 // Real time to maturity. Keep it slow: this is a long-term Wood source. Override for testing with ?treeMin=1
 export const TREE = { growMin: 40, wood: 6, stump: 1, saplingBack: 0.5, stageAt: [0, 0.25, 0.6, 1], stageNames: ['Sapling', 'Young tree', 'Growing tree', 'Mature tree'], hurryJewels: 1 };
-export const SHOP = { wood5: { wood: 5, price: 12 }, sapling: { price: 20 } };
+export const SHOP = { wood5: { wood: 5, price: 12 }, sapling: { price: 20 }, scrap5: { scrap: 5, price: 45 } };   // v0.52: Scrap Metal ×5 (recycling finds stays the cheap way)
 
 // ---------- v0.3: Jewel Shop ----------
 // ONE flag: 'simulated' = prototype test purchases (no charge). Set to 'apple-iap' once a native StoreKit bridge exists (see js/payments.js).
@@ -394,18 +593,21 @@ export const JEWEL_BUNDLES = [
 ];
 
 // v0.41: traffic features
-export const PARKING = { cap: 2, capLv2: 3, gapMult: 0.7, extraItem: 0.3 };            // gaps between customers ×0.7 (30% shorter)
-export const WINDMILL = { regenS: [40, 36, 33, 30] };   // seconds per water for a 60 s barrel at card Lv1..Lv4 (global: every connected barrel); ×½ again with the Brass Watering Can
+// v0.52: customers arrive in groups. Per card level (Lv1…Lv4): parking spots on the lot, cars per arrival (each car is one
+// customer) and the multiplier on the gap between arrivals (base 15–30 s, no lot = 1 car, gap counted from when it leaves).
+export const PARKING = { spots: [2, 3, 4, 6], cars: [2, 2, 3, 3], gapMult: [1.4, 1.2, 1.25, 1.15], extraItem: 0.3 };
+export const parkLv = (lv) => Math.max(1, Math.min(4, lv || 1)) - 1;
+export const WINDMILL = { regenS: [20, 18, 17, 15] };   // v0.52: seconds per water at card Lv1..Lv4 (was 40/36/33/30; base 60 s) — global: every connected barrel; ×½ again with the Brass Watering Can
 export const BILLBOARD = { boostMs: 5 * 60000, cooldownMs: 60 * 60000, mult: 2, jewels: 1 };  // Run ad: 2× traffic for 5 min · free once an hour · 1 Jewel to skip the wait
 export const TIPS = {
-  parking: 'Your <b>Parking Lot</b> is open! Up to 2 cars can stop at once (3 at card Lv2), customers come 30% more often, and some buy an extra item.',
-  windmill: 'Your <b>Windmill</b> is turning! Every rain barrel that’s connected to a stand now refills faster (40 s instead of 60 s; more with card levels).',
+  parking: 'Your <b>Parking Lot</b> is open! Customers now come in <b>groups of 2 cars</b> — each car is a customer. Stack Parking Lot cards to level it up: more spots (2 → 3 → 4 → 6), bigger groups and shorter gaps. Some customers buy an extra item.',
+  windmill: 'Your <b>Windmill</b> is turning! Every rain barrel that’s connected to a stand now refills every <b>20 s</b> instead of 60 s (faster with card levels).',
   billboard: 'Your <b>Billboard</b> is up! Tap it and <b>Run ad</b> for twice the traffic for 5 minutes. It’s free once an hour; during the wait you can spend 1 Jewel to run it now.',
   chop: 'An old wooded lot. <b>Tap a tree</b> to chop it down — you’ll get <b>Wood</b>.',
   stump: 'Stumps stay behind. <b>Tap a stump</b> to dig it out and clear the ground.',
   find: 'Something glints! <b>Tap the sparkle</b> to pick up what you found.',
   finds: 'Found items go to <b>Bag → Finds</b>. <b>Restore</b> them into something useful, or <b>recycle</b> them.',
-  sapling: 'A <b>tree sapling</b>! Plant it on open ground (Bag or Build). Trees grow slowly but give lots of Wood.',
+  sapling: 'A <b>tree sapling</b>! Plant it from the <b>Supply Market</b> (Tree sapling › Plant) on open ground. Trees grow slowly but give lots of Wood.',
   build: 'Nice clearing! Tap <b>Build</b> and place a <b>raised bed</b> on a fully cleared patch.',
   standbp: 'Next: build your <b>Farm Stand</b> by the road. Tap the glowing blueprint or open <b>Build</b>.',
   water: 'Seeds need a drink. <b>Tap the planted tile</b> and water it.',
@@ -414,16 +616,20 @@ export const TIPS = {
   harvested: 'Harvests give flowers <i>and</i> seeds. Put spares on your <b>Farm Stand</b> by the road.',
   stand: 'Your <b>Farm Stand</b> is built! Tap it to stock flowers — drivers will pull over to buy.',
   barrel: 'Each <b>rain barrel</b> refills by <b>1 water a minute</b> (up to 10), even while the game is closed — the badge shows when the next drop lands. Hand watering uses the bed’s own plot barrel first, then the nearest other barrel. Water only comes from rain barrels.',
-  plotbarrel: 'This plot has no rain barrel yet. Buy a <b>Rain Barrel</b> at the Supply Market (40 coins) and place it here: its own water for irrigation, up to <b>4 beds</b>. A barrel only collects rain through a gutter from a <b>stand on the same plot</b> (Tincture or Essential Oil Stand) — it connects automatically. Until then, hand watering borrows from your nearest barrel.',
+  plotbarrel: 'This plot has no rain barrel yet. Build a <b>Rain Barrel</b> from the Build menu (40 coins) and place it here: its own water for irrigation, up to <b>8 beds</b> (this plot and the one behind it). A barrel only collects rain through a gutter from a <b>stand on the same plot</b> (Tincture or Essential Oil Stand) — it connects automatically. Until then, hand watering borrows from your nearest barrel. <b>Goal reward:</b> a free <b>Tincture Stand</b> — place it on that plot and its roof feeds the barrel.',
   sickle: 'You own the <b>Harvest Sickle</b>! Tap the sickle button on the left, then tap a glowing raised bed to harvest every ripe plant in that bed at once.',
   plow: 'You own the <b>Hand Plow</b>! Tap the plow button on the left, pick a seed, then tap a glowing raised bed to plant every empty tile in that bed.',
   oils: 'The <b>Essential Oil Stand</b> is an Epic card: find it in a Card Pack, buy it at the Supply Market (150 coins), then build it (25 Wood) on one of your <b>other plots</b>. It distills <b>seeds</b> into oils worth far more than the seeds.',
-  still: 'Your <b>Essential Oil Stand</b> is ready! Distill <b>seeds</b> into essential oils (5 Lavender, 4 Calendula or 3 Chamomile seeds each) — oils sell for a premium at the Farm Stand, far more than the seeds.',
-  tincture: 'Your <b>Tincture Stand</b> is ready! Steep flowers with <b>Glycerin</b> or <b>Vinegar</b> (Supply Market) — tinctures sell for far more at the Farm Stand.',
+  teastand: 'Your <b>Tea Stand</b> is ready! Tap it, pick any <b>three dried herbs</b> (duplicates allowed) and brew a tea — the predicted price shows as you pick. Rarer herbs make far pricier teas; three different herbs add 10%. Teas sell at your Farm Stand.',
+  press: 'Your <b>Pressed Oil Stand</b> is ready! Tap it and pick a recipe — Sunflower seeds become <b>Sunflower Oil</b> or <b>Sun Butter</b>; Damask Rose seeds, olives, almonds, cacao and Sunpetal seeds make richer oils.',
+  fruitstand: 'Your <b>Fruit Stand</b> is ready! Tap it to cook orchard fruit into <b>jellies, butters, sauces and canned fruit</b> — each sells for well above the raw fruit.',
+  orchard: 'The <b>Orchard</b> is yours! Fruit-tree cards are in Card Packs now. Buy saplings at the Supply Market and plant them on the tree spots — they grow slowly, then fruit again and again.',
+  still: 'Your <b>Essential Oil Stand</b> is ready! Distill <b>seeds</b> into essential oils (5 Lavender, 4 Calendula or 3 Chamomile seeds each) — oils sell for a premium at the Farm Stand, far more than the seeds. Each distillation also leaves a <b>hydrosol</b> (Rose Water from Damask Rose) — a small extra to sell.',
+  tincture: 'Your <b>Tincture Stand</b> is ready! Steep flowers with <b>Glycerin</b> or <b>Vinegar</b> — find their cards in Card Packs, then buy them at the Supply Market — tinctures sell for far more at the Farm Stand.',
   customer: 'A customer! They’ll pick what they want from your stand and pay in coins.',
   lavender: 'You can now build a <b>Drying Rack</b> (Build). Dried Lavender sells for almost 3× fresh.',
   rebuild: 'Your stand has earned enough to <b>rebuild the Supply Market</b>. Tap the old cottage or open Build.',
-  market: 'The <b>Supply Market</b> is open — seeds, <b>Rain Barrels</b> for new plots, <b>Wood bundles</b>, <b>saplings</b> and Card Packs (<b>1 Jewel</b> each).',
+  market: 'The <b>Supply Market</b> is open — seeds, a <b>water truck</b> to fill your rain barrels, <b>Wood bundles</b>, <b>saplings</b> and Card Packs (<b>1 Jewel</b> each).',
   packs: 'Card Packs cost <b>1 Jewel</b> each: Supply Market › Card Packs. Out of Jewels? Get some in the <b>Jewel Shop</b> — or keep clearing the woods, where a Jewel turns up now and then.',
   pack: 'Discovered cards unlock new items in the Supply Market — buy them with coins. More Card Packs cost <b>1 Jewel</b> each (Jewels: Jewel Shop, or rare finds in the woods).',
   decor: 'Placed decor raises your garden’s <b>atmosphere</b> — customers stop by more often.',
@@ -445,7 +651,25 @@ export const SHADE = {
   tree: { w: 0.55, reach: 3.4 },  // a wild tree of scale 1 (weight & reach scale with tree size)
   grownStage: [0.15, 0.45, 0.75, 1.0], // planted trees cast more shade as they grow (sapling → mature)
   bgTree: { w: 0.55, reach: 3.4 },
-  buildings: { stand: { w: 0.35, reach: 2.6 }, market: { w: 0.55, reach: 3.4 }, rack: { w: 0.2, reach: 2.0 }, tincture: { w: 0.3, reach: 2.4 }, still: { w: 0.3, reach: 2.4 } },
+  // v0.52: built objects shade along the rendered shadow instead of in a circle. light = the scene's DirectionalLight
+  // (world.js: sunDir (-0.75, 0.32, -0.58) · 26 with y = 14): dir = ground direction toward the sun, k = shadow length
+  // per unit of height (24.6 / 14). Boxes are the renderer's own shadow-casting mesh bounds (measured from world.js):
+  // dx/dz = footprint centre offset from the object's spot, hx/hz = half sizes, h = height, w = shadow strength.
+  light: { dir: [-0.791, -0.612], k: 1.76, soft: 0.18 },
+  boxes: {
+    stand:     { dx: 0.24,  dz: 0.08, hx: 1.69, hz: 0.71, h: 2.77, w: 0.6 },
+    market:    { dx: 0.05,  dz: 0.22, hx: 1.63, hz: 1.45, h: 2.81, w: 0.6 },
+    rack:      { dx: 0,     dz: 0,    hx: 1.06, hz: 0.79, h: 1.82, w: 0.45 },
+    tincture:  { dx: -0.01, dz: 0.04, hx: 1.1,  hz: 0.79, h: 1.96, w: 0.55 },
+    still:     { dx: 0.01,  dz: 0.04, hx: 1.1,  hz: 0.75, h: 1.96, w: 0.55 },
+    teastand:  { dx: 0,     dz: 0.04, hx: 1.05, hz: 0.75, h: 2.0,  w: 0.55 },
+    press:      { dx: -0.1,  dz: 0.0,  hx: 1.0,  hz: 0.55, h: 2.4,  w: 0.5 },    // v0.6
+    fruitstand: { dx: 0,     dz: 0.04, hx: 1.05, hz: 0.75, h: 2.0,  w: 0.55 },   // v0.6
+    windmill:  { dx: 0,     dz: 0,    hx: 0.75, hz: 0.75, h: 3.6,  w: 0.6 },   // tower + cap (the open sails add ~0.5 height)
+    billboard: { dx: 0,     dz: 0.07, hx: 1.68, hz: 0.37, h: 3.73, w: 0.5 },
+    hive:      { dx: 0,     dz: 0,    hx: 0.32, hz: 0.32, h: 0.9,  w: 0.45 },
+    barrel:    { dx: 0,     dz: 0,    hx: 0.36, hz: 0.36, h: 1.05, w: 0.45 },
+  },
   slowerBelow: 0.95,              // sun under this shows 'growing slower'
   muchSlowerBelow: 0.3,
 };

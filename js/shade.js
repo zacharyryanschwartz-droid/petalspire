@@ -2,9 +2,30 @@
 import { SHADE } from './data.js';
 
 // casters: [{ x, z, w, reach }] — w and reach are already scaled for the caster's size/stage
+// v0.52: tall built objects cast a projected shadow. c = { x, z, hx, hz, h, w }: an axis-aligned footprint
+// (half sizes hx/hz around x/z) of height h. A ground point is shaded when the ray from it toward the sun
+// (C.light.dir on the ground, rising 1 unit per C.light.k) passes over the footprint before it climbs above h,
+// i.e. exactly the shadow the renderer's directional light draws. Edges are softened by averaging 3 footprints.
+function rayHits(px, pz, ux, uz, L, hx, hz) {
+  if (hx <= 0 || hz <= 0) return false;
+  let t0 = 0, t1 = L;
+  for (const [p, u, h] of [[px, ux, hx], [pz, uz, hz]]) {
+    if (Math.abs(u) < 1e-9) { if (Math.abs(p) > h) return false; continue; }
+    let a = (-h - p) / u, b = (h - p) / u; if (a > b) [a, b] = [b, a];
+    t0 = Math.max(t0, a); t1 = Math.min(t1, b); if (t0 > t1) return false;
+  }
+  return true;
+}
+export function boxShade(x, z, c, C = SHADE) {
+  const L = c.h * C.light.k, [ux, uz] = C.light.dir, soft = C.light.soft;
+  let hit = 0;
+  for (const m of [-soft, 0, soft]) if (rayHits(x - c.x, z - c.z, ux, uz, L, c.hx + m, c.hz + m)) hit++;
+  return c.w * hit / 3;
+}
 export function shadeAt(x, z, casters, C = SHADE) {
   let s = 0;
   for (const c of casters) {
+    if (c.h != null) { s += boxShade(x, z, c, C); if (s >= 1) return 1; continue; }
     const dx = c.x - x, dz = c.z - z, d = Math.hypot(dx, dz);
     if (d >= c.reach) continue;
     const dir = d < 1e-3 ? 1 : Math.max(0, (dx * C.sunDir[0] + dz * C.sunDir[1]) / d);
