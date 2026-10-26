@@ -21,7 +21,7 @@ This is a **prototype**: version numbers stay below 1.0 until the first official
 
 Drag with one finger to pan, pinch to zoom, and twist with two fingers to turn. On desktop, right-drag or shift-drag turns the view.
 
-## New in v0.6 — Sunflower seeds, the Pressed Oil Stand, the Fruit Stand and the Orchard
+## New in v0.6 — the Map, the Orchard, Sunflower seeds, the Pressed Oil Stand and the Fruit Stand
 
 v0.6 (build `0.6`, label "v0.6 prototype") contains everything listed under v0.52 below, plus the items here.
 
@@ -46,8 +46,11 @@ Price = raw value × (1.7 + 0.25 × (tier − 1)), butters ×1.06.
 
 Recipes stay locked until you have found the source card.
 
-### The Orchard (7th plot, 2500 coins)
-- Locked until all five wood plots are owned. 2 raised beds and **12 fruit-tree spots**; lighter woods to clear. Stands may not cover a tree spot.
+### The Map and The Orchard (its own place)
+- A **Map** button (top right) opens a painted map: **Home**, **The Orchard**, and five places marked *Coming soon* (Vegetable Farm, Grain Fields, Livestock Ranch, Full Production, Grocery Store), each locked and fogged. Tap one to see a teaser card.
+- Home now has **6 plots for sale**: 150 · 300 · 600 · 1000 · 1500 · **2000 (the new Back Woods)**. The old Orchard plot behind Home is now this ordinary wooded plot.
+- **The Orchard unlocks after every Home plot is bought**, then costs **3000 coins + 60 Wood** on the Map. Buying it takes you there. Travel back and forth any time; both places grow in real time in one save, and your Bag is shared.
+- The Orchard is a sunny fenced field with **12 fruit-tree spots**, **2 raised-bed sites** and an **Orchard Shed** whose roof feeds an Orchard rain barrel (+1 per tick, more with stands). Growth, shade and water rules are the same as at Home. Crafting stands (Fruit Stand, Pressed Oil Stand, …) can go at either place but not on a tree spot.
 - Buying it adds **14 tree cards** (2 per tier) to the Card Pack pool; until then no tree card can be drawn. Tier totals stay Basic 34.615 · Epic 31.385 · Legendary 20.051 · Rare 8.718 · Super Rare 3.138 · Ultra 1.395 · Other World 0.697 %. Trees take ≈14.34% of draws: e.g. Apple 3.1469%, Cherry 1.4857%, Lemon 1.1568%, Olive 0.7265%, Pomegranate 0.3923%, Eucalyptus 0.1744%, Moonpeach 0.0872%; each Epic feature 3.0769% → 2.7856%.
 - Find a tree card → the Supply Market sells its sapling → tap a free tree spot. Trees grow sapling → young → tree → fruiting (25% / 60% / 100% of the grow time), then fruit again every cycle without replanting. Tap a ripe tree to pick it. Grown trees cast shade. Card levels shorten the times.
 
@@ -79,6 +82,8 @@ Price = raw × (1.6 + 0.25 × (tier − 1)); jelly ×1.08, butters/preserves ×1
 | Plum Sauce (4) | 64 | 118 | | Crystal Apple Jelly (2) | 440 | 1473 |
 
 ### Also since v0.51
+- **Crate Shelf**: a restored Old Crate is now an item in Bag › Finds. **Install** puts it on the Farm Stand at once: a stacked-crate shelf appears beside the counter, with jars on it once the stand holds more than 12, and shelf space goes **12 → 16**. **Take out** (in the Bag or the Stand panel) returns it to the Bag; anything over 12 goes back to your Bag. Old saves keep an already-working shelf installed; a shelf that was stuck in the Bag can now be installed.
+- The Tincture Stand and Essential Oil Stand use drawn icons (dropper bottles on a stand, a copper still) everywhere, like every other feature.
 - **Tea Stand** (Epic card, any owned plot): blend 3 dried herbs. Price = round(Σ dried × (1.4 + 0.35 × (avg tier − 1)) × 1.1 if all different); brew 15 + 10 × (tier − 1) s. Lavender Tea 59 (vs 42 dried) · Lavender + Rosemary + Tulsi 689 (vs 316) · Moonflower Starlight 11319 (vs 3234) · Moonflower + Crystal Rose + Sunpetal 13583.
 - Shade fix (shadows follow the sun direction) and a live Billboard face.
 - On the Roadside Lot, crafting stands may stand on an unbuilt bed patch; that patch then can't take a bed until the stand moves.

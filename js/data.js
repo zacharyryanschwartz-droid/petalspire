@@ -97,7 +97,7 @@ for (const t of Object.keys(PLANT_TIERS)) { const ps = Object.values(SPECIES).fi
   for (const s of ps) s.packW = PLANT_TIERS[t].pack * (s.packShare ?? 1 / ps.length); }
 
 // ---------------- v0.6 ORCHARD TREES ----------------
-// Tree cards join the pack pool only once the Orchard (the last plot) is bought. A tree is planted from a sapling (bought at
+// Tree cards join the pack pool only once The Orchard (bought on the Map after every Home plot) is owned. A tree is planted from a sapling (bought at
 // the Market once its card is found) on a tree spot in the Orchard, grows slowly by tier, then fruits again and again on a
 // long cycle — no replanting. Card levels work like plants: +10% fruit price and −5% grow/cycle time per level.
 //   by tier order o (1 Basic … 7 Other World): grow 300 · 420 · 540 · 660 · 840 · 1020 · 1200 s; fruit every 150 … 360 s;

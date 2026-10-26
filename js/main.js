@@ -140,7 +140,7 @@ function installShelf() {
   if (!S.bonus.crate || S.shelfOn) return false;
   if (!S.standBuilt) { toast('Build the Roadside Farm Stand first, then install the Crate Shelf on it'); return false; }
   S.shelfOn = true; save(); syncShelf(); renderPanel(); hud();
-  W.poof?.(V3(SPOTS.stand[0] - 1.75, 0.8, SPOTS.stand[1] + 0.2), '#F5D07A', 16, 1.5);
+  W.poof?.(V3(SPOTS.stand[0] + 1.98, 0.8, SPOTS.stand[1] + 0.2), '#F5D07A', 16, 1.5);
   toast(`Crate Shelf installed on your Farm Stand · shelf space ${STAND_CAP} → ${standCap()}`); return true;
 }
 // taking the shelf out puts everything that no longer fits back in the bag (last-listed products first)

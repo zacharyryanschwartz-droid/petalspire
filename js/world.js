@@ -946,7 +946,7 @@ export function createWorld(canvas) {
     const sh = billboard.userData.shimmer; sh.material.opacity = bbOn ? 0.55 : 0; if (bbOn) sh.material.map.offset.x = ((t * 0.28) % 1.6) - 0.8; });
 
   // v0.6: the Crate Shelf — two old crates stacked on their sides beside the counter (shown while installed)
-  const standShelf = new THREE.Group(); standShelf.position.set(-1.78, 0, 0.12); standShelf.rotation.y = 0.18; stand.add(standShelf); standShelf.visible = false;
+  const standShelf = new THREE.Group(); standShelf.position.set(1.98, 0, -0.12); standShelf.rotation.y = -0.22; stand.add(standShelf); standShelf.visible = false;
   const shelfGoods = new THREE.Group(); standShelf.add(shelfGoods);
   {
     const cm = mat('#B98A5A'), cd = mat('#8E6040');
