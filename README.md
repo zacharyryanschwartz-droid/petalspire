@@ -1,4 +1,4 @@
-# Petalspire v0.61
+# Petalspire v0.62
 
 A cozy 3D flower-garden prototype for iPhone Safari (portrait, one thumb). Also plays on desktop with a mouse.
 This is a **prototype**: version numbers stay below 1.0 until the first official release.
@@ -20,6 +20,15 @@ This is a **prototype**: version numbers stay below 1.0 until the first official
 7. **Land for sale.** Five wooded plots, each with a floating For Sale sign: 150 → 300 → 600 → 1000 → 1500 coins.
 
 Drag with one finger to pan, pinch to zoom, and twist with two fingers to turn. On desktop, right-drag or shift-drag turns the view.
+
+## New in v0.62 — find the card first, coins as the backup
+
+v0.62 (build `0.62`, label "v0.62 prototype") is v0.61 with a clearer stand unlock. Saves carry over unchanged.
+
+- Where the next unlockable stand shows (one card in Build, one row in the Supply Market), it now reads **"Find the [Stand] card in packs"**. The Card Pack (3 cards · 1 Jewel) is shown, and the main button, **Open Card Packs**, goes to Market › Card Packs. The Tincture Stand is not a pack card, so it reads **"Earn the Tincture Stand free"** with its goal.
+- A secondary blush button, **"Can't find the card?"** ("Rather not wait?" for the Tincture Stand), opens a small panel with the **unlock price**, **your coins**, the normal build price that still applies when you place it, and **Unlock**. If you can't afford it, Unlock is disabled and a hint says how many coins you still need.
+- The rules are unchanged: same ladder (1,000 → 2,500 → 5,000 → 8,000), only the next stand is shown, only where it can be built, other locked items stay hidden, and the normal build price still applies after unlocking.
+- Screenshots: `89-find-card-in-packs`, `90-unlock-panel-affordable`, `91-unlock-panel-not-enough` (87/88 updated to the new look).
 
 ## New in v0.61 — the Orchard grows up, and Gardeners
 

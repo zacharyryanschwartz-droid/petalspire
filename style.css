@@ -814,3 +814,27 @@ body.modal-open .tooldock, body.modal-open .goal, body.modal-open .bubble{visibi
 .worker-sheet>span:nth-child(2){flex:1}
 .worker-sheet .wk-ico{font-size:18px}
 .worker-card svg{flex:none}
+
+/* v0.62: stand unlock — the card in packs first, coins behind "Can't find the card?" */
+.coin-unlock .cu-pack{display:flex;align-items:center;gap:8px;background:#FFF8EC;border:1.5px dashed var(--honey);border-radius:12px;padding:5px 8px}
+.coin-unlock .cu-pack img{width:34px;height:34px;object-fit:cover;border-radius:7px;flex:none}
+.coin-unlock .cu-pack b{display:block;font-family:'Fraunces';font-size:14px;font-weight:600;color:var(--moss);line-height:1.1}
+.coin-unlock .cu-pack small{display:flex;align-items:center;gap:3px;font-size:12px;font-weight:700;color:var(--ink-soft)}
+.coin-unlock .cu-pack small i{width:14px;height:14px}
+.cu-ask{align-self:flex-start;min-height:44px;padding:8px 12px;margin:0;border:1.5px solid var(--blush);background:#FFF6F4;border-radius:999px;
+  font-family:'Nunito',sans-serif;font-weight:800;font-size:13px;color:#A0545B;cursor:pointer}
+.cu-ask:active{transform:translateY(1px)}
+.row.coin-unlock{align-items:flex-start}
+.row.coin-unlock .meta{flex:1;min-width:0}
+.cu-acts{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;align-items:center}
+.cu-acts .btn.sm{min-height:44px}
+.cu-panel .cu-art{width:96px;height:72px;margin:0 auto;background:#FBF3E6;border-radius:16px;display:grid;place-items:center}
+.cu-panel .cu-art svg{width:80px}
+.cu-panel .muted{margin:0 0 10px;font-size:14px}
+.cu-lines{display:grid;gap:6px;text-align:left}
+.cu-lines div{display:flex;justify-content:space-between;align-items:center;background:#fff;border:1.5px solid #E7EFE3;border-radius:12px;padding:8px 12px;font-weight:700;color:var(--moss)}
+.cu-lines b{font-size:16px}.cu-lines b.no{color:#B5545C}.cu-lines b.ok{color:#4F7A4B}
+.cu-note{margin:8px 0 0;font-size:12.5px;font-weight:600;color:var(--ink-soft)}
+.cu-hint{margin:8px 0 0;padding:8px 10px;border-radius:12px;background:#FFF0EF;border:1.5px dashed var(--blush);color:#8E4950;font-size:13px;font-weight:700}
+.confirm-acts .btn{min-height:46px}
+.cu-panel .confirm-acts .btn{white-space:nowrap;font-size:14px;padding:10px 8px}

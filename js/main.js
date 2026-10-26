@@ -13,7 +13,7 @@ import { shadeAt, speedFor, sunLabel, rebaseStart } from './shade.js';
 
 // Save format: v0.3, v0.31 and v0.4 share one localStorage key (schema v: 3). `build` records which prototype build last wrote the save;
 // v0.3 / v0.31 saves (no `build`, no per-plot barrels) are migrated on load (migrate04 below); v0.4 saves load as-is and are re-tagged. Prototype builds stay below 1.0.
-export const BUILD = '0.61';
+export const BUILD = '0.62';
 const SAVE_KEY = 'petalspire.v03', V02_KEY = 'petalspire.v02', OLD_KEYS = ['petalspire.v01'];
 const QS = new URLSearchParams(location.search);
 const TREE_MS = Math.max(0.05, +QS.get('treeMin') || TREE.growMin) * 60000;   // ?treeMin=1 for quick testing
@@ -1817,13 +1817,36 @@ const COIN_STANDS = new Set(STAND_UNLOCK.map((u) => u.id));
 const standGot = (id) => (id === 'tincture' ? !!S.owned.tincture : !!S.unlocked[id]);
 const nextCoinStand = () => STAND_UNLOCK.find((u) => !standGot(u.id)) || null;
 const coinStandHere = (id) => { const u = nextCoinStand(); return u && u.id === id && standOkAt(id, curLoc()) ? u : null; };
-const coinUnlockSub = (id) => `${id === 'tincture' ? 'Or earn it free from the goal “' + GOALS.find((g) => g.reward === 'tincture').text.split(' · ')[0] + '”' : 'Or find its card in a Card Pack'} · ${whereTag(id)}`;
-function coinUnlockCard(id) { const u = coinStandHere(id); if (!u) return ''; const ok = S.coins >= u.coins;
-  return `<div class="build-card coin-unlock" data-coin-unlock-card="${id}"><div class="bc-art">${FEATURE_ART[id]}</div><div class="meta"><b>${FEATURES[id].name}</b><small>Unlock it with coins. ${coinUnlockSub(id)}.</small>
-    <div class="cost">${coin(u.coins)} <span class="${ok ? 'ok' : 'no'}">you have ${S.coins} coins</span></div>
-    <button class="btn btn-gold" data-act="coin-unlock" data-id="${id}" ${ok ? '' : 'disabled'}><i data-icon="coin"></i> Unlock · ${u.coins.toLocaleString('en-US')} coins</button></div></div>`; }
+const fmtC = (n) => n.toLocaleString('en-US');
+// v0.62: the card is the main route (Card Pack), coins are the fallback behind "Can't find the card?"
+const tincGoal = () => GOALS.find((g) => g.reward === 'tincture').text.split(' · ')[0];
+const cuTitle = (id) => (id === 'tincture' ? `Earn the ${FEATURES[id].name} free` : `Find the ${FEATURES[id].name} card in packs`);
+const cuSub = (id) => (id === 'tincture' ? `A free reward for the goal “${tincGoal()}”` : `Open a Card Pack to find it — that unlocks it for free`) + ` · ${whereTag(id)}`;
+const cuAskLabel = (id) => (id === 'tincture' ? 'Rather not wait?' : 'Can’t find the card?');
+const cuPack = () => `<div class="cu-pack"><img src="assets/pack.jpg" alt=""/><span><b>${PACKS.standard.name}</b><small>${PACKS.standard.cards} cards · ${PACK_JEWELS} <i data-icon="jewel"></i></small></span></div>`;
+function coinUnlockCard(id) { const u = coinStandHere(id); if (!u) return '';
+  return `<div class="build-card coin-unlock" data-coin-unlock-card="${id}"><div class="bc-art">${FEATURE_ART[id]}</div><div class="meta"><b>${cuTitle(id)}</b><small>${cuSub(id)}.</small>
+    ${id === 'tincture' ? '' : cuPack()}
+    ${id === 'tincture' ? '' : `<button class="btn btn-gold" data-act="go-packs" data-cu-packs="${id}"><i data-icon="jewel"></i> Open Card Packs</button>`}
+    <button class="cu-ask" data-act="coin-unlock-ask" data-id="${id}">${cuAskLabel(id)}</button></div></div>`; }
 function coinUnlockRow(id) { const u = coinStandHere(id); if (!u) return '';
-  return `<div class="row coin-unlock" data-coin-unlock-row="${id}"><div class="ico">${FEATURE_ART[id]}</div><div class="meta"><b>Unlock the ${FEATURES[id].name}</b><small>${coinUnlockSub(id)}</small>${mktTag(id)}</div><div class="acts"><button class="btn btn-gold sm" data-act="coin-unlock" data-id="${id}" ${S.coins >= u.coins ? '' : 'disabled'}>${coin(u.coins)}</button></div></div>`; }
+  return `<div class="row coin-unlock" data-coin-unlock-row="${id}"><div class="ico">${FEATURE_ART[id]}</div><div class="meta"><b>${cuTitle(id)}</b><small>${cuSub(id)}</small>${mktTag(id)}
+    <div class="cu-acts">${id === 'tincture' ? '' : `<button class="btn btn-gold sm" data-act="go-packs" data-cu-packs="${id}"><i data-icon="jewel"></i> Card Packs</button>`}<button class="cu-ask" data-act="coin-unlock-ask" data-id="${id}">${cuAskLabel(id)}</button></div></div></div>`; }
+// the small "Can't find the card?" panel: unlock price, your coins, Unlock (disabled + hint when short)
+function coinUnlockAsk(id) {
+  const u = nextCoinStand(); if (!u || u.id !== id || !standOkAt(id, curLoc())) return false;
+  const ok = S.coins >= u.coins, short = u.coins - S.coins, C = $('#confirm');
+  const bc = id === 'tincture' ? null : buyCost(id);
+  C.innerHTML = `<div class="confirm-card cu-panel" data-cu-panel="${id}"><div class="cu-art">${FEATURE_ART[id]}</div>
+    <h3>Unlock with coins</h3><p class="muted">${id === 'tincture' ? `Skip the goal and unlock the ${FEATURES[id].name} now.` : `No ${FEATURES[id].name} card yet? Unlock it now instead.`}</p>
+    <div class="cu-lines"><div><span>Unlock price</span><b data-cu-price>${coin(fmtC(u.coins))}</b></div><div><span>Your coins</span><b data-cu-have class="${ok ? 'ok' : 'no'}">${coin(fmtC(S.coins))}</b></div></div>
+    <p class="cu-note">${id === 'tincture' ? 'Placing it stays free.' : `Then build it as usual: ${coin(fmtC(bc.coins))}${bc.wood ? ' ' + woodTag(bc.wood) : ''} when you place it.`}</p>
+    ${ok ? '' : `<p class="cu-hint" data-cu-hint>You need ${coin(fmtC(short))} more — sell at your stands, or keep an eye out for the card in packs.</p>`}
+    <div class="confirm-acts"><button class="btn" data-c="no">Not now</button><button class="btn btn-gold" data-c="ok" data-cu-unlock="${id}" ${ok ? '' : 'disabled'}><i data-icon="coin"></i> Unlock · ${fmtC(u.coins)}</button></div></div>`;
+  fillIcons(C); C.classList.remove('hidden');
+  C.onclick = (e) => { const b = e.target.closest('[data-c]'); if (!b && e.target !== C) return; if (b?.disabled) return; C.classList.add('hidden'); C.innerHTML = ''; if (b?.dataset.c === 'ok') coinUnlock(id); };
+  return true;
+}
 function coinUnlock(id) {
   const u = nextCoinStand(); if (!u || u.id !== id || S.coins < u.coins) return false;
   S.coins -= u.coins; S.stats.coinUnlocks = (S.stats.coinUnlocks || 0) + 1;
@@ -2656,6 +2679,7 @@ $('#panel-body').addEventListener('click', (e) => {
   if (a === 'build-stand') return buildStand();
   if (a === 'build-ostand') return buildOStand();
   if (a === 'coin-unlock') return coinUnlock(b.dataset.id);
+  if (a === 'coin-unlock-ask') return coinUnlockAsk(b.dataset.id);
   if (a === 'hire-worker') return hireWorker(b.dataset.lot);
   if (a === 'pay-worker') return payWorker(b.dataset.lot);
   if (a === 'open-worker') return openPanel('worker', b.dataset.lot);
@@ -3154,7 +3178,7 @@ setInterval(save, 5000);
 // ---------------- Debug hooks (used by automated tests) ----------------
 const V = (x, y, z) => new THREE.Vector3(x, y, z);
 window.__ps = {
-  STAND_UNLOCK, coinUnlock, nextCoinStand, WORKER, hireWorker, payWorker, workerPass, catchUpWorkers, syncWorkers, workerStatus, workStands, workersOn, workerAt: (l) => W.workerAt(l), get workers() { return S.workers; },
+  STAND_UNLOCK, coinUnlock, coinUnlockAsk, nextCoinStand, WORKER, hireWorker, payWorker, workerPass, catchUpWorkers, syncWorkers, workerStatus, workStands, workersOn, workerAt: (l) => W.workerAt(l), get workers() { return S.workers; },
   setClock: (t) => { clockAt = t; },
   BUILD, get fromBuild() { return fromBuild; },
   TIPS, JEWEL_DROP, obsState, PACKS,
