@@ -1,4 +1,4 @@
-# Petalspire v0.6
+# Petalspire v0.61
 
 A cozy 3D flower-garden prototype for iPhone Safari (portrait, one thumb). Also plays on desktop with a mouse.
 This is a **prototype**: version numbers stay below 1.0 until the first official release.
@@ -20,6 +20,13 @@ This is a **prototype**: version numbers stay below 1.0 until the first official
 7. **Land for sale.** Five wooded plots, each with a floating For Sale sign: 150 → 300 → 600 → 1000 → 1500 coins.
 
 Drag with one finger to pan, pinch to zoom, and twist with two fingers to turn. On desktop, right-drag or shift-drag turns the view.
+
+## New in v0.61 — the Map unlocks with your land
+
+v0.61 (build `0.61`, label "v0.61 prototype") is v0.6 plus one change:
+- The **Map is locked until all 6 Home plots are bought**. Until then the Map button is greyed out with a gold lock badge, and tapping it shows "Buy all Home plots to unlock the Map · n/6 plots".
+- Buying the 6th plot unlocks it with a little bounce, sparkles and the toast "All Home plots are yours — the Map is unlocked!". The unlock is kept in the save.
+- Old saves that already own every Home plot (or The Orchard) get the Map unlocked on load.
 
 ## New in v0.6 — the Map, the Orchard, Sunflower seeds, the Pressed Oil Stand and the Fruit Stand
 

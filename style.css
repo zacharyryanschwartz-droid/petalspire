@@ -781,3 +781,12 @@ body.modal-open .tooldock, body.modal-open .goal, body.modal-open .bubble{visibi
 .follow-btn em i{width:18px;height:18px;display:inline-block}
 .follow-btn.claimed{opacity:.88;background:#F4F1E8;border-color:#DCD5C2}
 .follow-btn.claimed em{background:#E3EED8;border-color:#A9C493;color:#3F6332}
+/* v0.61: the Map is locked until every Home plot is owned */
+.map-btn .map-lock{display:none}
+.map-btn.locked{background:#EDE8DC;border-color:#A39C8C;box-shadow:0 3px 0 #A39C8C}
+.map-btn.locked > svg{filter:grayscale(1);opacity:.55}
+.map-btn.locked b{color:#8C8576}
+.map-btn.locked .map-lock{display:block;position:absolute;right:-7px;top:-8px;width:24px;height:24px;border-radius:50%;background:#FFF8E6;border:1.5px solid #C9A14A;box-shadow:0 1px 3px rgba(0,0,0,.18)}
+.map-btn.locked .map-lock svg{width:18px;height:18px;margin:2px;filter:none;opacity:1}
+.map-btn.just-unlocked{animation:mapUnlock 1.1s ease 2}
+@keyframes mapUnlock{0%,100%{transform:scale(1)}40%{transform:scale(1.16) rotate(-4deg);box-shadow:0 0 0 6px rgba(244,195,90,.45)}}

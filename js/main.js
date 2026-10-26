@@ -13,7 +13,7 @@ import { shadeAt, speedFor, sunLabel, rebaseStart } from './shade.js';
 
 // Save format: v0.3, v0.31 and v0.4 share one localStorage key (schema v: 3). `build` records which prototype build last wrote the save;
 // v0.3 / v0.31 saves (no `build`, no per-plot barrels) are migrated on load (migrate04 below); v0.4 saves load as-is and are re-tagged. Prototype builds stay below 1.0.
-export const BUILD = '0.6';
+export const BUILD = '0.61';
 const SAVE_KEY = 'petalspire.v03', V02_KEY = 'petalspire.v02', OLD_KEYS = ['petalspire.v01'];
 const QS = new URLSearchParams(location.search);
 const TREE_MS = Math.max(0.05, +QS.get('treeMin') || TREE.growMin) * 60000;   // ?treeMin=1 for quick testing
@@ -403,6 +403,7 @@ let sunflowerRefund = 0;
 // v0.6: shelves used to switch on the moment they were restored. Keep it installed where it already worked (a built stand);
 // a shelf that was stuck in the bag (no stand yet) becomes an installable item.
 if (S.shelfOn === undefined) { S.shelfOn = !!(S.bonus.crate && S.standBuilt); }
+if (S.mapOpen === undefined) S.mapOpen = LOT_FOR_SALE.every((l) => S.lots[l]) || !!S.lots.orchard;   // v0.61: old saves that own every Home plot get the Map
 W.makeBlueprint(W.tincture, 'tincture', `Blueprint · ${BUILDS.tincture.wood} Wood`, 2.2, 1.4);
 for (const o of OBSTACLES) W.setObstacle(o.id, obsState(o.id));
 for (const id of LOT_FOR_SALE) W.setLotOwned(id, !!S.lots[id]);
@@ -474,6 +475,7 @@ document.fonts?.ready.then(() => W.relabel());
 const shown = { coins: S.coins, wood: S.wood, water: totalWater(), jewels: S.jewels };
 function bump(id) { const p = $(id); p.classList.remove('bump'); void p.offsetWidth; p.classList.add('bump'); }
 function hud() {
+  syncMapBtn();
   $('#coin-count').textContent = S.coins; const tw = totalWater(); $('#water-count').textContent = tw; $('#wood-count').textContent = S.wood; $('#jewel-count').textContent = S.jewels;
   if (S.coins !== shown.coins) { bump('#pill-coins'); shown.coins = S.coins; }
   if (S.wood !== shown.wood) { bump('#pill-wood'); shown.wood = S.wood; }
@@ -2106,7 +2108,7 @@ function buyLot(id) {
   closePanel(); W.setLotOwned(id, true);
   const [cx, cz] = lotCenter(id); W.poof(new THREE.Vector3(cx, 0.6, cz), '#F5D07A', 26, 3);
   W.ctl.moved = true; glideW({ target: new THREE.Vector3(cx * 0.6, 0.3, cz * 0.6 + 0.6), zoom: 1.15 }, 1.4);
-  toast(`${LOTS[id].name} is yours!`); tip('plotbought'); hud(); checkGoals(); return true;
+  toast(`${LOTS[id].name} is yours!`); tip('plotbought'); hud(); checkGoals(); unlockMapIfReady(); return true;
 }
 
 // ---------------- v0.6: the Map — Home, The Orchard, and places coming soon ----------------
@@ -2216,7 +2218,23 @@ function renderMap() {
   $('#map-body').innerHTML = mapSVG(); $('#map-card').innerHTML = mapSel ? mapCard(mapSel) : `<p class="muted map-hint">Tap a place. Everything keeps growing while you are away.</p>`;
   fillIcons($('#map'));
 }
-function openMap() { closePanel(); if (placing) exitPlace(); if (buildMode) exitBuild(); deselect(); mapSel = null; $('#map').classList.remove('hidden'); renderMap(); }
+// v0.61: the Map stays locked until every Home plot is owned
+function mapLocked() { return !S.mapOpen; }
+function homeLotsOwned() { return LOT_FOR_SALE.filter((l) => S.lots[l]).length; }
+function syncMapBtn() {
+  const b = $('#btn-map'); if (!b) return; const lk = mapLocked();
+  b.classList.toggle('locked', lk); b.setAttribute('aria-label', lk ? `Map · locked (${homeLotsOwned()}/${LOT_FOR_SALE.length} Home plots)` : 'Map');
+}
+function unlockMapIfReady() {
+  if (S.mapOpen || LOT_FOR_SALE.some((l) => !S.lots[l])) return false;
+  S.mapOpen = true; save(); syncMapBtn();
+  const b = $('#btn-map'); b.classList.add('just-unlocked'); setTimeout(() => b.classList.remove('just-unlocked'), 2400);
+  const r = b.getBoundingClientRect(); sparkles($('#ui'), r.left + r.width / 2, r.top + r.height / 2, 16); buzz([20, 40, 20]);
+  setTimeout(() => toast('<i data-icon="sparkle"></i> All Home plots are yours — the Map is unlocked!'), 900);
+  return true;
+}
+function openMap() { if (mapLocked()) { toast(`<i data-icon="lock"></i> Buy all Home plots to unlock the Map · ${homeLotsOwned()}/${LOT_FOR_SALE.length} plots`); return false; }
+  closePanel(); if (placing) exitPlace(); if (buildMode) exitBuild(); deselect(); mapSel = null; $('#map').classList.remove('hidden'); renderMap(); }
 function closeMap() { $('#map').classList.add('hidden'); mapSel = null; }
 $('#btn-map').addEventListener('click', (e) => { e.stopPropagation(); $('#map').classList.contains('hidden') ? openMap() : closeMap(); });
 $('#map-close').addEventListener('click', closeMap);
@@ -2771,7 +2789,7 @@ const V = (x, y, z) => new THREE.Vector3(x, y, z);
 window.__ps = {
   BUILD, get fromBuild() { return fromBuild; },
   TIPS, JEWEL_DROP, obsState, PACKS,
-  hud, syncBarrels, lotRoofs, standsLine, buildBarrelAt: (lot, x, z) => buildBarrel(lot, x, z), openMap, closeMap, travel, buyOrchard, claimFollow, SOCIALS, setLoc, loc: () => curLoc(), orchardLocked, mapPlaces: () => MAP_PLACES.map((p) => ({ id: p.id, name: p.name, soon: !!p.soon, state: placeState(p) })), ORCHARD_PRICE, casterIds: () => casters().map((c) => c.id + (c.h != null ? ":box" : ":tree")), checkGoals, regenBarrels, feedLot, reachLots,  get barrelReachTargets() { return W.bedTargets.children.map((g) => ({ b: g.userData.b, ok: g.userData.ok })); }, barrelRoof, lotRoofs, barrelStands, barrelPerTick, get gutterLots() { return [...W.gutters.keys()]; }, gutterPipes(lot) { return W.gutters.get(lot)?.userData.pipes || 0; },
+  hud, syncBarrels, lotRoofs, standsLine, buildBarrelAt: (lot, x, z) => buildBarrel(lot, x, z), openMap, closeMap, mapLocked, syncMapBtn, unlockMapIfReady, travel, buyOrchard, claimFollow, SOCIALS, setLoc, loc: () => curLoc(), orchardLocked, mapPlaces: () => MAP_PLACES.map((p) => ({ id: p.id, name: p.name, soon: !!p.soon, state: placeState(p) })), ORCHARD_PRICE, casterIds: () => casters().map((c) => c.id + (c.h != null ? ":box" : ":tree")), checkGoals, regenBarrels, feedLot, reachLots,  get barrelReachTargets() { return W.bedTargets.children.map((g) => ({ b: g.userData.b, ok: g.userData.ok })); }, barrelRoof, lotRoofs, barrelStands, barrelPerTick, get gutterLots() { return [...W.gutters.keys()]; }, gutterPipes(lot) { return W.gutters.get(lot)?.userData.pipes || 0; },
   get tincGrandfathered() { return tincGrandfathered; }, tincProblem, tincSpots, buildTincture, placeTincture, buildStill, placeStill, distill, collectOil, STILL, TEA, teaInfo, teaId, teaSps, registerTea, buildTea, placeTea, brewTea, collectTea, teaAdd, teaRemove, get teaPick() { return [...teaPick]; }, set teaPick(v) { teaPick = [...v]; }, teaHTML, syncTea, DRY_TIER_S,
   CRAFT, PRESS, FRUITSTAND, TREES, TREE_IDS, SEED_BAGS, bagId, bagSeeds, buildCraft, placeCraft, craftMake, craftCollect, craftHTML, syncCraft, orchardSpots, orchardProblem, plantOrchard, pickTree, syncOrchard, orchStage, orchRipe, orchardTreeHTML, startTreePlace, orchardLocked, packW, cardOdds, tierOdds, featureOdds, drawNonBasic, collIds, get sunflowerRefund() { return sunflowerRefund; }, ORCHARD_TREE_SPOTS,
   RESALE, sellPlaced, stockAntique, sellRestored, installShelf, uninstallShelf, shelfOn, syncShelf, SHELF_BONUS, STAND_CAP, focusThing, get atmosphere() { return atmosphere(); }, get standCap() { return standCap(); },
