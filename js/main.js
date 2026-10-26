@@ -870,7 +870,8 @@ function enterBuild() {
   else tip('shade');
 }
 function exitBuild() { buildMode = false; W.setGhosts(null); $('#buildbar').classList.add('hidden'); }
-$('#buildbar-cancel').addEventListener('click', () => { if (placing) { const b = placing.buy; exitPlace(); if (b) toast(`Cancelled — nothing was charged for the ${FEATURES[b.id]?.name || 'tree sapling'}`); } else exitBuild(); });
+function cancelPlacing() { if (!placing) return false; const b = placing.buy; exitPlace(); if (b) toast(`Cancelled — nothing was charged for the ${FEATURES[b.id]?.name || 'tree sapling'}`); return true; }
+$('#buildbar-cancel').addEventListener('click', () => { if (!cancelPlacing()) exitBuild(); });
 function buildBed(siteId) {
   if (S.beds.includes(siteId) || !siteClear(siteId) || S.wood < bedCost()) return false;
   S.wood -= bedCost(); S.beds.push(siteId); for (let k = 0; k < PER_BED; k++) S.tiles.push(null); setTimeout(syncBees, 1200);
@@ -2639,7 +2640,7 @@ window.__ps = {
   Ads, get adsOn() { return Ads.enabled; },
   // v0.4 helpers
   setHeroHold: (ms) => { heroHoldMs = ms; }, grantTincture, get tincCardMigrated() { return tincCardMigrated; }, spawnRoadScrap: () => spawnRoadScrap(), get roadScrap() { return S.roadScrap; }, packIsAllBasic: (ids) => ids.every((id) => cardTier(CARDS[id]) === 'basic'), rollPack: (n) => rollPack(n),
-  startBuy, buyCost, cancelPlace: () => { if (placing) exitPlace(); },
+  startBuy, buyCost, cancelPlace: cancelPlacing,
   fillBarrels, truckQuote: () => { const q = truckQuote(); return { need: q.need, can: q.can, lots: q.list.map(([l]) => l) }; }, get truck() { return truck && { state: truck.state, x: truck.x, stopX: truck.stopX }; }, baseOpen, baseNeeds, SUPPLY_CARDS, get basesMigrated() { return basesMigrated; },
   get barrels() { return S.barrels; }, barrelText, totalWater, handSource: (i) => handSource(i)?.lot || null, buildBarrel, unhookIrrigation, BARREL, craftTincture, collectTincture, buildTincture,
   setBarrelCap(n) { BARREL.maxBeds = n; syncBarrels(); }, barrelScreen(lot) { const b = S.barrels[lot]; return W.project(V(b.x, 0.5, b.z)); }, barrelLabel(lot) { const s = W.barrels.get(lot)?.userData.info; return s && { main: s.userData.main, sub: s.userData.sub, visible: s.visible, scale: s.scale.y, opacity: s.material.opacity }; },
