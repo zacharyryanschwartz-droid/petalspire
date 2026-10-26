@@ -1276,8 +1276,8 @@ function startBuy(id) {
   }
   if ((id === 'tincture' || id === 'still') && !tincLots().length) { toast(`Buy a neighbouring plot first — the ${FEATURES[id].name} is built on one of your other plots`); return false; }
   if (id === 'beehive' && !hiveLots().length) { toast('Every plot you own already has a beehive (one per plot)'); return false; }
-  buyIntent = { id };
   if (B.tree && !S.lots.orchard) { toast('Buy the Orchard plot first — fruit trees grow only there'); return false; }
+  buyIntent = { id };
   try { if (id === 'tincture' || id === 'still' || id === 'teastand' || CRAFT[id]) startStandPlace(id, FEATURES[id].name, c.wood); else if (B.tree) startTreePlace(B.tree); else enterPlace(B.what); } finally { buyIntent = null; }
   if (!placing || placing.what !== B.what) return false;
   placing.buy = { id };
