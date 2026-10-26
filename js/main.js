@@ -534,7 +534,7 @@ function checkGoals(silent = false) {
 checkGoals(true);
 let goalKey = '';
 function renderGoal() {
-  const G = $('#goal'); if (!S.introDone) { G.classList.add('hidden'); return; }
+  const G = $('#goal'); if (!S.introDone || (S.goalsClosed && S.goal >= GOALS.length)) { G.classList.add('hidden'); return; }
   G.classList.remove('hidden');
   const g = GOALS[S.goal];
   const key = g ? `${S.goal}:${Math.min(g.n(), g.of)}` : 'done'; if (key === goalKey) return; goalKey = key;
@@ -2597,7 +2597,7 @@ const V = (x, y, z) => new THREE.Vector3(x, y, z);
 window.__ps = {
   BUILD, get fromBuild() { return fromBuild; },
   TIPS, JEWEL_DROP, obsState, PACKS,
-  hud, casterIds: () => casters().map((c) => c.id + (c.h != null ? ":box" : ":tree")), checkGoals, regenBarrels, feedLot, reachLots,  get barrelReachTargets() { return W.bedTargets.children.map((g) => ({ b: g.userData.b, ok: g.userData.ok })); }, barrelRoof, lotRoofs, barrelStands, barrelPerTick, get gutterLots() { return [...W.gutters.keys()]; }, gutterPipes(lot) { return W.gutters.get(lot)?.userData.pipes || 0; },
+  hud, syncBarrels, casterIds: () => casters().map((c) => c.id + (c.h != null ? ":box" : ":tree")), checkGoals, regenBarrels, feedLot, reachLots,  get barrelReachTargets() { return W.bedTargets.children.map((g) => ({ b: g.userData.b, ok: g.userData.ok })); }, barrelRoof, lotRoofs, barrelStands, barrelPerTick, get gutterLots() { return [...W.gutters.keys()]; }, gutterPipes(lot) { return W.gutters.get(lot)?.userData.pipes || 0; },
   get tincGrandfathered() { return tincGrandfathered; }, tincProblem, tincSpots, buildTincture, placeTincture, buildStill, placeStill, distill, collectOil, STILL, TEA, teaInfo, teaId, teaSps, registerTea, buildTea, placeTea, brewTea, collectTea, teaAdd, teaRemove, get teaPick() { return [...teaPick]; }, set teaPick(v) { teaPick = [...v]; }, teaHTML, syncTea, DRY_TIER_S,
   CRAFT, PRESS, FRUITSTAND, TREES, TREE_IDS, SEED_BAGS, bagId, bagSeeds, buildCraft, placeCraft, craftMake, craftCollect, craftHTML, syncCraft, orchardSpots, orchardProblem, plantOrchard, pickTree, syncOrchard, orchStage, orchRipe, orchardTreeHTML, startTreePlace, orchardLocked, packW, cardOdds, tierOdds, featureOdds, drawNonBasic, collIds, get sunflowerRefund() { return sunflowerRefund; }, ORCHARD_TREE_SPOTS,
   RESALE, sellPlaced, stockAntique, sellRestored, focusThing, get atmosphere() { return atmosphere(); }, get standCap() { return standCap(); },
