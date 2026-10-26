@@ -220,6 +220,37 @@ i[data-icon] svg{width:100%;height:100%}
 .r-legendary .card-face::after{left:auto;right:.3em;transform:scaleX(-1)}
 .r-legendary,.r-epic{animation:pulse 2.4s ease-in-out infinite}
 @keyframes pulse{50%{filter:brightness(1.06)}}
+/* v0.5 plant-tier frames (Basic → Epic → Legendary → Rare → Super Rare → Ultra Rare → Other World): each step glows more */
+.r-basic{--fr:#B7D4B5;--fr2:rgba(183,212,181,.9);--rc:#5E825F;--pc:#8DB78A}
+.plant-card.r-rare .card-face{border-width:.36em;border-style:double;box-shadow:0 0 2em .6em rgba(200,224,232,1),0 .6em 1.4em rgba(70,50,20,.2),inset 0 0 0 .2em #F6FBFC,inset 0 0 0 .3em #9CC6D6}
+.plant-card.r-rare .card-face::before,.plant-card.r-rare .card-face::after{content:"✧";position:absolute;color:#7FB3C6;font-size:1em;top:.05em;left:.35em}
+.plant-card.r-rare .card-face::after{left:auto;right:.35em}
+.r-superrare{--fr:#3D5A40;--fr2:#F5D07A;--rc:#3D5A40;--pc:#6E9A62}
+.r-superrare .card-face{border-width:.36em;border-style:double;background:radial-gradient(120% 70% at 50% 0%,#EEF6EA,#FFF9F0 65%);
+  box-shadow:0 0 2.2em .75em rgba(183,212,181,.95),0 0 .9em .2em rgba(245,208,122,.8),0 .6em 1.4em rgba(70,50,20,.2),inset 0 0 0 .2em #FFF9F0,inset 0 0 0 .3em #F5D07A}
+.r-superrare .card-face::before,.r-superrare .card-face::after{content:"✦";position:absolute;color:#C9952E;font-size:1em;top:.05em;left:.35em}
+.r-superrare .card-face::after{left:auto;right:.35em}
+.r-ultra{--fr:#B48AD8;--fr2:#F7C5C5;--rc:#8A5FB8;--pc:#B48AD8}
+.r-ultra .card-face{border-width:.36em;background:linear-gradient(170deg,#FBF6FF,#FFF4F4 55%,#F2F8FA);
+  box-shadow:0 0 2.4em .9em rgba(196,160,232,.9),0 0 1em .3em rgba(247,197,197,.9),0 .6em 1.4em rgba(70,50,20,.2),inset 0 0 0 .2em #FFF9F0,inset 0 0 0 .3em #D9C2EE}
+.r-ultra .card-face::before,.r-ultra .card-face::after{content:"❀";position:absolute;color:#B48AD8;font-size:1em;top:.05em;left:.35em}
+.r-ultra .card-face::after{left:auto;right:.35em}
+.r-otherworld{--rc:#6C7FD0;--pc:#9FB4F0}
+.r-otherworld .card-face{border:.38em solid transparent;
+  background:linear-gradient(175deg,#FFFDF8,#F4F2FF 60%,#FFF4EA) padding-box,conic-gradient(from 0deg,#F7C5C5,#F5D07A,#B7D4B5,#C8E0E8,#C9B7F0,#F7C5C5) border-box;
+  box-shadow:0 0 2.8em 1.1em rgba(200,200,255,.95),0 0 1.2em .4em rgba(245,208,122,.95),0 .6em 1.4em rgba(70,50,20,.2),inset 0 0 1.2em rgba(200,224,232,.9)}
+.r-otherworld .card-face::before,.r-otherworld .card-face::after{content:"☾";position:absolute;color:#8C9BE0;font-size:1em;top:.05em;left:.35em;text-shadow:0 0 .4em #fff}
+.r-otherworld .card-face::after{content:"✺";left:auto;right:.35em;color:#D9A93F}
+.r-superrare,.r-ultra,.plant-card.r-rare{animation:pulse 2.4s ease-in-out infinite}
+.r-otherworld{animation:owglow 2.2s ease-in-out infinite}
+@keyframes owglow{50%{filter:brightness(1.1) saturate(1.15) drop-shadow(0 0 .6em rgba(220,215,255,.95))}}
+/* tier tags & chips (Market, collection, pack odds) */
+.t-basic{--tc:#5E825F}.t-epic{--tc:#B07A1E}.t-legendary{--tc:#9A6A12}.t-rare{--tc:#4F8597}.t-superrare{--tc:#3D5A40}.t-ultra{--tc:#8A5FB8}.t-otherworld{--tc:#6C7FD0}
+.tier-tag{font-style:normal;font-weight:800;font-size:.86em;color:var(--tc);border:1.3px solid var(--tc);border-radius:7px;padding:0 5px;background:#fff;white-space:nowrap}
+.tier-gem{display:block;width:30px;height:30px;margin:auto;border-radius:9px;transform:rotate(45deg) scale(.75);background:linear-gradient(135deg,#fff,var(--tc));box-shadow:0 0 10px var(--tc)}
+.t-otherworld.tier-gem{background:conic-gradient(#F7C5C5,#F5D07A,#B7D4B5,#C8E0E8,#C9B7F0,#F7C5C5);box-shadow:0 0 14px #B9B4F4}
+.coll-tier{display:flex;align-items:center;gap:6px;margin-top:14px}
+.odds span.t-otherworld{background:linear-gradient(90deg,#FFF4F4,#F4F2FF,#F2F8FA)}
 
 /* card back + flip */
 .flip{perspective:900px}

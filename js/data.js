@@ -1,51 +1,89 @@
 // Petalspire v0.4 — game data
 // v0.4: REAL PLANTS ONLY. Each species is one self-contained entry, so the full plant catalog can be added later.
-// v0.4 PLANT TIERS (data only for now — the full catalog comes later). Lowest → highest. Each higher tier = lower pack odds,
-// longer grow, higher cost and sell price. drop/grow/cost/sell are PLACEHOLDER multipliers applied to each plant's base numbers
-// (Basic = 1, so today's plants are unchanged). seeds: [min, max] seeds per harvest; bonus: chance of +1 seed (Other World).
+// v0.5 PLANT TIERS — the full catalog: 21 plants, 3 per tier. Lowest → highest (the user's order). Each higher tier has
+// lower pack odds, a longer grow time, a higher seed cost and a higher sell price. Basic keeps the v0.4 numbers exactly.
+//   pack: % chance that ONE pack card is a plant of this tier (split between its 3 plants by packShare; features keep their v0.41 odds)
+//   glow: 0 = none, 1 = soft (Rare+), 2 = Ultra Rare shimmer, 3 = Other World (strongest glow + floating motes)
+//   seeds: [min, max] seeds per harvest; bonus: chance of +1 seed (Other World: 1, sometimes 2)
+//   color: tier label / card frame colour (brand palette)
 export const PLANT_TIERS = {
-  basic:      { label: 'Basic',       order: 1, drop: 1,    grow: 1,   cost: 1,   sell: 1,   seeds: [5, 5] },
-  epic:       { label: 'Epic',        order: 2, drop: 0.7,  grow: 1.3, cost: 1.4, sell: 1.4, seeds: [4, 5] },
-  legendary:  { label: 'Legendary',   order: 3, drop: 0.5,  grow: 1.6, cost: 2,   sell: 2,   seeds: [4, 4] },
-  rare:       { label: 'Rare',        order: 4, drop: 0.35, grow: 2,   cost: 2.8, sell: 2.8, seeds: [3, 4] },
-  superrare:  { label: 'Super Rare',  order: 5, drop: 0.2,  grow: 2.5, cost: 4,   sell: 4,   seeds: [2, 3] },
-  ultra:      { label: 'Ultra Rare',  order: 6, drop: 0.1,  grow: 3.2, cost: 6,   sell: 6,   seeds: [2, 2] },
-  otherworld: { label: 'Other World', order: 7, drop: 0.04, grow: 4,   cost: 10,  sell: 10,  seeds: [1, 1], bonus: 0.25 },
+  basic:      { label: 'Basic',       order: 1, pack: 40,  glow: 0, seeds: [5, 5], color: '#5E825F' },
+  epic:       { label: 'Epic',        order: 2, pack: 8,   glow: 0, seeds: [4, 5], color: '#B07A1E' },
+  legendary:  { label: 'Legendary',   order: 3, pack: 4.5, glow: 0, seeds: [4, 4], color: '#9A6A12' },
+  rare:       { label: 'Rare',        order: 4, pack: 3,   glow: 1, seeds: [3, 4], color: '#4F8597' },
+  superrare:  { label: 'Super Rare',  order: 5, pack: 1.8, glow: 1, seeds: [2, 3], color: '#3D5A40' },
+  ultra:      { label: 'Ultra Rare',  order: 6, pack: 0.8, glow: 2, seeds: [2, 2], color: '#8A5FB8' },
+  otherworld: { label: 'Other World', order: 7, pack: 0.4, glow: 3, seeds: [1, 1], bonus: 0.25, color: '#6C7FD0' },
 };
+export const TIER_ORDER = Object.keys(PLANT_TIERS).sort((a, b) => PLANT_TIERS[a].order - PLANT_TIERS[b].order);
 // Seeds from one harvest, by the plant's tier rule (Basic 5 · Epic 4–5 · Legendary 4 · Rare 3–4 · Super Rare 2–3 · Ultra Rare 2 · Other World 1, 25% → 2).
 export function rollSeeds(tier, rnd = Math.random) {
   const t = PLANT_TIERS[tier] || PLANT_TIERS.basic; const [a, b] = t.seeds;
   return a + Math.floor(rnd() * (b - a + 1)) + (t.bonus && rnd() < t.bonus ? 1 : 0);
 }
-// Fields: tier (key of PLANT_TIERS: seeds per harvest + multipliers), rarity (card-frame colour / pack pool, key of RARITY), growS, seedPrice, flowerSell, seedSell, yieldF [min, max] flowers (seeds come from the tier), color, img, stats, blurb,
-// dries (can go on the Drying Rack), tincture (see TINCTURE.recipes).
+// Fields: tier (key of PLANT_TIERS), rarity (card frame = the tier), growS, seedPrice, flowerSell, seedSell, yieldF [min, max] flowers
+// (seeds come from the tier), color, icon (bag/stand icon kind), img, stats, blurb, packShare (share of the tier's pack odds),
+// uses (shown on the card): dries / tincture / oil (see DRYING, TINCTURE.recipes, STILL.recipes).
+const P = (id, tier, name, type, [growS, seedPrice, flowerSell, yieldF], color, icon, stats, blurb, extra = {}) =>
+  ({ id, tier, rarity: tier, name, type, growS, seedPrice, flowerSell, seedSell: Math.round(seedPrice / 2), yieldF, color, icon, img: `assets/card-${id}.jpg`, stats, blurb, ...extra });
+const st = (Growth, Beauty, Yield, Atmosphere) => ({ Growth, Beauty, Yield, Atmosphere });
 export const SPECIES = {
-  lavender: {
-    id: 'lavender', tier: 'basic', name: 'Lavender', rarity: 'common', type: 'Plant · Aromatic herb',
-    growS: 35, seedPrice: 6, flowerSell: 5, seedSell: 3, yieldF: [2, 3],
-    color: '#9C86C9', img: 'assets/card-lavender.jpg', dries: true,
-    stats: { Growth: 4, Beauty: 3, Yield: 4, Atmosphere: 4 },
-    blurb: 'Silvery leaves and slender purple flower spikes. Smells wonderful and dries beautifully on the rack.',
-  },
-  calendula: {
-    id: 'calendula', tier: 'basic', name: 'Calendula', rarity: 'uncommon', type: 'Plant · Pot marigold',
-    growS: 50, seedPrice: 10, flowerSell: 9, seedSell: 5, yieldF: [2, 3],
-    color: '#F0A33A', img: 'assets/card-calendula.jpg',
-    stats: { Growth: 3, Beauty: 4, Yield: 3, Atmosphere: 3 },
-    blurb: 'Cheerful orange-gold, daisy-like blooms. A classic for soothing glycerites and salves.',
-  },
-  chamomile: {
-    id: 'chamomile', tier: 'basic', name: 'Chamomile', rarity: 'rare', type: 'Plant · Tea herb',
-    growS: 80, seedPrice: 18, flowerSell: 24, seedSell: 9, yieldF: [1, 2],
-    color: '#FFFDF4', img: 'assets/card-chamomile.jpg',
-    stats: { Growth: 2, Beauty: 4, Yield: 2, Atmosphere: 5 },
-    blurb: 'Tiny white daisies with sunny yellow centres and feathery leaves. Prized for calming tea.',
-  },
+  // ---- Basic (unchanged from v0.4) ----
+  lavender: { id: 'lavender', tier: 'basic', name: 'Lavender', rarity: 'basic', type: 'Plant · Aromatic herb',
+    growS: 35, seedPrice: 6, flowerSell: 5, seedSell: 3, yieldF: [2, 3], color: '#9C86C9', icon: 'spike', img: 'assets/card-lavender.jpg', dries: true, packShare: 0.7,
+    stats: st(4, 3, 4, 4), blurb: 'Silvery leaves and slender purple flower spikes. Smells wonderful and dries beautifully on the rack.' },
+  calendula: { id: 'calendula', tier: 'basic', name: 'Calendula', rarity: 'basic', type: 'Plant · Pot marigold',
+    growS: 50, seedPrice: 10, flowerSell: 9, seedSell: 5, yieldF: [2, 3], color: '#F0A33A', icon: 'daisy', img: 'assets/card-calendula.jpg', packShare: 0.2,
+    stats: st(3, 4, 3, 3), blurb: 'Cheerful orange-gold, daisy-like blooms. A classic for soothing glycerites and salves.' },
+  chamomile: { id: 'chamomile', tier: 'basic', name: 'Chamomile', rarity: 'basic', type: 'Plant · Tea herb',
+    growS: 80, seedPrice: 18, flowerSell: 24, seedSell: 9, yieldF: [1, 2], color: '#FFFFFF', icon: 'daisy', img: 'assets/card-chamomile.jpg', packShare: 0.1,
+    stats: st(2, 4, 2, 5), blurb: 'Tiny white daisies with sunny yellow centres and feathery leaves. Prized for calming tea.' },
+  // ---- Epic ----
+  peppermint: P('peppermint', 'epic', 'Peppermint', 'Plant · Cooling mint', [100, 24, 28, [2, 3]], '#8FC48A', 'leaf', st(4, 3, 4, 4),
+    'Bright, square-stemmed mint with serrated leaves and lilac flower spikes. Dries into tea, steeps into tinctures, distils into a cool oil.', { dries: true }),
+  echinacea: P('echinacea', 'epic', 'Echinacea', 'Plant · Purple coneflower', [115, 27, 32, [2, 3]], '#D77FB0', 'cone', st(3, 5, 3, 3),
+    'Tall coneflowers with drooping pink-magenta petals around a spiky copper cone. A favourite immune-support tincture.'),
+  lemonbalm: P('lemonbalm', 'epic', 'Lemon Balm', 'Plant · Lemon-scented herb', [105, 25, 30, [2, 3]], '#B9DB7C', 'leaf', st(4, 3, 4, 4),
+    'A soft mound of crinkled, lemon-scented leaves. Calming in tea and glycerites; dries well.', { dries: true }),
+  // ---- Legendary ----
+  rosemary: P('rosemary', 'legendary', 'Rosemary', 'Plant · Woody herb', [145, 38, 46, [2, 3]], '#6E8F86', 'leaf', st(3, 3, 4, 4),
+    'Upright woody sprigs of needle-like leaves dotted with pale blue flowers. Dries, steeps and distils beautifully.', { dries: true }),
+  yarrow: P('yarrow', 'legendary', 'Yarrow', 'Plant · Meadow herb', [150, 40, 48, [2, 3]], '#F2BFC6', 'umbel', st(3, 4, 4, 3),
+    'Feathery leaves under flat clusters of tiny blush flowers. A classic dried herb and tincture.', { dries: true }),
+  sunflower: P('sunflower', 'legendary', 'Sunflower', 'Plant · Golden giant', [165, 44, 54, [2, 3]], '#F5C542', 'daisy', st(3, 5, 4, 4),
+    'A tall, cheerful giant with a honey-gold face and a dark seed disc. Sells well fresh — customers love it.'),
+  // ---- Rare (soft glow) ----
+  damaskrose: P('damaskrose', 'rare', 'Damask Rose', 'Plant · Old rose', [205, 68, 84, [2, 3]], '#F2A7B8', 'bloom', st(2, 5, 3, 5),
+    'The perfumer’s rose: full, fragrant blush blooms. Its seeds distil into precious rose otto oil.'),
+  tulsi: P('tulsi', 'rare', 'Holy Basil', 'Plant · Tulsi', [190, 62, 78, [2, 3]], '#A884C2', 'spike', st(3, 4, 4, 4),
+    'Sacred tulsi: purple-tinged leaves and mauve flower spikes. Dries into a fragrant tea and makes a prized tincture.', { dries: true }),
+  elderflower: P('elderflower', 'rare', 'Elderflower', 'Plant · Elder shrub', [200, 65, 80, [2, 3]], '#F6F1DC', 'umbel', st(2, 4, 4, 5),
+    'Lacy, creamy-white umbels on a young elder. Dried for tea, steeped into a sweet glycerite.', { dries: true }),
+  // ---- Super Rare (soft glow) ----
+  saffron: P('saffron', 'superrare', 'Saffron Crocus', 'Plant · Autumn crocus', [260, 100, 140, [2, 2]], '#B79AE0', 'bloom', st(2, 5, 2, 4),
+    'Lilac crocus cups with three vivid red threads — the world’s most precious spice. Sells for a fortune.'),
+  bluelotus: P('bluelotus', 'superrare', 'Blue Lotus', 'Plant · Water lily', [275, 110, 150, [2, 2]], '#8FB8E8', 'bloom', st(2, 5, 2, 5),
+    'Star-shaped sky-blue water lilies with golden hearts, floating over round pads.'),
+  jasmine: P('jasmine', 'superrare', 'Jasmine', 'Plant · Night-scented vine', [285, 118, 158, [2, 2]], '#FFFDF6', 'star', st(2, 5, 2, 5),
+    'A twining vine of starry white flowers with blush buds. Its seeds distil into a heady jasmine oil.'),
+  // ---- Ultra Rare (real but famously rare; shimmering glow) ----
+  ghostorchid: P('ghostorchid', 'ultra', 'Ghost Orchid', 'Plant · Leafless orchid', [350, 170, 245, [2, 2]], '#F4F7F2', 'bloom', st(1, 5, 2, 5),
+    'A leafless orchid of the swamps: one pale, floating bloom with long curling tails, hanging from a tangle of roots.'),
+  jadevine: P('jadevine', 'ultra', 'Jade Vine', 'Plant · Rainforest vine', [365, 180, 260, [2, 2]], '#5FD3B8', 'claw', st(1, 5, 2, 5),
+    'Cascades of claw-shaped flowers in an impossible luminous jade-turquoise.'),
+  middlemist: P('middlemist', 'ultra', 'Middlemist Red', 'Plant · Rare camellia', [380, 190, 275, [2, 2]], '#E0607A', 'bloom', st(1, 5, 2, 5),
+    'Perhaps the rarest flower on Earth: lush, fully double rose-pink camellia blooms on glossy dark leaves.'),
+  // ---- Other World (fantasy; glows the most) ----
+  moonflower: P('moonflower', 'otherworld', 'Moonflower', 'Plant · Night-bloom', [460, 280, 440, [2, 2]], '#FFF6E6', 'moon', st(1, 5, 2, 5),
+    'A white trumpet bloom that glows softly, as if holding a little moonlight. Motes of light drift around it.'),
+  crystalrose: P('crystalrose', 'otherworld', 'Crystal Rose', 'Plant · Crystal bloom', [480, 300, 480, [2, 2]], '#C9D6F5', 'bloom', st(1, 5, 2, 5),
+    'A rose of translucent, faceted crystal petals that catch and hold the light.'),
+  sunpetal: P('sunpetal', 'otherworld', 'Spiral Sunpetal', 'Plant · Golden spire', [500, 320, 520, [2, 2]], '#F5D07A', 'sun', st(1, 5, 2, 5),
+    'Golden petals unfurl in a perfect spiral, glowing like the last of the evening light.'),
 };
-// v0.4: the original fantasy plants are kept (disabled) for a possible future Ultra Rare tier.
-// They are NOT in CARDS, packs, the Market or starter content. To re-enable one later: set enabled: true and add it to SPECIES/CARDS.
+// v0.4 kept the fantasy plants disabled; v0.5 brings Moonflower and Spiral Sunpetal back as the Other World tier (with Crystal Rose).
+// Heartvine stays disabled (not in CARDS, packs or the Market).
 export const FANTASY_SPECIES = {
-
   heartvine: {
     id: 'heartvine', tier: 'ultra', name: 'Heartvine', rarity: 'ultra', enabled: false, type: 'Plant · Climbing vine',
     growS: 35, seedPrice: 6, flowerSell: 5, seedSell: 3, yieldF: [2, 3],
@@ -53,22 +91,10 @@ export const FANTASY_SPECIES = {
     stats: { Growth: 4, Beauty: 3, Yield: 4, Atmosphere: 2 },
     blurb: 'Blush, heart-shaped leaves on a twisting vine. Dries beautifully on the rack.',
   },
-  sunpetal: {
-    id: 'sunpetal', tier: 'ultra', name: 'Spiral Sunpetal', rarity: 'ultra', enabled: false, type: 'Plant · Golden spire',
-    growS: 50, seedPrice: 10, flowerSell: 9, seedSell: 5, yieldF: [2, 3],
-    color: '#F5D07A', img: 'assets/card-sunpetal.jpg',
-    stats: { Growth: 3, Beauty: 4, Yield: 3, Atmosphere: 3 },
-    blurb: 'Golden petals unfurl in a perfect spiral, catching the evening light.',
-  },
-  moonflower: {
-    id: 'moonflower', tier: 'otherworld', name: 'Moonflower', rarity: 'ultra', enabled: false, type: 'Plant · Night-bloom',
-    growS: 80, seedPrice: 18, flowerSell: 24, seedSell: 9, yieldF: [1, 2],
-    color: '#FFF6E6', img: 'assets/card-moonflower.jpg',
-    stats: { Growth: 2, Beauty: 5, Yield: 2, Atmosphere: 5 },
-    blurb: 'A white trumpet bloom that glows softly, as if holding a little moonlight.',
-  },
 };
-
+// Pack weight (in % of one card slot) for every plant: tier pack odds × the plant's share (equal shares unless set).
+for (const t of Object.keys(PLANT_TIERS)) { const ps = Object.values(SPECIES).filter((s) => s.tier === t);
+  for (const s of ps) s.packW = PLANT_TIERS[t].pack * (s.packShare ?? 1 / ps.length); }
 
 export const FEATURES = {
   rainbarrel: {
@@ -128,9 +154,6 @@ export const FEATURES = {
   },
 };
 
-// Apply the tier multipliers to each plant's base numbers (no-op for Basic).
-for (const sp of [...Object.values(SPECIES), ...Object.values(FANTASY_SPECIES)]) { const t = PLANT_TIERS[sp.tier];
-  sp.growS = Math.round(sp.growS * t.grow); sp.seedPrice = Math.round(sp.seedPrice * t.cost); sp.flowerSell = Math.round(sp.flowerSell * t.sell); sp.seedSell = Math.round(sp.seedSell * t.sell); sp.dropW = t.drop; }
 export const CARDS = { ...SPECIES, ...FEATURES };
 
 export const RARITY = {
@@ -139,8 +162,18 @@ export const RARITY = {
   rare:      { label: 'Rare',      w: 15, color: '#7FB3C6' },
   epic:      { label: 'Epic',      w: 7,  color: '#E2B653' },
   legendary: { label: 'Legendary', w: 2,  color: '#D9A93F' },
-  ultra:     { label: 'Ultra Rare', w: 0,  color: '#B48AD8' },   // v0.4: reserved (weight 0) — for the fantasy plants later
+  ultra:     { label: 'Ultra Rare', w: 0,  color: '#B48AD8' },
+  // v0.5: plant-tier frames (plants use their tier as the card frame; pack odds now come from PLANT_TIERS[].pack)
+  basic:      { label: 'Basic',       w: 0, color: '#8DB78A' },
+  superrare:  { label: 'Super Rare',  w: 0, color: '#3D5A40' },
+  otherworld: { label: 'Other World', w: 0, color: '#8C9BE0' },
 };
+// v0.5 pack odds: every card has a weight in % of one pack slot. Features keep exactly their v0.41 odds (rarity weight split
+// over that v0.41 rarity pool): Uncommon 10% each, Rare 2.5% each, Epic 2.33% each, Legendary 2%. Plants get the rest (58.5%)
+// through PLANT_TIERS[].pack. Total = 100%.
+export const FEATURE_PACK_W = { uncommon: 10, rare: 2.5, epic: 7 / 3, legendary: 2 };
+for (const f of Object.values(FEATURES)) f.packW = FEATURE_PACK_W[f.rarity] ?? 0;
+export const PACK_W = Object.fromEntries(Object.entries(CARDS).map(([k, c]) => [k, c.packW || 0]));
 
 // v0.4 CARD STACKS & UPGRADES (placeholder numbers). Every copy of a card you find stacks on one card (×n).
 // Copies are kept as progress (never consumed): at 3 / 6 / 10 copies the card can be upgraded to Lv2 / Lv3 / Lv4 with a tap.
@@ -181,6 +214,14 @@ export const TINCTURE = {
     lavender:  { n: 2, s: 90,  sell: { glycerin: 42, vinegar: 36 } },
     calendula:   { n: 2, s: 120, sell: { glycerin: 52, vinegar: 46 } },
     chamomile: { n: 1, s: 150, sell: { glycerin: 80, vinegar: 72 } },
+    // v0.5 (botanically plausible herbal tinctures / glycerites)
+    peppermint:  { n: 2, s: 150, sell: { glycerin: 130, vinegar: 118 } },
+    echinacea:   { n: 2, s: 160, sell: { glycerin: 142, vinegar: 128 } },
+    lemonbalm:   { n: 2, s: 150, sell: { glycerin: 134, vinegar: 122 } },
+    rosemary:    { n: 2, s: 180, sell: { glycerin: 200, vinegar: 182 } },
+    yarrow:      { n: 2, s: 180, sell: { glycerin: 210, vinegar: 190 } },
+    tulsi:       { n: 1, s: 210, sell: { glycerin: 175, vinegar: 160 } },
+    elderflower: { n: 1, s: 210, sell: { glycerin: 182, vinegar: 166 } },
   },
 };
 // v0.41 Essential Oil Stand: SEEDS only in, oil out. Each oil is worth well over selling those seeds (or buying them new).
@@ -190,13 +231,42 @@ export const STILL = {
     lavender:  { n: 5, s: 180, sell: 70 },
     calendula: { n: 4, s: 210, sell: 95 },
     chamomile: { n: 3, s: 240, sell: 120 },
+    // v0.5: peppermint, rosemary, rose otto and jasmine oils
+    peppermint: { n: 4, s: 240, sell: 150 },
+    rosemary:   { n: 4, s: 270, sell: 250 },
+    damaskrose: { n: 3, s: 300, sell: 330 },
+    jasmine:    { n: 2, s: 360, sell: 420 },
   },
+};
+// v0.5 Drying Rack: which flowers dry, how long (s) and what the dried bundle sells for (Lavender is unchanged: 40 s, 14).
+export const DRYING = {
+  lavender:    { s: 40, sell: 14 },
+  peppermint:  { s: 60, sell: 70 },
+  lemonbalm:   { s: 60, sell: 74 },
+  rosemary:    { s: 75, sell: 112 },
+  yarrow:      { s: 75, sell: 118 },
+  tulsi:       { s: 90, sell: 190 },
+  elderflower: { s: 90, sell: 196 },
 };
 export const oilId = (sp) => 'oil_' + sp;
 export const tinctureId = (sp, base) => `tinc_${base === 'vinegar' ? 'v' : 'g'}_${sp}`;
-export const TINCTURE_NAMES = { lavender: 'Lavender', calendula: 'Calendula', chamomile: 'Chamomile' };
+export const TINCTURE_NAMES = Object.fromEntries(Object.values(SPECIES).map((s) => [s.id, s.name]));
 
-export const ITEMS = {
+// Bag / stand items. v0.5: generated for every plant (seeds, fresh flowers, dried bundles, tinctures, oils); the
+// v0.4 Basic items keep their exact names, prices and icons.
+const shade = (hex, k) => { const n = parseInt(hex.slice(1), 16), f = (v) => Math.max(0, Math.min(255, Math.round(v * k))); return '#' + [n >> 16, (n >> 8) & 255, n & 255].map((v) => f(v).toString(16).padStart(2, '0')).join(''); };
+export const ITEMS = {};
+for (const sp of Object.values(SPECIES)) {
+  ITEMS['seed_' + sp.id] = { name: `${sp.name} Seeds`, sell: sp.seedSell, icon: ['seed', sp.color] };
+  ITEMS['flower_' + sp.id] = { name: sp.name, sell: sp.flowerSell, icon: [sp.icon || 'daisy', sp.color] };
+  if (DRYING[sp.id]) ITEMS['dried_' + sp.id] = { name: `Dried ${sp.name}`, sell: DRYING[sp.id].sell, icon: ['bundle', shade(sp.color, 0.92)] };
+  if (STILL.recipes[sp.id]) ITEMS[oilId(sp.id)] = { name: `${sp.name} Essential Oil`, sell: STILL.recipes[sp.id].sell, icon: ['dropper', shade(sp.color, 0.75)] };
+  const tr = TINCTURE.recipes[sp.id];
+  if (tr) { ITEMS[tinctureId(sp.id, 'glycerin')] = { name: `${sp.name} Glycerite`, sell: tr.sell.glycerin, icon: ['dropper', shade(sp.color, 1.05)] };
+    ITEMS[tinctureId(sp.id, 'vinegar')] = { name: `${sp.name} Vinegar Tincture`, sell: tr.sell.vinegar, icon: ['dropper', shade(sp.color, 0.7)] }; }
+}
+// v0.4 originals (exact icons and colours kept)
+Object.assign(ITEMS, {
   seed_lavender:  { name: 'Lavender Seeds',  sell: 3,  icon: ['seed', '#B9A6DC'] },
   seed_calendula:   { name: 'Calendula Seeds',   sell: 5,  icon: ['seed', '#F0A33A'] },
   seed_chamomile: { name: 'Chamomile Seeds', sell: 9,  icon: ['seed', '#F3EFC9'] },
@@ -213,8 +283,10 @@ export const ITEMS = {
   tinc_v_calendula:   { name: 'Calendula Vinegar Tincture',   sell: 46, icon: ['dropper', '#C08A3A'] },
   tinc_g_chamomile: { name: 'Chamomile Glycerite',        sell: 80, icon: ['dropper', '#F3E7B5'] },
   tinc_v_chamomile: { name: 'Chamomile Vinegar Tincture', sell: 72, icon: ['dropper', '#D2B67A'] },
-};
-export const SELL_ORDER = ['oil_chamomile', 'oil_calendula', 'oil_lavender', 'tinc_g_chamomile', 'tinc_v_chamomile', 'tinc_g_calendula', 'tinc_v_calendula', 'tinc_g_lavender', 'tinc_v_lavender', 'dried_lavender', 'flower_chamomile', 'flower_calendula', 'flower_lavender', 'seed_chamomile', 'seed_calendula', 'seed_lavender'];
+});
+// Most valuable first (oils, tinctures, dried, flowers, seeds) — the same order as v0.4 for the Basic items.
+const kindRank = (id) => ['oil_', 'tinc_', 'dried_', 'flower_', 'seed_'].findIndex((p) => id.startsWith(p));
+export const SELL_ORDER = Object.keys(ITEMS).sort((a, b) => kindRank(a) - kindRank(b) || ITEMS[b].sell - ITEMS[a].sell || (a.startsWith('tinc_g') ? -1 : 1));
 
 export const WOOD = { tree: 3, stump: 1, bush: 0, rock: 0 };
 export const BED_COSTS = [12, 20, 28, 36, 44, 52];   // wood per raised bed, escalating

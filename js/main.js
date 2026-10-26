@@ -1,8 +1,8 @@
-// Petalspire v0.4 — game logic + UI
+// Petalspire v0.5 — game logic + UI (v0.5: the full 21-plant catalog)
 import * as THREE from 'three';
 import { createWorld } from './world.js';
 import { buildPlant } from './plants.js';
-import { SPECIES, FANTASY_SPECIES, PLANT_TIERS, rollSeeds, FEATURES, CARDS, RARITY, ITEMS, SELL_ORDER, TIPS, RESALE, PACKS, PACK_JEWELS, JEWEL_EXCHANGE, JEWEL_DROP, PARKING, BILLBOARD, WINDMILL, DUP_COINS, CARD_LEVELS, RACK_SLOTS, DRY_S, BARREL, BASES, TINCTURE, STILL, oilId, tinctureId, TINCTURE_NAMES,
+import { SPECIES, FANTASY_SPECIES, PLANT_TIERS, TIER_ORDER, PACK_W, DRYING, rollSeeds, FEATURES, CARDS, RARITY, ITEMS, SELL_ORDER, TIPS, RESALE, PACKS, PACK_JEWELS, JEWEL_EXCHANGE, JEWEL_DROP, PARKING, BILLBOARD, WINDMILL, DUP_COINS, CARD_LEVELS, RACK_SLOTS, DRY_S, BARREL, BASES, TINCTURE, STILL, oilId, tinctureId, TINCTURE_NAMES,
   WOOD, BED_COSTS, STAND_CAP, MARKET_GOAL, WATER_REGEN_S, WATER_REGEN_MAX, STARTER, STARTER_FILL, STARTER_JEWELS,
   BUILDS, FINDS, FIND_IDS, FIND_CHANCE, SAPLING_CHANCE, RESTORE_HURRY_JEWELS, ATMOS_STEP, ATMOS_MAX, TREE, SHOP, JEWEL_BUNDLES, NO_ADS_BUNDLE, ADS, ADS_MODE, OTHER_GAMES, SHADE } from './data.js';
 import { LOTS, SIGNS, LOT_FOR_SALE, LOT_PRICES, SITES, OBSTACLES, SPOTS, PARK_X, BED_N, TILE, SITE_HALF, siteById, obstacleById, inSite, lotCenter, lotAt } from './layout.js';
@@ -13,7 +13,7 @@ import { shadeAt, speedFor, sunLabel, rebaseStart } from './shade.js';
 
 // Save format: v0.3, v0.31 and v0.4 share one localStorage key (schema v: 3). `build` records which prototype build last wrote the save;
 // v0.3 / v0.31 saves (no `build`, no per-plot barrels) are migrated on load (migrate04 below); v0.4 saves load as-is and are re-tagged. Prototype builds stay below 1.0.
-export const BUILD = '0.41';
+export const BUILD = '0.5';
 const SAVE_KEY = 'petalspire.v03', V02_KEY = 'petalspire.v02', OLD_KEYS = ['petalspire.v01'];
 const QS = new URLSearchParams(location.search);
 const TREE_MS = Math.max(0.05, +QS.get('treeMin') || TREE.growMin) * 60000;   // ?treeMin=1 for quick testing
@@ -36,9 +36,9 @@ const seeded = (k, salt) => frac(Math.sin(k * 12.9898 + salt * 78.233) * 43758.5
 function freshState() {
   return {
     v: 3, build: BUILD, coins: 10, wood: 0, jewels: 0, scrap: 0,
-    inv: { seed_lavender: 0, seed_calendula: 0, seed_chamomile: 0, flower_lavender: 0, flower_calendula: 0, flower_chamomile: 0, dried_lavender: 0, water: 0, sapling: 0, glycerin: 0, vinegar: 0,
-      tinc_g_lavender: 0, tinc_v_lavender: 0, tinc_g_calendula: 0, tinc_v_calendula: 0, tinc_g_chamomile: 0, tinc_v_chamomile: 0, oil_lavender: 0, oil_calendula: 0, oil_chamomile: 0 },
-    unlocked: { lavender: true, calendula: true, chamomile: false, rainbarrel: false, beehive: false, sundial: false },
+    // v0.5: one slot for every plant item (seeds, flowers, dried, tinctures, oils), generated from the catalog
+    inv: { ...Object.fromEntries(Object.keys(ITEMS).map((k) => [k, 0])), water: 0, sapling: 0, glycerin: 0, vinegar: 0 },
+    unlocked: { ...Object.fromEntries(Object.keys(SPECIES).map((k) => [k, false])), lavender: true, calendula: true, rainbarrel: false, beehive: false, sundial: false },
     owned: { beehive: false, sundial: false, tincture: false, still: false, sickle: false, plow: false, parking: false, billboard: false, windmill: false }, toolAt: {},
     cards: {},   // v0.4: card stacks { id: { n: copies, lv } }
     hives: {}, hiveInv: 0,   // v0.4: placeable Honeybee Skeps, one per plot ({ lot: { x, z } }); the boost only reaches beds on that plot
@@ -86,7 +86,10 @@ function realPlants(raw) {
   return raw.replace(/Spiral Sunpetal|Crystal Rose/g, (m) => (m === 'Crystal Rose' ? 'Chamomile' : 'Calendula'))
     .replace(/heartvine|sunpetal|moonflower|crystal_?rose/gi, (m) => (m[0] === m[0].toUpperCase() ? PLANT_NAME_MAP : PLANT_MAP)[m.toLowerCase()]);
 }
-try { S = JSON.parse(realPlants(localStorage.getItem(SAVE_KEY))); } catch { S = null; }
+// v0.5: Moonflower, Spiral Sunpetal and Crystal Rose are real catalog plants again (Other World tier), so the old-id
+// mapping only runs on saves written BEFORE v0.5 (no build, or build < 0.5). v0.5+ saves are loaded untouched.
+const preCatalog = (raw) => { if (!raw) return false; const m = /"build":"([^"]*)"/.exec(raw); return !m || !(parseFloat(m[1]) >= 0.5); };
+try { const raw = localStorage.getItem(SAVE_KEY); S = JSON.parse(preCatalog(raw) ? realPlants(raw) : raw); } catch { S = null; }
 if (!S || S.v !== 3) {
   let old = null; try { old = JSON.parse(realPlants(localStorage.getItem(V02_KEY))); } catch {}
   if (old && old.v === 2) { S = migrate02(old); upgraded = true; needs04 = true; }
@@ -349,7 +352,15 @@ function syncBarrels() {
     else W.setBarrelInfo(lot, `${b.w}/${regenMax()} · Not collecting`, 'Connect to a stand on this plot', false, b.w / regenMax()); }
 }
 function syncRack() { W.setRack(S.rack.map((r) => r && { done: now() - r.start >= r.ms })); }
-function syncStand() { W.setStandStock({ heart: S.stand.flower_lavender || S.stand.dried_lavender || S.stand.seed_lavender, sun: S.stand.flower_calendula || S.stand.seed_calendula, moon: S.stand.flower_chamomile || S.stand.seed_chamomile || S.stand.dried_lavender }); }
+// v0.5: the stand's three crates show any plant goods — plants cycle through the heart / sun / moon crates in catalog
+// order (Lavender → heart, Calendula → sun, Chamomile → moon, exactly as before; then Peppermint → heart, …).
+const SP_IDX = Object.fromEntries(Object.keys(SPECIES).map((k, i) => [k, i]));
+function syncStand() {
+  const box = { heart: 0, sun: 0, moon: 0 }, names = ['heart', 'sun', 'moon'];
+  for (const [id, n] of Object.entries(S.stand)) { if (!n) continue; const m = /^(seed|flower|dried)_(.+)$/.exec(id); if (!m || SP_IDX[m[2]] == null) continue;
+    box[names[SP_IDX[m[2]] % 3]] += n; if (id === 'dried_lavender') box.moon += n; }
+  W.setStandStock(box);
+}
 bgCasters = W.bgTrees.map((b, n) => ({ id: 'bg' + n, x: b.x, z: b.z, w: SHADE.bgTree.w * b.s, reach: SHADE.bgTree.reach * b.s }));
 catchUpIrrigation(); catchUpShade(); worldReady = true; applyShade(); shadeSig = shadeSignature();
 for (const id of S.irrigBeds) W.setIrrigation(id, true, barrelXZ(lotOfSite(id)));
@@ -1107,12 +1118,14 @@ function collectOil(k) {
   const id = oilId(t.sp); S.inv[id] = (S.inv[id] || 0) + 1; S.stills[k] = null; S.stats.oils = (S.stats.oils || 0) + 1;
   syncStill(); save(); hud(); renderPanel(); popAt(spotV('still', 2.2), `+1 ${ITEMS[id].name}`); checkGoals(); return true;
 }
+// v0.5: Basic recipes are always listed (as before); higher-tier recipes appear once that plant is unlocked (or you hold some).
+const recipeOpen = (sp) => SPECIES[sp]?.tier === 'basic' || S.unlocked[sp] || S.inv['flower_' + sp] > 0 || S.inv['seed_' + sp] > 0;
 function stillHTML() {
   const free = S.stills.some((t) => !t);
   const slots = S.stills.map((t, k) => { if (!t) return `<div class="tslot empty">Empty still</div>`; const id = oilId(t.sp), left = t.start + t.ms - now();
     return left <= 0 ? `<button class="tslot done" data-scollect="${k}">${itemSvg(id)}<span><b>${ITEMS[id].name}</b><small>Ready! Tap to collect</small></span></button>`
       : `<div class="tslot">${itemSvg(id)}<span><b>${ITEMS[id].name}</b><small>Distilling · <em data-sleft="${k}">${fmtTime(left)}</em></small></span></div>`; }).join('');
-  const rows = Object.entries(STILL.recipes).map(([sp, r]) => { const id = oilId(sp), have = S.inv['seed_' + sp] || 0, ok = free && have >= r.n, sd = SPECIES[sp];
+  const rows = Object.entries(STILL.recipes).filter(([sp]) => recipeOpen(sp)).map(([sp, r]) => { const id = oilId(sp), have = S.inv['seed_' + sp] || 0, ok = free && have >= r.n, sd = SPECIES[sp];
     return `<div class="row"><div class="ico">${itemSvg(id)}</div><div class="meta"><b>${ITEMS[id].name}</b><small>${r.n} ${sd.name} seeds · ${fmtTime(r.s * 1000)} · sells for ${sellOf(id)} <span class="oil-vs">(seeds sell for ${r.n * sd.seedSell}, cost ${r.n * sd.seedPrice} new)</span> · you have ${have}</small></div><div class="acts"><button class="btn btn-gold sm" data-distill="${sp}" ${ok ? '' : 'disabled'}>Distill</button></div></div>`; }).join('');
   return `<div class="hero"><img src="assets/still.jpg" alt=""/><p>Essential oils from your seeds</p></div>
     <div class="sec-title">Stills · ${S.stills.filter(Boolean).length}/${S.stills.length}</div><div class="tslots">${slots}</div>
@@ -1136,7 +1149,7 @@ function tinctureHTML() {
   const slots = S.tinc.map((t, k) => { if (!t) return `<div class="tslot empty">Empty flask</div>`; const id = tinctureId(t.sp, t.base), left = t.start + t.ms - now();
     return left <= 0 ? `<button class="tslot done" data-tcollect="${k}">${itemSvg(id)}<span><b>${ITEMS[id].name}</b><small>Ready! Tap to collect</small></span></button>`
       : `<div class="tslot">${itemSvg(id)}<span><b>${ITEMS[id].name}</b><small>Steeping · <em data-tleft="${k}">${fmtTime(left)}</em></small></span></div>`; }).join('');
-  const rows = Object.entries(TINCTURE.recipes).map(([sp, r]) => { const id = tinctureId(sp, base), have = S.inv['flower_' + sp], ok = has && free && have >= r.n;
+  const rows = Object.entries(TINCTURE.recipes).filter(([sp]) => recipeOpen(sp)).map(([sp, r]) => { const id = tinctureId(sp, base), have = S.inv['flower_' + sp], ok = has && free && have >= r.n;
     return `<div class="row"><div class="ico">${itemSvg(id)}</div><div class="meta"><b>${ITEMS[id].name}</b><small>${r.n} ${TINCTURE_NAMES[sp]} + 1 ${BASES[base].name} · ${fmtTime(r.s * 1000)} · sells for ${r.sell[base]} · you have ${have}</small></div><div class="acts"><button class="btn btn-gold sm" data-craft="${sp}" ${ok ? '' : 'disabled'}>Steep</button></div></div>`; }).join('');
   return `<div class="hero"><img src="assets/tincture.jpg" alt=""/><p>Tinctures &amp; dried herbs</p></div>
     <div class="sec-title">Base</div>${seg}
@@ -1193,7 +1206,7 @@ function cardsHTML() {   // v0.4: card stacks + upgrades
   return `<p class="muted" style="margin:8px 2px">Duplicate cards stack. At ${T.join(' / ')} copies a plant (or tool) card can be upgraded — copies are kept, never spent. Seeds per harvest always follow the plant’s tier.</p><div class="stacks">${rows || '<p class="muted">Open a Card Pack to start your collection.</p>'}</div>`;
 }
 function satchelHTML() {
-  const ids = ['seed_lavender', 'seed_calendula', 'seed_chamomile', 'flower_lavender', 'flower_calendula', 'flower_chamomile', 'dried_lavender'];
+  const ids = ['seed_', 'flower_', 'dried_'].flatMap((p) => Object.keys(SPECIES).map((sp) => p + sp)).filter((id) => ITEMS[id]);   // v0.5: every plant
   const res = (icon, name, n) => `<div class="inv"><i data-icon="${icon}" style="width:38px;height:38px"></i><b>${name}</b><small>×${n}</small></div>`;
   const cells = res('wood', 'Wood', S.wood) + (S.scrap ? res('scrap', 'Scrap', S.scrap) : '') + (S.inv.sapling ? res('sapling', 'Tree sapling', S.inv.sapling) : '') +
     ids.filter((id) => S.inv[id] > 0).map((id) => `<div class="inv">${itemSvg(id)}<b>${ITEMS[id].name}</b><small>×${S.inv[id]}</small></div>`).join('') +
@@ -1435,7 +1448,13 @@ function marketHTML() {
     rows.push(!S.unlocked.rainbarrel ? lockedRow(FEATURE_ART.rainbarrel, 'Rain Barrel')
       : more > 0 ? buyRow('barrel', FEATURE_ART.rainbarrel, 'Rain Barrel', `Place it in ${need.map(lotName).join(' or ')} · collects 1 water a minute only when that plot has a stand (roof gutter) · feeds up to ${BARREL.maxBeds} beds`, BARREL.price)
       : `<div class="row"><div class="ico">${FEATURE_ART.rainbarrel}</div><div class="meta"><b>Rain Barrel</b><small>${S.barrelInv > 0 ? `You have ${S.barrelInv} to place` : 'Every plot you own has its barrel · buy more land for another'}</small></div>${S.barrelInv > 0 ? '<div class="acts"><button class="btn btn-primary sm" data-act="place-barrel">Place</button></div>' : ''}</div>`); }
-  for (const sp of Object.keys(SPECIES)) { const d = SPECIES[sp]; rows.push(S.unlocked[sp] ? buyRow('seed_' + sp, `<img src="${d.img}" alt=""/>`, `${d.name} Seeds`, `${PLANT_TIERS[d.tier].label} · blooms in ~${d.growS}s · you have ${S.inv['seed_' + sp]}`, d.seedPrice) : lockedRow(`<img src="${d.img}" alt=""/>`, `${d.name} Seeds`)); }
+  // v0.5: every unlocked plant is for sale (tier-coloured label, grow time, flower price). Locked Basic plants keep their own row;
+  // locked higher-tier plants are folded into one compact row per tier so the list stays short.
+  for (const t of TIER_ORDER) { const sps = Object.keys(SPECIES).filter((sp) => SPECIES[sp].tier === t), T = PLANT_TIERS[t];
+    for (const sp of sps) { const d = SPECIES[sp]; if (S.unlocked[sp]) rows.push(buyRow('seed_' + sp, `<img src="${d.img}" alt=""/>`, `${d.name} Seeds`, `<em class="tier-tag t-${t}">${T.label}</em> · blooms in ~${fmtTime(d.growS * 1000)} · flowers sell for ${d.flowerSell} · you have ${S.inv['seed_' + sp]}`, d.seedPrice));
+      else if (t === 'basic') rows.push(lockedRow(`<img src="${d.img}" alt=""/>`, `${d.name} Seeds`)); }
+    const locked = sps.filter((sp) => !S.unlocked[sp]);
+    if (t !== 'basic' && locked.length) rows.push(`<div class="row locked tier-locked" data-tier-locked="${t}"><div class="ico"><span class="tier-gem t-${t}"></span></div><div class="meta"><b><em class="tier-tag t-${t}">${T.label}</em> ${locked.length === sps.length ? `${sps.length} plants` : `${locked.length} more`}</b><small>Discover ${locked.map((sp) => SPECIES[sp].name).join(', ')} in Card Packs (${T.pack}% a card)</small></div><i data-icon="lock" style="width:22px;height:22px"></i></div>`); }
   rows.push(S.unlocked.irrigation ? buyRow('irrigation', FEATURE_ART.irrigation, `Irrigation card${S.irrigN ? ` · you have ${S.irrigN}` : ''}`, 'Waters one raised bed from your rain barrel. One card per bed.', FEATURES.irrigation.price) + (irrigFree() > 0 && S.beds.length > S.irrigBeds.length ? `<div class="ts-actions" style="margin:-4px 0 6px"><button class="btn sm" data-act="assign-irrig">Assign a spare card to a bed</button></div>` : '') : lockedRow(FEATURE_ART.irrigation, 'Irrigation'));
   const tf = FEATURES.tincture;
   rows.push(S.owned.tincture ? `<div class="row"><div class="ico">${FEATURE_ART.tincture}</div><div class="meta"><b>${tf.name}</b><small>${S.tinctureBuilt ? `Owned · built on ${lotName(S.tincPos?.lot || 'home')}` : tincLots().length ? 'Owned · build it on one of your other plots (Build menu)' : 'Owned · buy a neighbouring plot, then build it there'}</small></div></div>`
@@ -1483,7 +1502,10 @@ function buy(id, price) {
 }
 function packsHTML() {
   const disc = Object.keys(CARDS).filter((k) => S.discovered[k]);
-  const odds = Object.entries(RARITY).map(([k, r]) => `<span style="border-color:${r.color};color:${r.color}">${r.label} ${r.w}%</span>`).join('');
+  // v0.5: odds per card, by plant tier (plus all feature cards together)
+  const odds = TIER_ORDER.map((t) => `<span class="t-${t}" style="border-color:${PLANT_TIERS[t].color};color:${PLANT_TIERS[t].color}">${PLANT_TIERS[t].label} ${PLANT_TIERS[t].pack}%</span>`).join('') +
+    `<span style="border-color:#7FB3C6;color:#5E8C9A">Features ${+featureOdds().toFixed(1)}%</span>`;
+  const group = (title, ids, cls = '') => `<div class="sec-title coll-tier ${cls}">${title} · ${ids.filter((k) => S.discovered[k]).length}/${ids.length}</div><div class="coll">${ids.map((k) => (S.discovered[k] ? cardHTML(k) : `<div class="card"><div class="back" style="position:absolute;inset:0;border-radius:1.1em;opacity:.55"><img src="assets/emblem.png" alt=""/><span>?</span></div></div>`)).join('')}</div>`;
   return `<div class="pack-hero"><div class="pack-art"><img src="assets/pack.jpg" alt="Botanical card pack"/></div>
     <div class="pack-info"><h4>Botanical Card Pack</h4><p>3 illustrated cards. New discoveries unlock seeds &amp; features here at the market.</p>
     ${S.jewels >= PACK_JEWELS ? `<button class="btn btn-gold" data-act="buy-pack">Open pack · ${jewelPrice(PACK_JEWELS)}</button>`
@@ -1491,24 +1513,32 @@ function packsHTML() {
     <small class="pack-note">You have ${S.jewels} <i data-icon="jewel"></i> · Jewels come from the Jewel Shop or, rarely, the woods</small></div></div>
     <div class="odds">${odds}</div>
     <div class="sec-title">Your collection · ${disc.length}/${Object.keys(CARDS).length}</div>
-    <div class="coll">${Object.keys(CARDS).map((k) => (S.discovered[k] ? cardHTML(k) : `<div class="card"><div class="back" style="position:absolute;inset:0;border-radius:1.1em;opacity:.55"><img src="assets/emblem.png" alt=""/><span>?</span></div></div>`)).join('')}</div>`;
+    ${TIER_ORDER.map((t) => group(`<em class="tier-tag t-${t}">${PLANT_TIERS[t].label}</em> plants · ${PLANT_TIERS[t].pack}% a card`, Object.keys(SPECIES).filter((k) => SPECIES[k].tier === t), 't-' + t)).join('')}
+    ${group('Garden features', Object.keys(FEATURES))}`;
 }
 
+// v0.5 Drying Rack: any dryable herb (DRYING). Each slot remembers its plant (old slots without one are Lavender).
+const dryables = () => Object.keys(DRYING).filter((sp) => sp === 'lavender' || S.unlocked[sp] || S.inv['flower_' + sp] > 0 || S.inv['dried_' + sp] > 0);
+const rackPick = () => Object.keys(DRYING).find((sp) => S.inv['flower_' + sp] > 0);
 function rackHTML() {
+  const pick = rackPick();
   const slots = S.rack.map((r, k) => {
-    if (!r) return `<button class="slot" data-slot="${k}">${itemIcon('bundle', '#EFE6D6').replace('<svg', '<svg class="bundle" opacity=".5"')}<span>${S.inv.flower_lavender ? 'Tap to hang Lavender' : 'Empty'}</span></button>`;
-    const left = r.ms - (now() - r.start);
-    if (left <= 0) return `<button class="slot done" data-slot="${k}">${itemIcon('bundle', '#C99A8E').replace('<svg', '<svg class="bundle"')}<span>Dried! Tap to collect</span></button>`;
+    if (!r) return `<button class="slot" data-slot="${k}">${itemIcon('bundle', '#EFE6D6').replace('<svg', '<svg class="bundle" opacity=".5"')}<span>${pick ? `Tap to hang ${SPECIES[pick].name}` : 'Empty'}</span></button>`;
+    const sp = r.sp || 'lavender', left = r.ms - (now() - r.start);
+    if (left <= 0) return `<button class="slot done" data-slot="${k}">${itemSvg('dried_' + sp).replace('<svg', '<svg class="bundle"')}<span>Dried ${SPECIES[sp].name}! Tap to collect</span></button>`;
     const k2 = 1 - left / r.ms, C = 2 * Math.PI * 22;
     return `<div class="slot drying"><svg class="ring" viewBox="0 0 54 54"><circle cx="27" cy="27" r="22" fill="none" stroke="#F3E3DA" stroke-width="5"/><circle cx="27" cy="27" r="22" fill="none" stroke="#F2AEB3" stroke-width="5" stroke-linecap="round" stroke-dasharray="${C}" stroke-dashoffset="${C * (1 - k2)}" transform="rotate(-90 27 27)"/></svg><span data-left="${k}">${fmtTime(left)}</span></div>`;
   }).join('');
-  return `<div class="hero"><img src="assets/rack.jpg" alt=""/><p>Hang fresh Lavender to dry</p></div><div class="slots">${slots}</div>
-    <div class="row"><div class="ico">${itemSvg('flower_lavender')}</div><div class="meta"><b>Fresh Lavender ×${S.inv.flower_lavender}</b><small>Dries in ${DRY_S}s · sells for ${sellOf('dried_lavender')} (fresh: ${sellOf('flower_lavender')})</small></div>
-    <div class="acts"><button class="btn btn-blush sm" data-act="fill-rack" ${S.inv.flower_lavender && S.rack.includes(null) ? '' : 'disabled'}>Hang all</button></div></div>
-    ${S.inv.dried_lavender ? `<p class="muted" style="margin:10px 4px 0">You have ${S.inv.dried_lavender} Dried Lavender — put it on your Farm Stand.</p>` : ''}`;
+  const rows = dryables().map((sp) => { const d = SPECIES[sp], f = 'flower_' + sp;
+    return `<div class="row"><div class="ico">${itemSvg(f)}</div><div class="meta"><b>Fresh ${d.name} ×${S.inv[f]}</b><small>Dries in ${DRYING[sp].s}s · sells for ${sellOf('dried_' + sp)} (fresh: ${sellOf(f)})</small></div>
+    <div class="acts"><button class="btn btn-blush sm" data-act="fill-rack" data-sp="${sp}" ${S.inv[f] && S.rack.includes(null) ? '' : 'disabled'}>Hang all</button></div></div>`; }).join('');
+  const dried = dryables().filter((sp) => S.inv['dried_' + sp] > 0).map((sp) => `${S.inv['dried_' + sp]} Dried ${SPECIES[sp].name}`);
+  return `<div class="hero"><img src="assets/rack.jpg" alt=""/><p>Hang fresh ${dryables().length > 1 ? 'herbs' : 'Lavender'} to dry</p></div><div class="slots">${slots}</div>
+    ${rows}
+    ${dried.length ? `<p class="muted" style="margin:10px 4px 0">You have ${dried.join(', ')} — put it on your Farm Stand.</p>` : ''}`;
 }
-const hang = (k) => { if (S.rack[k] || !S.inv.flower_lavender) return false; S.inv.flower_lavender--; S.rack[k] = { start: now(), ms: DRY_S * 1000 }; return true; };
-function collect(k) { const r = S.rack[k]; if (!r || now() - r.start < r.ms) return; S.rack[k] = null; S.inv.dried_lavender++; toast('+1 Dried Lavender'); }
+const hang = (k, sp = rackPick()) => { const f = 'flower_' + sp; if (S.rack[k] || !sp || !DRYING[sp] || !(S.inv[f] > 0)) return false; S.inv[f]--; S.rack[k] = { start: now(), ms: DRYING[sp].s * 1000, sp }; return true; };
+function collect(k) { const r = S.rack[k]; if (!r || now() - r.start < r.ms) return; const sp = r.sp || 'lavender', id = 'dried_' + sp; S.rack[k] = null; S.inv[id] = (S.inv[id] || 0) + 1; toast(`+1 ${ITEMS[id].name}`); }
 function afterRack() { save(); hud(); renderPanel(); syncRack(); }
 
 function lotHTML(id) {
@@ -1598,7 +1628,7 @@ $('#panel-body').addEventListener('click', (e) => {
   if (b.dataset.unhook) return unhookIrrigation(b.dataset.unhook);
   if (b.dataset.slot != null) { const k = +b.dataset.slot; if (S.rack[k]) collect(k); else hang(k); afterRack(); return; }
   const a = b.dataset.act;
-  if (a === 'fill-rack') { for (let k = 0; k < RACK_SLOTS; k++) hang(k); afterRack(); return; }
+  if (a === 'fill-rack') { const sp = b.dataset.sp || 'lavender'; for (let k = 0; k < RACK_SLOTS; k++) hang(k, sp); afterRack(); return; }
   if (a === 'buy-pack') return buyPack();
   if (a === 'place-bed') return enterBuild();
   if (a === 'place-sapling') return enterPlace('sapling');
@@ -1701,15 +1731,21 @@ function cardHTML(id, extra = '') {
   if (st && (st.n > 1 || lv > 1)) extra += `${st.n > 1 ? `<span class="stack-badge">×${st.n}</span>` : ''}${CARD_LEVELS.upgradable(id, c) ? `<span class="lv-badge">Lv${lv}</span>` : ''}`;
   const art = SPECIES[id] || c.img ? `<img src="${c.img}" alt=""/>` : FEATURE_ART[id];
   const stats = Object.entries(statsOf).map(([k, v]) => `<span>${k}</span><span class="pips">${[1, 2, 3, 4, 5].map((n) => `<b class="${n <= v ? 'on' : ''}"></b>`).join('')}</span>`).join('');
-  return `<div class="card r-${c.rarity}${S.cards && canUpgrade(id) ? ' can-up' : ''}" data-card="${id}">${extra}<div class="card-face"><div class="card-rar">${rl}</div><div class="card-art">${art}</div>
+  return `<div class="card r-${c.rarity}${c.tier ? ` plant-card t-${c.tier}` : ''}${S.cards && canUpgrade(id) ? ' can-up' : ''}" data-card="${id}">${extra}<div class="card-face"><div class="card-rar">${rl}</div><div class="card-art">${art}</div>
     <div class="card-name">${c.name}</div><div class="card-type">${c.type}</div><div class="stats">${stats}</div></div></div>`;
 }
-function zoomCard(id) { const z = el('div', 'zoom', cardHTML(id) + `<p class="zoom-text">${CARDS[id].blurb}<br/><small>Tap anywhere to close</small></p>`); z.addEventListener('click', () => z.remove()); $('#ui').appendChild(z); }
-function drawCard() {
-  let roll = Math.random() * 100; let rar = 'common';
-  for (const [k, r] of Object.entries(RARITY)) { if (roll < r.w) { rar = k; break; } roll -= r.w; }
-  const pool = Object.keys(CARDS).filter((k) => CARDS[k].rarity === rar);   // within a frame rarity, plants are weighted by their tier's drop multiplier
-  let w = Math.random() * pool.reduce((a, k) => a + (CARDS[k].dropW ?? 1), 0); for (const k of pool) { w -= CARDS[k].dropW ?? 1; if (w < 0) return k; } return pool[pool.length - 1];
+const plantUses = (sp) => { const d = SPECIES[sp]; if (!d) return ''; const T = PLANT_TIERS[d.tier], sd = T.seeds[0] === T.seeds[1] ? `${T.seeds[0]}${T.bonus ? ' (sometimes ' + (T.seeds[0] + 1) + ')' : ''}` : T.seeds.join('–');
+  const u = [DRYING[sp] && 'drying', TINCTURE.recipes[sp] && 'tinctures', STILL.recipes[sp] && 'essential oil'].filter(Boolean);
+  return `<br/><b>${T.label}</b> · grows in ${fmtTime(d.growS * 1000)} · seed costs ${d.seedPrice} coins · flowers sell for ${d.flowerSell} · ${sd} seeds per harvest${u.length ? ` · uses: ${u.join(', ')}` : ''}`; };
+function zoomCard(id) { const z = el('div', 'zoom', cardHTML(id) + `<p class="zoom-text">${CARDS[id].blurb}${plantUses(id)}<br/><small>Tap anywhere to close</small></p>`); z.addEventListener('click', () => z.remove()); $('#ui').appendChild(z); }
+// v0.5: one weighted pick over every card (PACK_W, in % of a card slot). Features keep their v0.41 odds; plants follow
+// their tier (Basic 40 · Epic 8 · Legendary 4.5 · Rare 3 · Super Rare 1.8 · Ultra Rare 0.8 · Other World 0.4).
+const PACK_TOTAL = Object.values(PACK_W).reduce((a, b) => a + b, 0);
+const featureOdds = () => Object.keys(FEATURES).reduce((a, k) => a + PACK_W[k], 0) / PACK_TOTAL * 100;
+function drawCard(rnd = Math.random) {
+  let w = rnd() * PACK_TOTAL;
+  for (const [k, p] of Object.entries(PACK_W)) { if (!p) continue; w -= p; if (w < 0) return k; }
+  return 'lavender';
 }
 function buyPack(forced) {
   if (!S.marketBuilt) return;
@@ -1972,7 +2008,7 @@ window.__ps = {
   // v0.4 helpers
   get barrels() { return S.barrels; }, barrelText, totalWater, handSource: (i) => handSource(i)?.lot || null, buildBarrel, unhookIrrigation, BARREL, craftTincture, collectTincture, buildTincture,
   setBarrelCap(n) { BARREL.maxBeds = n; syncBarrels(); }, barrelScreen(lot) { const b = S.barrels[lot]; return W.project(V(b.x, 0.5, b.z)); }, barrelLabel(lot) { const s = W.barrels.get(lot)?.userData.info; return s && { main: s.userData.main, sub: s.userData.sub, visible: s.visible, scale: s.scale.y, opacity: s.material.opacity }; },
-  cardPool: (r) => Object.keys(CARDS).filter((k) => CARDS[k].rarity === r), RARITY, SPECIES, FANTASY_SPECIES, PLANT_TIERS, rollSeeds,
+  cardPool: (r) => Object.keys(CARDS).filter((k) => CARDS[k].rarity === r), RARITY, SPECIES, FANTASY_SPECIES, PLANT_TIERS, TIER_ORDER, PACK_W, DRYING, ITEMS, TINCTURE, STILL, drawCard, packOdds: () => ({ total: PACK_TOTAL, features: featureOdds() }), rollSeeds,
   sickleBed, plowBed, useTool, toolLeft, lotTiles, bedTiles, get bedTargets() { return W.bedTargets.children.map((g) => ({ b: g.userData.b, ok: g.userData.ok })); }, get fxCount() { return W.fxCount(); },
   giveTool(id) { S.discovered[id] = true; S.unlocked[id] = true; S.owned[id] = true; if (!S.cards[id]) addCard(id); save(); hud(); },
   resetTool(id) { S.toolAt[id] = 0; save(); hud(); },

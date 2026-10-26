@@ -1,4 +1,4 @@
-# Petalspire v0.41
+# Petalspire v0.5
 
 A cozy 3D flower-garden prototype for iPhone Safari (portrait, one thumb). Also plays on desktop with a mouse.
 This is a **prototype**: version numbers stay below 1.0 until the first official release.
@@ -20,6 +20,34 @@ This is a **prototype**: version numbers stay below 1.0 until the first official
 7. **Land for sale.** Five wooded plots, each with a floating For Sale sign: 150 → 300 → 600 → 1000 → 1500 coins.
 
 Drag with one finger to pan, pinch to zoom, and twist with two fingers to turn. On desktop, right-drag or shift-drag turns the view.
+
+## New in v0.5 — the full plant catalog
+
+21 plants, 3 per tier, in tier order. Each tier up has lower pack odds, a longer grow time, a higher seed cost and a higher flower price, with no overlap between tiers.
+
+| Tier | Plants | Grow | Seed cost | Flower sells | Seeds / harvest | Pack odds (tier) |
+|---|---|---|---|---|---|---|
+| Basic | Lavender, Calendula, Chamomile | 35–80 s | 6–18 | 5–24 | 5 | 40% |
+| Epic | Peppermint, Echinacea, Lemon Balm | 100–115 s | 24–27 | 28–32 | 4–5 | 8% |
+| Legendary | Rosemary, Yarrow, Sunflower | 145–165 s | 38–44 | 46–54 | 4 | 4.5% |
+| Rare | Damask Rose, Holy Basil (Tulsi), Elderflower | 190–205 s | 62–68 | 78–84 | 3–4 | 3% |
+| Super Rare | Saffron Crocus, Blue Lotus, Jasmine | 260–285 s | 100–118 | 140–158 | 2–3 | 1.8% |
+| Ultra Rare | Ghost Orchid, Jade Vine, Middlemist Red | 350–380 s | 170–190 | 245–275 | 2 | 0.8% |
+| Other World | Moonflower, Crystal Rose, Spiral Sunpetal | 460–500 s | 280–320 | 440–520 | 1 (sometimes 2) | 0.4% |
+
+Garden-feature cards keep their v0.41 odds exactly (41.5% of all cards together). Plants share the other 58.5% by tier. The Jewel drop stays at 4%.
+
+- **3D:** every plant has its own procedural model in the painterly palette. Rare and Super Rare plants have a soft halo, Ultra Rare a brighter one, and Other World the strongest glow plus floating motes.
+- **Cards:** tier label and colour on every card. Rare and above get distinct frames, and Other World gets an iridescent animated frame. The Packs screen shows odds per tier, and the collection is grouped by tier.
+- **Market:** a plant's seeds appear in the Supply Market once its card is found. Locked tiers show one summary row each.
+- **Uses:**
+  - glycerite and vinegar tinctures: Peppermint, Echinacea, Lemon Balm, Rosemary, Yarrow, Holy Basil, Elderflower;
+  - drying rack: Lavender, Peppermint, Lemon Balm, Rosemary, Yarrow, Holy Basil, Elderflower;
+  - essential oils: Peppermint, Rosemary, Damask Rose, Jasmine.
+  
+  Recipes for higher tiers show once the plant is unlocked.
+- **Early game unchanged:** Basic plants keep their exact numbers and the starter pack is the same.
+- **Saves:** older saves load without loss. New items start at 0 and the save is re-tagged 0.5. The old fantasy-id remap now runs only for saves from before v0.5, so the new Other World plants are never rewritten.
 
 ## New in v0.41
 - **Card Packs cost Jewels.** The Botanical Card Pack (3 cards; there is only one pack type) costs **1 Jewel** instead of coins.
