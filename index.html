@@ -8,7 +8,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="default" />
 <meta name="apple-mobile-web-app-title" content="Petalspire" />
 <meta name="theme-color" content="#F6E6CF" />
-<title>Petalspire · v0.64.1</title>
+<title>Petalspire · v0.65</title>
 <link rel="apple-touch-icon" href="assets/emblem.png" />
 <link rel="icon" href="assets/emblem.png" />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -30,7 +30,6 @@
       <button class="icon-btn" id="btn-settings" aria-label="Settings"><i data-icon="gear"></i></button>
     </div>
   </header>
-  <button id="btn-map" class="map-btn" aria-label="Map"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6.5 9 4l6 2.5L21 4v13.5L15 20l-6-2.5L3 20z" fill="#F7F1E3" stroke="#3D5A40" stroke-width="1.6" stroke-linejoin="round"/><path d="M9 4v13.5M15 6.5V20" stroke="#3D5A40" stroke-width="1.4"/><circle cx="17.5" cy="9.5" r="1.8" fill="#C2513F"/></svg><b>Map</b><span class="map-lock" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="5" y="10.5" width="14" height="10" rx="2.6" fill="#E3B341" stroke="#7A5A1E" stroke-width="1.6"/><path d="M8.2 10.5V8a3.8 3.8 0 0 1 7.6 0v2.5" fill="none" stroke="#7A5A1E" stroke-width="1.9"/><circle cx="12" cy="15.3" r="1.6" fill="#7A5A1E"/></svg></span></button>
   <div id="loc-chip" class="loc-chip hidden">The Orchard</div>
   <div id="goal" class="goal hidden"></div>
   <div id="tip" class="tip hidden"><img src="assets/emblem.png" alt="" /><p id="tip-text"></p></div>
@@ -55,7 +54,7 @@
     <button data-panel="build" id="tab-build"><i data-icon="build"></i><span>Build</span></button>
     <button data-panel="stand" id="tab-stand" class="hidden"><i data-icon="stand"></i><span>Stand</span><em id="stand-badge" class="badge soft hidden"></em></button>
     <button data-panel="market" id="tab-market"><i data-icon="market"></i><span>Market</span><em class="lock-badge"><i data-icon="lock"></i></em></button>
-    <button data-panel="rack" id="tab-rack" class="hidden"><i data-icon="rack"></i><span>Rack</span><em id="rack-badge" class="badge hidden"></em></button>
+    <button id="btn-map" class="tab-map" type="button" aria-label="Map"><svg class="map-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6.5 9 4l6 2.5L21 4v13.5L15 20l-6-2.5L3 20z" fill="#F7F1E3" stroke="#3D5A40" stroke-width="1.6" stroke-linejoin="round"/><path d="M9 4v13.5M15 6.5V20" stroke="#3D5A40" stroke-width="1.4"/><circle cx="17.5" cy="9.5" r="1.8" fill="#C2513F"/></svg><span>Map</span><em class="lock-badge"><i data-icon="lock"></i></em></button>
   </nav>
   <div id="popups"></div>
   <div id="confirm" class="confirm hidden" role="dialog" aria-modal="true"></div>
@@ -70,7 +69,7 @@
       <p class="tagline"><span>•</span> Flower Garden Game <span>•</span></p>
       <button id="btn-start" class="btn btn-primary big">Begin</button>
       <p class="title-hint">Clear · Grow · Sell</p>
-      <p class="version">v0.64.1 prototype</p>
+      <p class="version">v0.65 prototype</p>
     </div>
   </div>
 </div>

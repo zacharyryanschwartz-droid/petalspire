@@ -359,6 +359,9 @@ export function createWorld(canvas) {
     orchardShed.traverse((m) => { m.userData.kind ??= 'orchardshed'; });
     orchardShed.userData.kind = 'orchardshed';
   }
+  const bulkOrch = makeBulkBox('orchard'); bulkOrch.position.set(1.45, 0, 0.9); bulkOrch.rotation.y = -0.25; orchardShed.add(bulkOrch);
+  function bulkPop(loc) { const g = loc === 'orchard' ? bulkOrch : bulkHome; g.userData.pop = performance.now(); poof(g.getWorldPosition(new THREE.Vector3()).setY(0.7), '#E9B949', 10, 0.9); }
+  function setBulk(loc, on) { (loc === 'orchard' ? bulkOrch : bulkHome).visible = !!on; }
   function setOStandStock(n) { const g = orchardShed.getObjectByName('stock'); if (g) g.visible = n > 0; }
   const orchSign = label('The Orchard', { h: 0.55, color: '#3D5A40', border: '#D9A93F' }); orchSign.position.set(ORCH_X - 2.6, 1.7, 4.1); orchardScene.add(orchSign);
   function setLotOwned(id, owned) { const f = lotFx[id]; if (f) f.fx.visible = !owned; }
@@ -548,6 +551,24 @@ export function createWorld(canvas) {
     const hit = new THREE.Mesh(new THREE.BoxGeometry(3.0, 3.6, 1.8), new THREE.MeshBasicMaterial({ visible: false })); hit.position.y = 1.6; stand.add(hit);
   }
   stand.userData.kind = 'stand'; stand.visible = false;
+  // ---------- v0.65: Bulk Sell Box — a little slatted crate beside each stand (instant sale at half the stand price) ----------
+  function makeBulkBox(loc) {
+    const g = new THREE.Group(); g.userData = { kind: 'bulkbox', loc };
+    const slatM = mat('#E3C79A', { roughness: 0.85 }), postM = mat('#B88A5A'), sageM = mat('#9DBF9E'), blushM = mat('#F4B9BC'), goldM = mat('#E9B949', { roughness: 0.4 });
+    const base = shadowy(new THREE.Mesh(new THREE.BoxGeometry(0.78, 0.06, 0.58), postM)); base.position.y = 0.05; g.add(base);
+    for (let k = 0; k < 3; k++) for (const [w, d, x, z] of [[0.78, 0.04, 0, 0.27], [0.78, 0.04, 0, -0.27], [0.04, 0.54, 0.37, 0], [0.04, 0.54, -0.37, 0]]) {
+      const sl = shadowy(new THREE.Mesh(new THREE.BoxGeometry(w, 0.1, d), slatM)); sl.position.set(x, 0.14 + k * 0.14, z); g.add(sl); }
+    for (const [x, z] of [[0.37, 0.27], [-0.37, 0.27], [0.37, -0.27], [-0.37, -0.27]]) { const p = shadowy(new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.5, 0.07), postM)); p.position.set(x, 0.27, z); g.add(p); }
+    const band = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.05, 0.6), sageM); band.position.y = 0.43; g.add(band);
+    // a few goods peeking out, a blush tag and a honey-gold coin
+    for (let k = 0; k < 5; k++) { const b = new THREE.Mesh(new THREE.IcosahedronGeometry(0.08, 0), mat(['#9C86C9', '#F0A33A', '#FFFDF6', '#F2A7B8', '#8FC48A'][k])); b.position.set(-0.24 + k * 0.12, 0.42, (k % 2 ? 0.06 : -0.08)); g.add(b); }
+    const tag = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.2, 0.02), blushM); tag.position.set(0, 0.3, 0.3); tag.rotation.x = -0.08; g.add(tag);
+    const coin = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.07, 0.02, 14), goldM); coin.rotation.x = Math.PI / 2; coin.position.set(0, 0.3, 0.315); g.add(coin);
+    const lb = label('Bulk Box', { h: 0.3 }); lb.position.set(0, 0.95, 0); g.add(lb);
+    const hit = new THREE.Mesh(new THREE.BoxGeometry(0.95, 1.2, 0.8), new THREE.MeshBasicMaterial({ visible: false })); hit.position.y = 0.5; g.add(hit);
+    return g;
+  }
+  const bulkHome = makeBulkBox('home'); bulkHome.position.set(-1.95, 0, 0.75); bulkHome.rotation.y = 0.25; stand.add(bulkHome);
   // ---------- v0.4: one rain barrel per plot, each with a live water/countdown badge ----------
   const BARREL_FONT = '700 54px Nunito, sans-serif', BARREL_FONT2 = '700 40px Nunito, sans-serif';
   function barrelCanvasTex(line1, line2, full) {
@@ -657,21 +678,56 @@ export function createWorld(canvas) {
     const spout = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.018, 0.16, 6), mat('#6C93A6')); spout.rotation.z = -0.9; spout.position.set(0.1, 0.04, 0); can.add(spout);
     const arm2 = shadowy(new THREE.Mesh(new THREE.CapsuleGeometry(0.05, 0.2, 4, 8), shirt)); arm2.position.set(-0.2, 0.5, 0); arm2.rotation.z = -0.15; g.add(arm2);
     const pay = textSprite('Needs pay', { h: 0.26, color: '#8A5A1E', border: '#E3B341' }); pay.position.y = 1.32; pay.visible = false; g.add(pay);
+    // v0.65: a woven basket (hidden until they pick or carry), then everything but the pay tag goes on a rig so the gardener can lean, kneel and walk
+    const basket = new THREE.Group(); basket.position.set(-0.26, 0.36, 0.08); basket.visible = false;
+    const wick = mat('#B98A55', { roughness: 0.95 }), bsk = shadowy(new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.085, 0.1, 10, 1, true), wick)); basket.add(bsk);
+    const bbot = new THREE.Mesh(new THREE.CircleGeometry(0.085, 10), wick); bbot.rotation.x = -Math.PI / 2; bbot.position.y = -0.05; basket.add(bbot);
+    const hnd = new THREE.Mesh(new THREE.TorusGeometry(0.09, 0.012, 4, 10, Math.PI), wick); hnd.position.y = 0.04; basket.add(hnd);
+    const fillM = mat('#E7A0B5', { roughness: 0.8 }), fill = new THREE.Group(); for (const [fx, fz] of [[-0.04, 0], [0.04, 0.02], [0, -0.04]]) { const b = new THREE.Mesh(new THREE.SphereGeometry(0.045, 8, 6), fillM); b.position.set(fx, 0.04, fz); fill.add(b); } basket.add(fill);
+    g.add(basket);
+    const boots = []; g.children.forEach((c) => { if (c.geometry?.type === 'SphereGeometry' && Math.abs(c.position.y - 0.05) < 0.001) boots.push(c); });
+    const rig = new THREE.Group(); [...g.children].forEach((c) => { if (c !== pay) rig.add(c); }); g.add(rig);
     g.traverse((o) => { if (o !== g) o.userData = { ...o.userData, kind: 'worker', id: lot }; });
-    g.userData.parts = { arm, pay, head }; g.userData.state = 'work';
+    g.userData.parts = { arm, pay, head, rig, boots, can, basket, fillM, arm2 }; g.userData.state = 'work'; g.userData.mv = { path: [], k: 0, act: null, until: 0, face: null, carry: false };
     return g;
   }
+  // v0.65: walking + task poses (visual only — the work itself is already done by main.js). pts = waypoints, act = what to do on arrival.
+  function workerGo(lot, pts, act, ms, o = {}) { const g = workers.get(lot); if (!g) return false; const m = g.userData.mv;
+    m.path = (pts || []).map((p) => ({ x: p.x, z: p.z })); m.k = 0; m.act = act || null; m.ms = ms || 0; m.until = 0; m.face = o.face || null; m.carry = !!o.carry;
+    if (o.color) g.userData.parts.fillM.color.set(o.color); g.userData.parts.basket.visible = m.carry; return true; }
+  function workerIdle(lot) { const g = workers.get(lot); if (!g) return false; const m = g.userData.mv; return !m.path.length && performance.now() >= m.until; }
+  function workerPose(lot) { const g = workers.get(lot); if (!g) return null; const m = g.userData.mv; return { x: +g.position.x.toFixed(2), z: +g.position.z.toFixed(2), moving: m.path.length > 0, act: m.act, acting: !m.path.length && performance.now() < m.until, carry: g.userData.parts.basket.visible, left: m.path.length }; }
+  function placeWorker(lot, x, z) { const g = workers.get(lot); if (!g) return; g.position.set(x, 0, z); const m = g.userData.mv; m.path = []; m.until = 0; m.act = null; }
   function addWorker(lot, x, z, animate) { let g = workers.get(lot); if (!g) { g = makeWorker(lot); workers.set(lot, g); } g.position.set(x, 0, z); g.rotation.y = Math.atan2(-x + (x > 150 ? 300 : 0), 6 - z) * 0.4; if (animate) { g.visible = true; poof(g.position.clone().setY(0.5), '#B7D4B5', 14, 1.1); } else g.visible = true; return g; }
   function removeWorker(lot) { const g = workers.get(lot); if (!g) return; scene.remove(g); workers.delete(lot); }
   function setWorker(lot, state) { const g = workers.get(lot); if (!g) return; g.userData.state = state; g.userData.parts.pay.visible = state === 'pay'; }
   function workerAt(lot) { const g = workers.get(lot); return g ? { x: g.position.x, z: g.position.z, state: g.userData.state, pay: g.userData.parts.pay.visible, visible: g.visible } : null; }
+  const WK_SPEED = 1.15;
+  let wkLast = 0;
   function updateWorkers(t) {
-    for (const g of workers.values()) { const P = g.userData.parts, w = g.userData.state === 'work';
-      g.position.y = w ? Math.abs(Math.sin(t * 3 + g.id)) * 0.03 : 0;
-      P.arm.rotation.z = w ? 0.35 + Math.sin(t * 2.2 + g.id) * 0.35 : 0.08; P.arm.rotation.x = w ? -0.25 : 0;
-      P.head.rotation.y = w ? Math.sin(t * 0.9 + g.id) * 0.35 : Math.sin(t * 0.5) * 0.1;
+    const pnow = performance.now(), dt = Math.min(0.25, wkLast ? (pnow - wkLast) / 1000 : 0.016); wkLast = pnow;   // wall-clock step: same walking speed on slow devices
+    for (const g of workers.values()) { if (!g.visible) continue; const P = g.userData.parts, m = g.userData.mv, w = g.userData.state === 'work', ph = t + (g.id || 0);
+      let walk = false;
+      if (m.path.length) {   // walk along the waypoints, turning smoothly
+        const p = m.path[0], dx = p.x - g.position.x, dz = p.z - g.position.z, d = Math.hypot(dx, dz), step = WK_SPEED * dt;
+        if (d <= step) { g.position.x = p.x; g.position.z = p.z; m.path.shift(); if (!m.path.length) m.until = pnow + (m.ms || 0); }
+        else { g.position.x += dx / d * step; g.position.z += dz / d * step; turnTo(g, Math.atan2(dx, dz), dt * 8); walk = true; }
+      } else if (m.face && pnow < m.until) turnTo(g, Math.atan2(m.face.x - g.position.x, m.face.z - g.position.z), dt * 6);
+      const act = !walk && pnow < m.until ? m.act : null, R = P.rig;
+      // reset to neutral, then layer the pose
+      let ry = 0, rx = 0, armZ = 0.08, armX = 0, canX = 0, bootSw = 0, headY = Math.sin(ph * 0.5) * 0.1;
+      if (walk) { ry = Math.abs(Math.sin(ph * 9)) * 0.035; bootSw = Math.sin(ph * 9) * 0.07; armX = Math.sin(ph * 9) * 0.3; armZ = 0.12; headY = 0; }
+      else if (act === 'water') { rx = 0.12; armZ = 0.25; armX = -0.9; canX = 0.55 + Math.sin(ph * 2.2) * 0.12; headY = Math.sin(ph * 0.8) * 0.15; }
+      else if (act === 'plant') { ry = -0.16; rx = 0.42; armZ = 0.15; armX = -1.0 + Math.sin(ph * 4) * 0.25; headY = 0; }
+      else if (act === 'pick') { rx = 0.5 + Math.sin(ph * 2.4) * 0.08; armZ = 0.2; armX = -1.2 + Math.sin(ph * 3.4) * 0.3; headY = Math.sin(ph * 1.3) * 0.2; }
+      else if (act === 'stock' || act === 'craft') { rx = 0.08; armZ = 0.18; armX = -1.1 + Math.sin(ph * 3) * 0.35; headY = Math.sin(ph * 1.1) * 0.25; }
+      else if (act === 'rest') { ry = -0.12; rx = -0.05; armZ = 0.05; headY = Math.sin(ph * 0.4) * 0.25; }
+      else if (w && !m.act) { ry = Math.abs(Math.sin(ph * 3)) * 0.02; armZ = 0.2 + Math.sin(ph * 2.2) * 0.2; armX = -0.25; headY = Math.sin(ph * 0.9) * 0.35; }
+      R.position.y = ry; R.rotation.x = rx; P.arm.rotation.z = armZ; P.arm.rotation.x = armX; P.can.rotation.z = -canX; P.head.rotation.y = headY;
+      if (P.boots.length === 2) { P.boots[0].position.z = 0.02 + bootSw; P.boots[1].position.z = 0.02 - bootSw; }
       if (P.pay.visible) P.pay.position.y = 1.32 + Math.sin(t * 2.5) * 0.04; }
   }
+  function turnTo(g, a, k) { let d = a - g.rotation.y; d = Math.atan2(Math.sin(d), Math.cos(d)); g.rotation.y += d * Math.min(1, k); }
   let beeTex = null;
   function beeIcon() { if (beeTex) return beeTex; const c = document.createElement('canvas'); c.width = c.height = 96; const x = c.getContext('2d');
     x.fillStyle = 'rgba(255,249,236,.95)'; x.beginPath(); x.arc(48, 48, 44, 0, 7); x.fill(); x.strokeStyle = '#E2B65A'; x.lineWidth = 5; x.stroke();
@@ -1391,14 +1447,105 @@ export function createWorld(canvas) {
   function updateCars(dt, t) {
     for (let k = cars.length - 1; k >= 0; k--) {
       const c = cars[k];
-      if (c.state === 'in') { const d = c.stopX - c.x; c.v = Math.max(0.0, Math.min(10, d * 1.5)); if (d < 0.03) { c.x = c.stopX; c.v = 0; c.state = 'park'; const f = c.onPark; c.onPark = null; f?.(c); } }
+      if (c.van && c.state === 'out') {   // v0.65: timed drive-off too (3 s), then the van is hidden and returned to the pool
+        const u = (performance.now() - c.tOut) / 1000, d = u < 2 ? 3 * u * u : 12 + 12 * (u - 2), x = c.stopX + c.dir * d, dx = x - c.x;
+        c.x = x; c.group.position.x = x; c.v = Math.min(12, 6 * u); c.group.userData.wheels.forEach((w) => (w.rotation.z -= Math.abs(dx) / 0.2));
+        if (u > 3.2) { c.group.visible = false; c.group.userData.busy = false; cars.splice(k, 1); }
+        continue; }
+      if (c.van && c.state === 'in') {   // v0.65: the van's drive-in is timed (ease-out over T s), so it parks on time even at a low frame rate
+        const k = Math.min(1, (performance.now() - c.t0) / 1000 / c.T), x = c.stopX - c.dir * c.from * (1 - k) * (1 - k);
+        c.v = (2 * c.from * (1 - k)) / c.T; const dx = x - c.x; c.x = x; c.group.position.x = x; c.group.userData.wheels.forEach((w) => (w.rotation.z -= Math.abs(dx) / 0.2));
+        c.group.position.y = 0; if (k >= 1) { c.v = 0; c.state = 'park'; const f = c.onPark; c.onPark = null; f?.(c); }
+        continue; }
+      if (c.state === 'in') { const d = (c.stopX - c.x) * c.dir; c.v = Math.max(0.0, Math.min(c.van ? 12 : 10, d * (c.van ? 3 : 1.5)));   /* v0.65: the van brakes a little harder */ if (d < 0.03) { c.x = c.stopX; c.v = 0; c.state = 'park'; const f = c.onPark; c.onPark = null; f?.(c); } }
       else if (c.state === 'out') c.v = Math.min(11, c.v + 5 * dt);
       else if (c.state === 'pass') c.v = 8;
       const dx = c.v * dt * c.dir; c.x += dx; c.group.position.x = c.x;
       c.group.userData.wheels.forEach((w) => (w.rotation.z -= Math.abs(dx) / 0.2));
       c.group.position.y = c.v > 0.1 ? Math.abs(Math.sin(t * 14 + c.bob)) * 0.02 : 0;
+      if (c.van && c.state === 'out' && (c.x - c.stopX) * c.dir > 28) { c.group.visible = false; c.group.userData.busy = false; cars.splice(k, 1); continue; }   // v0.65: vans are reused, never removed
       if (Math.abs(c.x - (c.ox || 0)) > 48 && c.state !== 'in') { scene.remove(c.group); cars.splice(k, 1); }
     }
+  }
+
+  // ---------- v0.65: garden features (Sundial + garden charms) placed on the map ----------
+  // Each placed feature builds its own small geometries and disposes them when it is put back in the bag (materials come from
+  // the shared mat() cache, so they are never disposed here). Tap target: an invisible cylinder.
+  const featG = new THREE.Group(); scene.add(featG); const feats = new Map();
+  const C = { cream: '#FFF9F0', stone: '#E9DFCF', stoneD: '#C9B9A0', gold: '#E7B547', goldD: '#B8892E', sage: '#8FAF86', sageD: '#5E7F5A', blush: '#F2B9B4', copper: '#C98B4E', moon: '#C9D6F2', lilac: '#C8B4EA' };
+  function makeFeat(id) {
+    const g = new THREE.Group(); let hitH = 1.1;
+    const post = (h, x = 0) => M(new THREE.CylinderGeometry(0.05, 0.065, h, 8), woodD, x, h / 2);
+    switch (id) {
+      case 'sundial': { g.add(M(new THREE.CylinderGeometry(0.24, 0.3, 0.5, 10), mat(C.stone), 0, 0.25), M(new THREE.CylinderGeometry(0.36, 0.36, 0.06, 20), mat(C.gold, { roughness: 0.4, metalness: 0.3 }), 0, 0.53));
+        const gn = M(new THREE.BoxGeometry(0.03, 0.22, 0.3), mat(C.goldD, { metalness: 0.4, roughness: 0.4 }), 0, 0.64, 0.02); gn.rotation.x = 0.5; g.add(gn); hitH = 0.9; break; }
+      case 'gardenbell': { g.add(post(1.25), M(new THREE.BoxGeometry(0.42, 0.05, 0.05), woodD, 0.17, 1.2, 0));
+        g.add(M(new THREE.CylinderGeometry(0.05, 0.15, 0.22, 12, 1, true), mat(C.gold, { roughness: 0.35, metalness: 0.5, side: THREE.DoubleSide }), 0.32, 1.03), M(new THREE.SphereGeometry(0.035, 8, 6), mat(C.goldD), 0.32, 0.92)); hitH = 1.4; break; }
+      case 'rainchain': { g.add(post(1.35), M(new THREE.BoxGeometry(0.4, 0.05, 0.05), woodD, 0.16, 1.32, 0));
+        for (let k = 0; k < 7; k++) { const l = M(new THREE.TorusGeometry(0.045, 0.014, 5, 10), mat(C.copper, { metalness: 0.5, roughness: 0.4 }), 0.32, 1.24 - k * 0.12, 0); l.rotation.y = k % 2 ? Math.PI / 2 : 0; g.add(l); }
+        g.add(M(new THREE.CylinderGeometry(0.2, 0.15, 0.14, 14), mat(C.copper, { metalness: 0.4, roughness: 0.45 }), 0.32, 0.07), M(new THREE.CylinderGeometry(0.17, 0.17, 0.02, 14), mat('#9CCFE0', { roughness: 0.15 }), 0.32, 0.13)); hitH = 1.4; break; }
+      case 'seedtin': { g.add(M(new THREE.BoxGeometry(0.5, 0.32, 0.5), woodL, 0, 0.16), M(new THREE.BoxGeometry(0.38, 0.22, 0.28), mat(C.sage, { roughness: 0.5, metalness: 0.2 }), 0, 0.43), M(new THREE.BoxGeometry(0.4, 0.05, 0.3), mat(C.sageD, { metalness: 0.2 }), 0, 0.56), M(new THREE.BoxGeometry(0.2, 0.1, 0.01), mat(C.cream), 0, 0.44, 0.145)); hitH = 0.8; break; }
+      case 'scales': { g.add(post(1.05), M(new THREE.BoxGeometry(0.7, 0.04, 0.04), mat(C.gold, { metalness: 0.4, roughness: 0.4 }), 0, 1.05));
+        for (const x of [-0.32, 0.32]) { g.add(M(new THREE.CylinderGeometry(0.006, 0.006, 0.32, 4), mat(C.goldD), x, 0.89), M(new THREE.CylinderGeometry(0.16, 0.11, 0.05, 14), mat(C.gold, { metalness: 0.45, roughness: 0.35 }), x, 0.72)); }
+        g.add(M(new THREE.CylinderGeometry(0.22, 0.26, 0.06, 14), woodD, 0, 0.03)); hitH = 1.2; break; }
+      case 'pocketwatch': { g.add(M(new THREE.BoxGeometry(0.34, 0.3, 0.2), woodL, 0, 0.15));
+        const case_ = M(new THREE.CylinderGeometry(0.3, 0.3, 0.08, 22), mat(C.gold, { metalness: 0.45, roughness: 0.35 }), 0, 0.62, 0, Math.PI / 2); g.add(case_);
+        g.add(M(new THREE.CylinderGeometry(0.25, 0.25, 0.02, 22), mat(C.cream), 0, 0.62, 0.042, Math.PI / 2), M(new THREE.TorusGeometry(0.06, 0.02, 6, 12), mat(C.goldD), 0, 0.97, 0));
+        g.add(M(new THREE.BoxGeometry(0.02, 0.17, 0.01), mat('#5A4A44'), 0, 0.69, 0.055), M(new THREE.BoxGeometry(0.12, 0.02, 0.01), mat('#5A4A44'), 0.05, 0.62, 0.055)); hitH = 1.1; break; }
+      case 'moonfountain': { g.add(M(new THREE.CylinderGeometry(0.5, 0.56, 0.24, 18), mat(C.stone), 0, 0.12), M(new THREE.CylinderGeometry(0.44, 0.44, 0.03, 18), mat('#A9C4EE', { emissive: '#8C9BE0', emissiveIntensity: 0.45, roughness: 0.1 }), 0, 0.25));
+        g.add(M(new THREE.CylinderGeometry(0.07, 0.1, 0.5, 8), mat(C.stone), 0, 0.5), M(new THREE.CylinderGeometry(0.24, 0.16, 0.1, 14), mat(C.stone), 0, 0.78), M(new THREE.CylinderGeometry(0.2, 0.2, 0.02, 14), mat('#A9C4EE', { emissive: '#8C9BE0', emissiveIntensity: 0.5 }), 0, 0.83));
+        const moon = M(new THREE.TorusGeometry(0.13, 0.04, 8, 16, Math.PI * 1.2), mat(C.moon, { emissive: '#C9D6F2', emissiveIntensity: 0.8 }), 0, 1.03, 0, 0, 0, 0.9); g.add(moon); hitH = 1.2; break; }
+      case 'faelantern': { g.add(post(1.4), M(new THREE.BoxGeometry(0.36, 0.04, 0.04), woodD, 0.14, 1.36, 0));
+        g.add(M(new THREE.OctahedronGeometry(0.15, 0), mat(C.lilac, { emissive: '#B48AD8', emissiveIntensity: 1.1, roughness: 0.3 }), 0.28, 1.12), M(new THREE.ConeGeometry(0.11, 0.1, 6), mat(C.goldD), 0.28, 1.3, 0));
+        for (let k = 0; k < 3; k++) g.add(M(new THREE.SphereGeometry(0.025, 6, 4), mat('#FFF3C9', { emissive: '#F5D07A', emissiveIntensity: 1.2 }), 0.28 + Math.cos(k * 2.1) * 0.25, 0.9 + k * 0.12, Math.sin(k * 2.1) * 0.25)); hitH = 1.5; break; }
+      default: g.add(M(new THREE.BoxGeometry(0.3, 0.3, 0.3), mat(C.cream), 0, 0.15));
+    }
+    const hit = new THREE.Mesh(new THREE.CylinderGeometry(0.45, 0.45, hitH, 6), new THREE.MeshBasicMaterial({ visible: false })); hit.position.y = hitH / 2; g.add(hit);
+    return g;
+  }
+  const disposeGroup = (g) => g.traverse((o) => { o.geometry?.dispose(); if (o.material && !o.material.visible) o.material.dispose(); });   // shared mat() materials stay
+  function addFeat(key, id, x, z, rot = 0, animate = false) {
+    removeFeat(key, false);
+    const g = makeFeat(id); g.position.set(x, 0, z); g.rotation.y = rot; g.userData = { kind: 'gfeat', key, id }; featG.add(g); feats.set(key, g);
+    if (animate) { g.userData.born = performance.now(); g.scale.setScalar(0.01); poof(new THREE.Vector3(x, 0.4, z), '#F5D07A', 14, 1.2); }
+  }
+  function removeFeat(key, fx = true) { const g = feats.get(key); if (!g) return; if (fx) poof(g.position.clone().setY(0.4), '#E9D9B8', 12, 1); featG.remove(g); feats.delete(key); disposeGroup(g); }
+
+  // ---------- v0.65: the delivery van (Supply Market orders) ----------
+  // Two reusable vans (built once, hidden when idle — nothing is created per trip except a few crate meshes that share one
+  // geometry + material). A trip: drive in on the near lane, park, drop crates on the verge, drive off.
+  const vanPool = [], crateG = roundedBox(0.36, 0.3, 0.36, 0.04), crateM = mat('#D9B98A', { roughness: 0.85 }), crateBand = new THREE.BoxGeometry(0.38, 0.06, 0.38), dropC = [];
+  const vanGeo = { body: roundedBox(1.7, 1.0, 1.06, 0.14), cab: roundedBox(0.8, 0.78, 1.04, 0.16), wind: new THREE.BoxGeometry(0.06, 0.34, 0.84), stripe: new THREE.BoxGeometry(1.72, 0.12, 1.08), sign: new THREE.BoxGeometry(0.9, 0.3, 0.02), lamp: new THREE.SphereGeometry(0.07, 8, 6), leaf: new THREE.SphereGeometry(0.09, 8, 6) };
+  function makeVan() {
+    const g = new THREE.Group(), wheels = [];
+    g.add(M(vanGeo.body, mat('#FFF3E2', { roughness: 0.5 }), -0.35, 0.92, 0), M(vanGeo.stripe, mat(C.sage), -0.35, 0.72, 0), M(vanGeo.cab, mat('#F7C5C5', { roughness: 0.45 }), 0.86, 0.78, 0));
+    g.add(new THREE.Mesh(vanGeo.wind, mat('#CFE6EE', { roughness: 0.15, metalness: 0.1 }))); g.children[g.children.length - 1].position.set(1.24, 0.95, 0);
+    for (const z of [0.54, -0.54]) { const s = M(vanGeo.sign, mat(C.gold), -0.35, 1.1, z); g.add(s); const lf = M(vanGeo.leaf, mat(C.sageD), -0.75, 1.1, z * 1.02); lf.scale.set(1, 0.6, 0.3); g.add(lf); }
+    for (const z of [0.3, -0.3]) g.add(M(vanGeo.lamp, mat('#FFF6D8', { emissive: '#FFE1A0', emissiveIntensity: 0.9 }), 1.27, 0.62, z));
+    for (const x of [0.86, -0.8]) for (const z of [0.5, -0.5]) { const w = shadowy(new THREE.Mesh(wheelG, mat('#5A4A44'))); w.position.set(x, 0.2, z); g.add(w); const hb = new THREE.Mesh(hubG, mat('#FFF9F0')); w.add(hb); wheels.push(w); }
+    g.userData.wheels = wheels; g.userData.van = true; g.visible = false; scene.add(g);
+    return g;
+  }
+  // stopX = where it parks; ox = road offset (Orchard road at ORCH_X); onPark(van) runs once when it stops. Returns null when both vans are out.
+  // v0.65: it uses the FAR lane, coming from +x (dir −1), so it never collides with customers parked in the near-lane bays.
+  function spawnVan({ stopX = -3.4, ox = 0, onPark, from = 26, dir = -1, T } = {}) {
+    let g = vanPool.find((v) => !v.userData.busy); if (!g) { if (vanPool.length >= 2) return null; g = makeVan(); vanPool.push(g); }
+    g.userData.busy = true; g.visible = true; const x0 = stopX - dir * from; g.position.set(x0, 0, dir > 0 ? ROAD.near : ROAD.far); g.rotation.y = dir > 0 ? 0 : Math.PI;
+    const car = { group: g, dir, stopX, onPark, ox, state: 'in', v: 10, x: x0, bob: Math.random() * 10, van: true, from, t0: performance.now(), T: Math.max(0.8, T || from / 7.5), leave() { car.state = 'out'; car.v = 0.5; car.tOut = performance.now(); } };
+    cars.push(car); return car;
+  }
+  function dropCrates(x, z, n = 1) {
+    for (let k = 0; k < Math.min(3, Math.max(1, n)); k++) {
+      const c = new THREE.Mesh(crateG, crateM); c.castShadow = true; const band = new THREE.Mesh(crateBand, mat(C.sage)); c.add(band);
+      c.position.set(x - 0.5 + k * 0.42, 1.2 + k * 0.25, z); c.userData = { t0: performance.now() + k * 140, y1: 0.15 }; scene.add(c); dropC.push(c);
+    }
+  }
+  function updateCrates(nowMs) {
+    for (const g of [bulkHome, bulkOrch]) if (g.userData.pop) { const t = (nowMs - g.userData.pop) / 1000; if (t > 0.5) { g.scale.setScalar(1); g.userData.pop = 0; } else g.scale.set(1 + Math.sin(t * Math.PI * 2) * 0.08 * (1 - t * 2), 1 - Math.sin(t * Math.PI * 2) * 0.1 * (1 - t * 2), 1 + Math.sin(t * Math.PI * 2) * 0.08 * (1 - t * 2)); }
+    for (let k = dropC.length - 1; k >= 0; k--) { const c = dropC[k], t = (nowMs - c.userData.t0) / 1000; if (t < 0) continue;
+      c.position.y = Math.max(c.userData.y1, c.position.y - t * t * 6 * 0.016 * 10); c.rotation.y = t * 0.6;
+      if (t > 2.4) { c.scale.setScalar(Math.max(0.01, 1 - (t - 2.4) * 2.5)); }
+      if (t > 2.8) { poof(c.position.clone().setY(0.3), '#E9D9B8', 8, 0.8); scene.remove(c); dropC.splice(k, 1); } }
   }
 
   // ---------- Motes & droplets ----------
@@ -1451,8 +1598,8 @@ export function createWorld(canvas) {
     raycaster.setFromCamera(ndc, camera);
     if (mode === 'build') { const h = raycaster.intersectObjects(ghostMeshes, false)[0]; return h ? h.object.userData : null; }
     if (mode === 'ground') { const p = raycaster.ray.intersectPlane(groundPlane, new THREE.Vector3()); return p ? { kind: 'ground', point: p } : null; }
-    const targets = [...tiles.map((t) => t.mesh), ...tiles.map((t) => t.holder), woods, lootG, decorG, bpGroup];
-    if (stand.visible) targets.push(stand); if (rack.visible) targets.push(rack); if (tincture.visible) targets.push(tincture); if (still.visible) targets.push(still); if (teastand.visible) targets.push(teastand); if (press.visible) targets.push(press); if (fruitstand.visible) targets.push(fruitstand); targets.push(orchardG); if (parking.visible) targets.push(parking); if (windmill.visible) targets.push(windmill); if (billboard.visible) targets.push(billboard); targets.push(market); for (const g of barrels.values()) if (g.visible) targets.push(g); for (const g of hives.values()) if (g.visible) targets.push(g); for (const g of workers.values()) if (g.visible) targets.push(g);
+    const targets = [...tiles.map((t) => t.mesh), ...tiles.map((t) => t.holder), woods, lootG, decorG, featG, bpGroup];
+    if (stand.visible) targets.push(stand); if (rack.visible) targets.push(rack); if (tincture.visible) targets.push(tincture); if (still.visible) targets.push(still); if (teastand.visible) targets.push(teastand); if (press.visible) targets.push(press); if (fruitstand.visible) targets.push(fruitstand); targets.push(orchardG); if (orchardShed.visible) targets.push(orchardShed);   /* v0.65 fix: the Orchard Stand (and its scaffold while it's being built) was never tappable */ if (parking.visible) targets.push(parking); if (windmill.visible) targets.push(windmill); if (billboard.visible) targets.push(billboard); targets.push(market); for (const g of barrels.values()) if (g.visible) targets.push(g); for (const g of hives.values()) if (g.visible) targets.push(g); for (const g of workers.values()) if (g.visible) targets.push(g);
     for (const id of Object.keys(lotFx)) if (lotFx[id].fx.visible) targets.push(lotFx[id].sign, lotFx[id].tag);
     const hits = raycaster.intersectObjects(targets, true);
     for (const h of hits) { if (h.object.userData?.tag && visibleChain(h.object)) return { kind: 'lot', id: h.object.userData.id }; }
@@ -1546,11 +1693,12 @@ export function createWorld(canvas) {
       ctl.target.lerpVectors(G.from.target, G.to.target, e); updateCamera();
       if (k >= 1) { ctl.glide = null; G.onDone?.(); }
     } else if (ctl.auto) { ctl.az += dt * 0.06; updateCamera(); }
-    updateAnims(now); updateCars(dt, t); updateBuilds(now); updateWorkers(t);
+    updateAnims(now); updateCars(dt, t); updateCrates(now); updateBuilds(now); updateWorkers(t);
     bpMat.opacity = 0.22 + 0.14 * (0.5 + 0.5 * Math.sin(t * 3)); bpPad.opacity = 0.2 + 0.18 * (0.5 + 0.5 * Math.sin(t * 3));
     for (const l of loots.values()) { l.st.material.rotation = t * 1.2 + l.ph; const s = 0.45 + 0.2 * (0.5 + 0.5 * Math.sin(t * 4 + l.ph)); l.st.scale.setScalar(s); l.st.position.y = 0.95 + Math.sin(t * 2 + l.ph) * 0.08;
       if (l.born) { const k = Math.min(1, (now - l.born) / 500); l.g.scale.setScalar(Math.max(0.01, elastic(k))); if (k >= 1) l.born = 0; } }
     for (const g of decors.values()) if (g.userData.born) { const k = Math.min(1, (now - g.userData.born) / 600); g.scale.setScalar(Math.max(0.01, elastic(k))); if (k >= 1) g.userData.born = 0; }
+    for (const g of feats.values()) if (g.userData.born) { const k = Math.min(1, (now - g.userData.born) / 600); g.scale.setScalar(Math.max(0.01, elastic(k))); if (k >= 1) g.userData.born = 0; }
     for (const o of obs.values()) if (o.grown && o.group?.userData.born) { const k = Math.min(1, (now - o.group.userData.born) / 700); o.group.scale.setScalar(Math.max(0.01, elastic(k))); if (k >= 1) o.group.userData.born = 0; }
     if (marketState === 'building' && Math.random() < dt * 1.3) poof(market.position.clone().add(new THREE.Vector3((Math.random() - 0.5) * 2.4, 0.4 + Math.random() * 1.6, 0.9)), '#EBD5AA', 6, 0.7);
     for (const tl of tiles) {
@@ -1588,8 +1736,8 @@ export function createWorld(canvas) {
     renderer, scene, camera, ctl, DEF, tiles, beds, obs, stand, rack, market, barrel, still, setStill, teastand, setTea, press, fruitstand, setCraft, addOrchardTree, setOrchardTree, removeOrchardTree, orchardTrees, makeFruitTree, parking, setParking, windmill, billboard, setBillboard, spotGhosts, setSpotGhosts, bedTargets, setBedTargets, barrels, addBarrel, removeBarrel, gutters, setGutter, setBarrelInfo, setBarrelLv, hives, addHive, removeHive, setBeeBeds, tincture, setTincture, cars, frameHooks,
     updateCamera, resize, glide, intro, pick, project, tileWorld, sickleSweep, plowFurrows, fxCount: () => fxs.length,
     setObstacle, chop, clearObstacle, addBed, setGhosts, setLotOwned, setLocation, orchardScene, orchardShed, setOStandStock, setStandShelf, standShelf, setStandStock, setMarketOpen, setRack, appear, spawnCar, spawnTruck, poof,
-    tilePlant: (i) => tiles[i]?.plant || null, addWorker, removeWorker, setWorker, workerAt, setPlant, attachPlant, setIcon, setShade, bgTrees, setIrrigation, irrigPulse, irrig, select, splash, render, textSprite, relabel, groundAt,
-    buildAnim, setCons, makeBlueprint, setBlueprint, setMarketState, addLoot, removeLoot, addDecor, removeDecor, addGrown, setGrown, removeGrown, loots, decors,
+    tilePlant: (i) => tiles[i]?.plant || null, addWorker, removeWorker, setWorker, workerAt, workerGo, workerIdle, workerPose, placeWorker, setPlant, attachPlant, setIcon, setShade, bgTrees, setIrrigation, irrigPulse, irrig, select, splash, render, textSprite, relabel, groundAt,
+    buildAnim, setCons, makeBlueprint, setBlueprint, setMarketState, addLoot, removeLoot, addDecor, removeDecor, addFeat, removeFeat, feats, setBulk, bulkPop, bulkHome: () => bulkHome, bulkOrch: () => bulkOrch, spawnVan, dropCrates, vans: vanPool, crates: dropC, addGrown, setGrown, removeGrown, loots, decors,
     iconWorld(i) { const t = tiles[i]; t.icon.updateWorldMatrix(true, false); return new THREE.Vector3().setFromMatrixPosition(t.icon.matrixWorld); },
   };
 }

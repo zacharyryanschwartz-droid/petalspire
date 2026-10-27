@@ -950,3 +950,67 @@ body.modal-open .tooldock, body.modal-open .jeweldock, body.bar-open .jeweldock,
 .jd.active{border-color:#D9B45A;background:linear-gradient(180deg,#FFF9EC,#FBEBC0);animation:rushpulse 1.4s ease-in-out infinite}
 .jd.active em{background:#3D5A40;color:#fff;border-color:#3D5A40}
 @keyframes rushpulse{0%,100%{box-shadow:0 4px 12px rgba(61,90,64,.18)}50%{box-shadow:0 0 0 5px rgba(217,180,90,.35),0 4px 12px rgba(61,90,64,.18)}}
+
+/* ---------- v0.65: garden charms, swap odds line, bag rule note, Bulk Sell Box ---------- */
+.pack-swap-odds{margin:6px 4px 0;font-size:12px;font-weight:700;color:var(--ink-soft);line-height:1.4}
+.pack-swap-odds b{color:var(--moss)}
+.row.gf-bag{border-color:var(--honey);background:linear-gradient(90deg,#FFF8E6,#fff)}
+.gf-line,[data-gf-onmap]{margin:6px 4px 0;font-size:12px;font-weight:700;color:var(--ink-soft)}
+.charm-row .meta small{color:#6E5A2E}
+.row.bulk-strip{border:1.5px dashed var(--honey);background:#FFFBF0;margin-top:12px}
+.bulk-hero{display:flex;gap:12px;align-items:center;background:linear-gradient(180deg,#FFFBF4,#F6EBDC);border:1.5px solid var(--sage);border-radius:18px;padding:10px 12px;margin:0 2px 10px}
+.bulk-hero svg{width:64px;height:76px;flex:none}
+.bulk-hero p{margin:0;font-size:13px;font-weight:600;color:var(--moss);line-height:1.4}
+
+/* v0.65 per-location bags */
+.bag-loc { display: flex; align-items: center; gap: 10px; margin: 4px 2px 10px; padding: 10px 12px; border-radius: 16px; background: #eef3e6; border: 1px solid #d5e0c6; }
+.bag-loc > i { width: 30px; height: 30px; flex: none; }
+.bag-loc > span { display: flex; flex-direction: column; min-width: 0; }
+.bag-loc b { font-family: 'Fraunces', serif; font-size: 17px; color: #3f5a3a; }
+.bag-loc small { font-size: 12.5px; color: #7a7466; line-height: 1.3; }
+.send-box { margin: 10px 0 12px; border-radius: 16px; background: #fffaf0; border: 1px solid #efe0bf; }
+.send-box > summary { cursor: pointer; padding: 11px 14px; font-weight: 700; color: #6b5a2e; list-style: none; }
+.send-box > summary::-webkit-details-marker { display: none; }
+.send-box > summary::before { content: '▸ '; color: #c9a24a; }
+.send-box[open] > summary::before { content: '▾ '; }
+.send-box .send-list { padding: 0 8px 8px; }
+
+/* v0.65: the Map lives in the tab bar (where the Rack tab was) · dimmed with a lock until every Home plot is yours */
+#tabbar .tab-map svg.map-ico{width:26px;height:26px}
+#tabbar button.tab-map.locked > svg{filter:grayscale(1);opacity:.5}
+#tabbar button.tab-map.locked > span{color:#8C8576}
+#tabbar button.tab-map.just-unlocked{animation:mapUnlock 1.1s ease 2}
+/* v0.65: Instant Bloom / Customer Rush on the left edge, stacked above the tool dock, clear of the tab bar, HUD and safe areas */
+.jeweldock{right:auto!important;left:calc(var(--sal) + 10px)!important;align-items:flex-start}
+/* v0.65: storybook map */
+.map-screen{background:#FFF9F0}
+.map-head h2{font-family:'Fraunces',serif;font-weight:700}
+.map-svg.storybook{border-radius:16px;box-shadow:0 2px 10px rgba(122,90,60,.18),inset 0 0 0 1px rgba(122,90,60,.25)}
+.storybook .m-road{fill:none;stroke:#D9BF85;stroke-width:9;stroke-linecap:round;opacity:.9}
+.storybook .m-road.far{stroke-width:7;stroke-dasharray:1 0;opacity:.55}
+.storybook .m-rut{fill:none;stroke:#EBD9AE;stroke-width:2;stroke-dasharray:5 6;stroke-linecap:round}
+.storybook .m-label{font:700 14px 'Fraunces',serif;fill:#3D5A40;letter-spacing:.2px}
+.storybook .rb{fill:#FFF9F0;stroke:#7A5A3C;stroke-width:1.3}
+.storybook .rb-tail{fill:#F5D07A;stroke:#7A5A3C;stroke-width:1.1;stroke-linejoin:round}
+.storybook .map-place.here .rb{fill:#3D5A40}.storybook .map-place.here .m-label{fill:#FFF9F0}
+.storybook .map-place.st-forsale .rb,.storybook .map-place.st-locked .rb{fill:#FFF4D6}
+.storybook .m-price rect{fill:#F5D07A;stroke:#7A5A3C;stroke-width:1.1}
+.storybook .m-price text{font:800 11px 'Nunito',system-ui;fill:#3D3326}
+.storybook .m-unexplored{font:italic 600 17px 'Fraunces',serif;fill:#7A6A52}
+.storybook .m-unexplored.sm{font:600 12px 'Nunito',system-ui;fill:#9A8A70;font-style:normal}
+.storybook .m-title text{font:700 15px 'Fraunces',serif;fill:#3D5A40}
+.storybook .compass text{font:700 10px 'Fraunces',serif;fill:#7A5A3C}
+.storybook .map-place.st-forsale .scene,.storybook .map-place.st-locked .scene{filter:saturate(.55);opacity:.85}
+.storybook .m-fog{opacity:.92}
+.storybook .m-fog.clearing{animation:fogClear 2.2s ease-out .35s forwards}
+@keyframes fogClear{to{opacity:0;transform:translate(26px,-14px) scale(1.15)}}
+.storybook .m-north .m-cloud{animation:cloudDrift 9s ease-in-out infinite alternate}
+.storybook .m-north .m-cloud:nth-child(even){animation-duration:12s;animation-direction:alternate-reverse}
+@keyframes cloudDrift{from{translate:-5px 0}to{translate:6px 0}}
+.storybook .smoke{animation:smoke 3s ease-in-out infinite}
+@keyframes smoke{0%,100%{opacity:.85;translate:0 0}50%{opacity:.5;translate:2px -3px}}
+.storybook .m-ripple{animation:ripple 4s linear infinite}
+@keyframes ripple{to{stroke-dashoffset:-40}}
+.storybook .m-lock{animation:lockPulse 2.4s ease-in-out infinite}
+@keyframes lockPulse{50%{transform:translate(0,2px) scale(1.08)}}
+@media (prefers-reduced-motion:reduce){.storybook *{animation:none!important}.storybook .m-fog.clearing{opacity:0}}

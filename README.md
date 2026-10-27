@@ -1,4 +1,4 @@
-# Petalspire v0.63
+# Petalspire v0.65
 
 A cozy 3D flower-garden prototype for iPhone Safari (portrait, one thumb). Also plays on desktop with a mouse.
 This is a **prototype**: version numbers stay below 1.0 until the first official release.
@@ -20,6 +20,83 @@ This is a **prototype**: version numbers stay below 1.0 until the first official
 7. **Land for sale.** Five wooded plots, each with a floating For Sale sign: 150 → 300 → 600 → 1000 → 1500 coins.
 
 Drag with one finger to pan, pinch to zoom, and twist with two fingers to turn. On desktop, right-drag or shift-drag turns the view.
+
+## New in v0.65 — garden charms, delivery van, one Bag per place, a fairer economy, walking Gardeners and a storybook Map
+
+v0.65 (build `0.65`, label "v0.65 prototype") is v0.64.1 plus this update. Saves load with nothing lost (save key `petalspire.v03`; every change below migrates).
+
+### Garden charms (Sundial-style keepsakes)
+Find the card in a pack or swap, buy it once in the Supply Market, place it on your land. Copies level it up (3 / 6 / 10 copies → Lv2–4).
+
+| Charm | Tier | Price | Effect Lv1 → Lv4 |
+|---|---|---|---|
+| Golden Sundial | Rare | 90 | watered plants grow 25% faster |
+| Brass Garden Bell | Rare | 120 | customers where it stands arrive 8% → 15% sooner |
+| Copper Rain Chain | Super Rare | 180 | rain barrels refill 10% → 20% faster |
+| Seed Keeper's Tin | Super Rare | 200 | 15% → 30% chance of +1 seed per harvest |
+| Honeygold Scales | Ultra Rare | 280 | Farm Stand / Fruit Stand sales +5% → +10% |
+| Gardener's Pocket Watch | Ultra Rare | 300 | Gardener shifts +1 h → +3 h, same wage |
+| Moonlit Fountain | Other World | 420 | 20% → 35% chance of +1 flower |
+| Fae Lantern | Other World | 450 | drying and crafting 15% → 25% faster |
+
+- **Bag rule:** a feature is in the Bag only if it was **bought** (a pack card only unlocks it in the Market). Placed features leave the Bag; tap one on the map to put it back. A Sundial bought before v0.65 is placed for you on a free spot.
+- **One-time Market:** features and buildings leave the Market once bought (build them from the Build menu).
+- **Plant exchange (Swap):** draws from every Rare-or-better card — Rare 62.5% · Super Rare 22.5% · Ultra Rare 10% · Other World 5%; cards you already own weigh ×0.4.
+
+### Delivery van
+Supply Market orders and goods you send between places ride a delivery van to the Bag of the place you ordered from: about 4 s; it drives up if the trip is more than 0.7 s out, trips are at least 3.5 s apart, it parks 1.4 s, and anything overdue (+1.5 s, or on load) is delivered at once.
+
+### One Bag, Market and Build menu per place
+Home and the Orchard each have their own Bag, Market, Build menu, Stand and **Bulk Sell Box** (instant sale at half the stand price). Send goods between Bags from the Bag (free, by van). Owned features and buildings stay global.
+
+### Trees are Orchard-only
+Saplings are sold only in the Orchard Market and planted only on Orchard ground. Trees already growing at Home stay; unplanted saplings in the Home Bag moved to the Orchard Bag. The "Plant a tree sapling" goal is gone (goal chain 13 → 12; saves are remapped).
+
+### Economy
+| | Before | v0.65 |
+|---|---|---|
+| Seeds per harvest | Basic 5 · Epic 4–5 · Legendary 4 · Rare 3–4 · SR 2–3 · UR 2 · OW 1 (25% → 2) | Basic 2–3 · Epic 2–3 · Legendary 2 · Rare 1–2 · SR 1–2 · UR 1 (25% → 2) · OW 1 (15% → 2) |
+| Sunflower seeds | 100 per harvest | 50 |
+| Grow time, seconds (examples) | Peppermint 100 · Rosemary 145 · Damask Rose 205 · Saffron 260 · Ghost Orchid 350 · Moonflower 460 | 285 · 570 · 1260 · 2580 · 5160 · 10320 (Epic ≈×2.85 up to Other World ≈×22) |
+| Stand shelf | 12 (+4/+8/+12 by level) | 18 (+6/+12/+18) |
+| Customers | 1 kind (40% → 2), up to 3 each | 1–3 kinds (Lv4: 2–4), up to 3–5 each |
+
+Basic plants keep their old grow times; seed prices are unchanged; card packs never granted seeds, so there was nothing to halve there.
+
+### Billboard
+Run ad: 2× traffic for 5 minutes, free, then a **1-hour cool-off after each run** (wall clock, saved). 1 Jewel runs another during the cool-off.
+
+### Walking Gardeners
+Gardeners now walk between beds with a basket, kneel to plant and pick, and carry goods to the stand (visual only — the work itself is unchanged). Idle Gardeners rest near where they were hired.
+
+### Tab bar, Jewel dock
+The Rack tab is gone (tap the rack in the garden). The **Map** sits in the tab bar, dimmed with a lock until every Home plot is yours. Instant Bloom and Customer Rush moved to the left edge, stacked above the Sickle/Plow dock.
+
+### Orchard Stand rush fix
+"Finish for 1 Jewel" now works for every build and upgrade at every location. The Orchard Stand scaffold was not tappable (the Orchard shed was missing from tap targets); it is now, and the finished stand appears at once and stays after reload.
+
+### Watch Ad scales with progress
+Unlimited, and always worth a few minutes of income; the button shows the reward (e.g. "▶ Watch · +300").
+
+| Stage | Multiplier | Coins | Wood | Scrap |
+|---|---|---|---|---|
+| Fresh garden | ×1 | 50 | 20 | 5 |
+| 3 Home plots | ×2.5 | 125 | 50 | 13 |
+| All 6 Home plots | ×4 | 200 | 80 | 20 |
+| + the Orchard | ×6 | 300 | 120 | 30 |
+| + 3 Orchard plots | ×7.8 | 390 | 156 | 39 |
+
+### Rain barrels are fixtures
+Barrels never show in the Bag. Tap one in the garden to see its water and upgrade it in place. Spare barrel credits from old saves stay usable from the Build menu card.
+
+### Sorted lists
+Market, Bag, Stand restock, Bulk Sell Box, Send list and Build menu all run from the highest value to the lowest (sell value; buy price for things you only buy) within each section; ties by tier, then name.
+
+### Storybook Map
+The Map is now a hand-painted storybook map (light SVG plus one small canvas paper texture, no 3D): parchment paper, watercolour meadows, winding dirt roads, a stream with a bridge, the Home cottage garden and the Orchard trees, fences, sheep and flowers. Clouds cover the unexplored north. A place you don't own sits under fog with a lock and its price; the fog drifts away the first time you open the Map after buying it. Tap an open place to travel straight there.
+
+### Player stats
+Anonymous play stats (sessions, version) go to the studio's Games Backend. No API key is in the game and nothing personal is sent. Automated test browsers are skipped.
 
 ## New in v0.64 — the Sickle and Plow never rest, slower builds, and new Jewel uses
 

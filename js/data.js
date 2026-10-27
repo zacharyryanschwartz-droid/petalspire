@@ -4,19 +4,20 @@
 // lower pack odds, a longer grow time, a higher seed cost and a higher sell price. Basic keeps the v0.4 numbers exactly.
 //   pack: % chance that ONE pack card is a plant of this tier (split between its 3 plants by packShare; features keep their v0.41 odds)
 //   glow: 0 = none, 1 = soft (Rare+), 2 = Ultra Rare shimmer, 3 = Other World (strongest glow + floating motes)
-//   seeds: [min, max] seeds per harvest; bonus: chance of +1 seed (Other World: 1, sometimes 2)
+//   seeds: [min, max] seeds per harvest; bonus: chance of +1 seed (v0.65: Ultra Rare 25%, Other World 15% → 2)
 //   color: tier label / card frame colour (brand palette)
 export const PLANT_TIERS = {
-  basic:      { label: 'Basic',       order: 1, pack: 40,  glow: 0, seeds: [5, 5], color: '#5E825F' },
-  epic:       { label: 'Epic',        order: 2, pack: 8,   glow: 0, seeds: [4, 5], color: '#B07A1E' },
-  legendary:  { label: 'Legendary',   order: 3, pack: 4.5, glow: 0, seeds: [4, 4], color: '#9A6A12' },
-  rare:       { label: 'Rare',        order: 4, pack: 3,   glow: 1, seeds: [3, 4], color: '#4F8597' },
-  superrare:  { label: 'Super Rare',  order: 5, pack: 1.8, glow: 1, seeds: [2, 3], color: '#3D5A40' },
-  ultra:      { label: 'Ultra Rare',  order: 6, pack: 0.8, glow: 2, seeds: [2, 2], color: '#8A5FB8' },
-  otherworld: { label: 'Other World', order: 7, pack: 0.4, glow: 3, seeds: [1, 1], bonus: 0.25, color: '#6C7FD0' },
+  basic:      { label: 'Basic',       order: 1, pack: 40,  glow: 0, seeds: [2, 3], color: '#5E825F' },
+  epic:       { label: 'Epic',        order: 2, pack: 8,   glow: 0, seeds: [2, 3], color: '#B07A1E' },
+  legendary:  { label: 'Legendary',   order: 3, pack: 4.5, glow: 0, seeds: [2, 2], color: '#9A6A12' },
+  rare:       { label: 'Rare',        order: 4, pack: 3,   glow: 1, seeds: [1, 2], color: '#4F8597' },
+  superrare:  { label: 'Super Rare',  order: 5, pack: 1.8, glow: 1, seeds: [1, 2], color: '#3D5A40' },
+  ultra:      { label: 'Ultra Rare',  order: 6, pack: 0.8, glow: 2, seeds: [1, 1], bonus: 0.25, color: '#8A5FB8' },
+  otherworld: { label: 'Other World', order: 7, pack: 0.4, glow: 3, seeds: [1, 1], bonus: 0.15, color: '#6C7FD0' },
 };
 export const TIER_ORDER = Object.keys(PLANT_TIERS).sort((a, b) => PLANT_TIERS[a].order - PLANT_TIERS[b].order);
-// Seeds from one harvest, by the plant's tier rule (Basic 5 · Epic 4–5 · Legendary 4 · Rare 3–4 · Super Rare 2–3 · Ultra Rare 2 · Other World 1, 25% → 2).
+// Seeds from one harvest, by the plant's tier rule. v0.65 roughly halved them, but every plant can still give 2 (oils need seeds):
+// Basic 2–3 · Epic 2–3 · Legendary 2 · Rare 1–2 · Super Rare 1–2 · Ultra Rare 1, 25% → 2 · Other World 1, 15% → 2. (Was: Basic 5 · Epic 4–5 · Legendary 4 · Rare 3–4 · Super Rare 2–3 · Ultra Rare 2 · Other World 1, 25% → 2.)
 export function rollSeeds(tier, rnd = Math.random) {
   const t = PLANT_TIERS[tier] || PLANT_TIERS.basic; const [a, b] = t.seeds;
   return a + Math.floor(rnd() * (b - a + 1)) + (t.bonus && rnd() < t.bonus ? 1 : 0);
@@ -39,46 +40,46 @@ export const SPECIES = {
     growS: 80, seedPrice: 18, flowerSell: 24, seedSell: 9, yieldF: [1, 2], color: '#FFFFFF', icon: 'daisy', img: 'assets/card-chamomile.jpg', packShare: 0.1,
     stats: st(2, 4, 2, 5), blurb: 'Tiny white daisies with sunny yellow centres and feathery leaves. Prized for calming tea.' },
   // ---- Epic ----
-  peppermint: P('peppermint', 'epic', 'Peppermint', 'Plant · Cooling mint', [100, 24, 28, [2, 3]], '#8FC48A', 'leaf', st(4, 3, 4, 4),
+  peppermint: P('peppermint', 'epic', 'Peppermint', 'Plant · Cooling mint', [285, 24, 28, [2, 3]], '#8FC48A', 'leaf', st(4, 3, 4, 4),
     'Bright, square-stemmed mint with serrated leaves and lilac flower spikes. Dries into tea, steeps into tinctures, distils into a cool oil.', { dries: true }),
-  echinacea: P('echinacea', 'epic', 'Echinacea', 'Plant · Purple coneflower', [115, 27, 32, [2, 3]], '#D77FB0', 'cone', st(3, 5, 3, 3),
+  echinacea: P('echinacea', 'epic', 'Echinacea', 'Plant · Purple coneflower', [320, 27, 32, [2, 3]], '#D77FB0', 'cone', st(3, 5, 3, 3),
     'Tall coneflowers with drooping pink-magenta petals around a spiky copper cone. A favourite immune-support tincture.'),
-  lemonbalm: P('lemonbalm', 'epic', 'Lemon Balm', 'Plant · Lemon-scented herb', [105, 25, 30, [2, 3]], '#B9DB7C', 'leaf', st(4, 3, 4, 4),
+  lemonbalm: P('lemonbalm', 'epic', 'Lemon Balm', 'Plant · Lemon-scented herb', [300, 25, 30, [2, 3]], '#B9DB7C', 'leaf', st(4, 3, 4, 4),
     'A soft mound of crinkled, lemon-scented leaves. Calming in tea and glycerites; dries well.', { dries: true }),
   // ---- Legendary ----
-  rosemary: P('rosemary', 'legendary', 'Rosemary', 'Plant · Woody herb', [145, 38, 46, [2, 3]], '#6E8F86', 'leaf', st(3, 3, 4, 4),
+  rosemary: P('rosemary', 'legendary', 'Rosemary', 'Plant · Woody herb', [570, 38, 46, [2, 3]], '#6E8F86', 'leaf', st(3, 3, 4, 4),
     'Upright woody sprigs of needle-like leaves dotted with pale blue flowers. Dries, steeps and distils beautifully.', { dries: true }),
-  yarrow: P('yarrow', 'legendary', 'Yarrow', 'Plant · Meadow herb', [150, 40, 48, [2, 3]], '#F2BFC6', 'umbel', st(3, 4, 4, 3),
+  yarrow: P('yarrow', 'legendary', 'Yarrow', 'Plant · Meadow herb', [600, 40, 48, [2, 3]], '#F2BFC6', 'umbel', st(3, 4, 4, 3),
     'Feathery leaves under flat clusters of tiny blush flowers. A classic dried herb and tincture.', { dries: true }),
-  sunflower: P('sunflower', 'legendary', 'Sunflower', 'Plant · Golden giant', [165, 44, 54, [2, 3]], '#F5C542', 'daisy', st(3, 5, 4, 4),
-    'A tall, cheerful giant whose whole worth is its seed disc: one plant gives 100 seeds a harvest (no cut flowers). Sell them in bags of 50 or 100, replant them, or press them into Sunflower Oil and Sun Butter.', { seedsFixed: 100, noFlower: true, seedSell: 1 }),
+  sunflower: P('sunflower', 'legendary', 'Sunflower', 'Plant · Golden giant', [640, 44, 54, [2, 3]], '#F5C542', 'daisy', st(3, 5, 4, 4),
+    'A tall, cheerful giant whose whole worth is its seed disc: one plant gives 50 seeds a harvest (no cut flowers). Sell them in bags of 50 or 100, replant them, or press them into Sunflower Oil and Sun Butter.', { seedsFixed: 50, seedBonus: 5, noFlower: true, seedSell: 1 }),
   // ---- Rare (soft glow) ----
-  damaskrose: P('damaskrose', 'rare', 'Damask Rose', 'Plant · Old rose', [205, 68, 84, [2, 3]], '#F2A7B8', 'bloom', st(2, 5, 3, 5),
+  damaskrose: P('damaskrose', 'rare', 'Damask Rose', 'Plant · Old rose', [1260, 68, 84, [2, 3]], '#F2A7B8', 'bloom', st(2, 5, 3, 5),
     'The perfumer’s rose: full, fragrant blush blooms. Its seeds distil into precious rose otto oil.'),
-  tulsi: P('tulsi', 'rare', 'Holy Basil', 'Plant · Tulsi', [190, 62, 78, [2, 3]], '#A884C2', 'spike', st(3, 4, 4, 4),
+  tulsi: P('tulsi', 'rare', 'Holy Basil', 'Plant · Tulsi', [1140, 62, 78, [2, 3]], '#A884C2', 'spike', st(3, 4, 4, 4),
     'Sacred tulsi: purple-tinged leaves and mauve flower spikes. Dries into a fragrant tea and makes a prized tincture.', { dries: true }),
-  elderflower: P('elderflower', 'rare', 'Elderflower', 'Plant · Elder shrub', [200, 65, 80, [2, 3]], '#F6F1DC', 'umbel', st(2, 4, 4, 5),
+  elderflower: P('elderflower', 'rare', 'Elderflower', 'Plant · Elder shrub', [1200, 65, 80, [2, 3]], '#F6F1DC', 'umbel', st(2, 4, 4, 5),
     'Lacy, creamy-white umbels on a young elder. Dried for tea, steeped into a sweet glycerite.', { dries: true }),
   // ---- Super Rare (soft glow) ----
-  saffron: P('saffron', 'superrare', 'Saffron Crocus', 'Plant · Autumn crocus', [260, 100, 140, [2, 2]], '#B79AE0', 'bloom', st(2, 5, 2, 4),
+  saffron: P('saffron', 'superrare', 'Saffron Crocus', 'Plant · Autumn crocus', [2580, 100, 140, [2, 2]], '#B79AE0', 'bloom', st(2, 5, 2, 4),
     'Lilac crocus cups with three vivid red threads — the world’s most precious spice. Sells for a fortune.'),
-  bluelotus: P('bluelotus', 'superrare', 'Blue Lotus', 'Plant · Water lily', [275, 110, 150, [2, 2]], '#8FB8E8', 'bloom', st(2, 5, 2, 5),
+  bluelotus: P('bluelotus', 'superrare', 'Blue Lotus', 'Plant · Water lily', [2700, 110, 150, [2, 2]], '#8FB8E8', 'bloom', st(2, 5, 2, 5),
     'Star-shaped sky-blue water lilies with golden hearts, floating over round pads.'),
-  jasmine: P('jasmine', 'superrare', 'Jasmine', 'Plant · Night-scented vine', [285, 118, 158, [2, 2]], '#FFFDF6', 'star', st(2, 5, 2, 5),
+  jasmine: P('jasmine', 'superrare', 'Jasmine', 'Plant · Night-scented vine', [2820, 118, 158, [2, 2]], '#FFFDF6', 'star', st(2, 5, 2, 5),
     'A twining vine of starry white flowers with blush buds. Its seeds distil into a heady jasmine oil.'),
   // ---- Ultra Rare (real but famously rare; shimmering glow) ----
-  ghostorchid: P('ghostorchid', 'ultra', 'Ghost Orchid', 'Plant · Leafless orchid', [350, 170, 245, [2, 2]], '#F4F7F2', 'bloom', st(1, 5, 2, 5),
+  ghostorchid: P('ghostorchid', 'ultra', 'Ghost Orchid', 'Plant · Leafless orchid', [5160, 170, 245, [2, 2]], '#F4F7F2', 'bloom', st(1, 5, 2, 5),
     'A leafless orchid of the swamps: one pale, floating bloom with long curling tails, hanging from a tangle of roots.'),
-  jadevine: P('jadevine', 'ultra', 'Jade Vine', 'Plant · Rainforest vine', [365, 180, 260, [2, 2]], '#5FD3B8', 'claw', st(1, 5, 2, 5),
+  jadevine: P('jadevine', 'ultra', 'Jade Vine', 'Plant · Rainforest vine', [5400, 180, 260, [2, 2]], '#5FD3B8', 'claw', st(1, 5, 2, 5),
     'Cascades of claw-shaped flowers in an impossible luminous jade-turquoise.'),
-  middlemist: P('middlemist', 'ultra', 'Middlemist Red', 'Plant · Rare camellia', [380, 190, 275, [2, 2]], '#E0607A', 'bloom', st(1, 5, 2, 5),
+  middlemist: P('middlemist', 'ultra', 'Middlemist Red', 'Plant · Rare camellia', [5640, 190, 275, [2, 2]], '#E0607A', 'bloom', st(1, 5, 2, 5),
     'Perhaps the rarest flower on Earth: lush, fully double rose-pink camellia blooms on glossy dark leaves.'),
   // ---- Other World (fantasy; glows the most) ----
-  moonflower: P('moonflower', 'otherworld', 'Moonflower', 'Plant · Night-bloom', [460, 280, 440, [2, 2]], '#FFF6E6', 'moon', st(1, 5, 2, 5),
+  moonflower: P('moonflower', 'otherworld', 'Moonflower', 'Plant · Night-bloom', [10320, 280, 440, [2, 2]], '#FFF6E6', 'moon', st(1, 5, 2, 5),
     'A white trumpet bloom that glows softly, as if holding a little moonlight. Motes of light drift around it.'),
-  crystalrose: P('crystalrose', 'otherworld', 'Crystal Rose', 'Plant · Crystal bloom', [480, 300, 480, [2, 2]], '#C9D6F5', 'bloom', st(1, 5, 2, 5),
+  crystalrose: P('crystalrose', 'otherworld', 'Crystal Rose', 'Plant · Crystal bloom', [10800, 300, 480, [2, 2]], '#C9D6F5', 'bloom', st(1, 5, 2, 5),
     'A rose of translucent, faceted crystal petals that catch and hold the light.'),
-  sunpetal: P('sunpetal', 'otherworld', 'Spiral Sunpetal', 'Plant · Golden spire', [500, 320, 520, [2, 2]], '#F5D07A', 'sun', st(1, 5, 2, 5),
+  sunpetal: P('sunpetal', 'otherworld', 'Spiral Sunpetal', 'Plant · Golden spire', [11280, 320, 520, [2, 2]], '#F5D07A', 'sun', st(1, 5, 2, 5),
     'Golden petals unfurl in a perfect spiral, glowing like the last of the evening light.'),
 };
 // v0.4 kept the fantasy plants disabled; v0.5 brings Moonflower and Spiral Sunpetal back as the Other World tier (with Crystal Rose).
@@ -141,7 +142,7 @@ export const FEATURES = {
   beehive: {
     id: 'beehive', name: 'Honeybee Skep', rarity: 'legendary', type: 'Feature · Pollinators',
     price: 60, stats: { Growth: 3, Beauty: 3, Yield: 5, Atmosphere: 4 },
-    blurb: 'Once bought, busy bees add +1 flower to every harvest.',
+    blurb: 'Once bought and placed, busy bees add +1 flower to every harvest.',
   },
   irrigation: {
     id: 'irrigation', name: 'Irrigation', rarity: 'basic', type: 'Feature · Water',
@@ -213,9 +214,57 @@ export const FEATURES = {
   sundial: {
     id: 'sundial', name: 'Golden Sundial', rarity: 'rare', type: 'Feature · Time',
     price: 90, stats: { Growth: 5, Beauty: 4, Yield: 3, Atmosphere: 5 },
-    blurb: 'Once bought, every plant you water grows 25% faster.',
+    blurb: 'Once bought and placed, every plant you water grows 25% faster.',
+  },
+  // v0.65: garden charms — Sundial-style keepsakes for the upper tiers. Find the card, buy it in the Supply Market, and its
+  // effect works while you own it. Copies level it up (3 / 6 / 10 copies → Lv2–4); CHARMS below holds the per-level values.
+  gardenbell: {
+    id: 'gardenbell', name: 'Brass Garden Bell', rarity: 'rare', type: 'Charm · Customers', packW: 1,
+    price: 120, stats: { Growth: 1, Beauty: 4, Yield: 3, Atmosphere: 5 },
+    blurb: 'Once bought and placed, it rings for the stand nearby: customers at that location (Home or the Orchard) arrive 8% sooner (Lv4: 15%).',
+  },
+  rainchain: {
+    id: 'rainchain', name: 'Copper Rain Chain', rarity: 'superrare', type: 'Charm · Water', packW: 0.6,
+    price: 180, stats: { Growth: 4, Beauty: 4, Yield: 2, Atmosphere: 4 },
+    blurb: 'Once bought and placed, every rain barrel refills 10% faster (Lv4: 20%).',
+  },
+  seedtin: {
+    id: 'seedtin', name: "Seed Keeper's Tin", rarity: 'superrare', type: 'Charm · Seeds', packW: 0.6,
+    price: 200, stats: { Growth: 2, Beauty: 3, Yield: 5, Atmosphere: 3 },
+    blurb: 'Once bought and placed, every raised-bed harvest has a 15% chance of +1 seed (Lv4: 30%).',
+  },
+  scales: {
+    id: 'scales', name: 'Honeygold Scales', rarity: 'ultra', type: 'Charm · Sales', packW: 0.27,
+    price: 280, stats: { Growth: 1, Beauty: 5, Yield: 5, Atmosphere: 4 },
+    blurb: 'Once bought and placed, items sell for 5% more at the Farm Stand and the Fruit Stand (Lv4: 10%).',
+  },
+  pocketwatch: {
+    id: 'pocketwatch', name: "Gardener's Pocket Watch", rarity: 'ultra', type: 'Charm · Helpers', packW: 0.27,
+    price: 300, stats: { Growth: 4, Beauty: 3, Yield: 4, Atmosphere: 4 },
+    blurb: 'Once bought and placed, every Gardener shift lasts 1 hour longer for the same wage (Lv4: +3 hours).',
+  },
+  moonfountain: {
+    id: 'moonfountain', name: 'Moonlit Fountain', rarity: 'otherworld', type: 'Charm · Otherworldly', packW: 0.13,
+    price: 420, stats: { Growth: 5, Beauty: 5, Yield: 5, Atmosphere: 5 },
+    blurb: 'Once bought and placed, every raised-bed harvest has a 20% chance of +1 flower (Lv4: 35%).',
+  },
+  faelantern: {
+    id: 'faelantern', name: 'Fae Lantern', rarity: 'otherworld', type: 'Charm · Otherworldly', packW: 0.13,
+    price: 450, stats: { Growth: 5, Beauty: 5, Yield: 4, Atmosphere: 5 },
+    blurb: 'Once bought and placed, drying and crafting (rack, still, tinctures, tea, press, fruit stand) take 15% less time (Lv4: 25%).',
   },
 };
+// v0.65: per-level values of the garden charms (index = card level − 1). Fractions are % (0.08 = 8%); pocketwatch is hours.
+export const CHARMS = {
+  gardenbell:   { lv: [0.08, 0.10, 0.12, 0.15], fx: 'gap',   where: 'home' },
+  rainchain:    { lv: [0.10, 0.13, 0.16, 0.20], fx: 'water', where: 'all' },
+  seedtin:      { lv: [0.15, 0.20, 0.25, 0.30], fx: 'seed',  where: 'all' },
+  scales:       { lv: [0.05, 0.06, 0.08, 0.10], fx: 'sell',  where: 'stands' },
+  pocketwatch:  { lv: [1, 1.5, 2, 3],           fx: 'shift', where: 'all' },
+  moonfountain: { lv: [0.20, 0.25, 0.30, 0.35], fx: 'flower', where: 'all' },
+  faelantern:   { lv: [0.15, 0.18, 0.21, 0.25], fx: 'craft', where: 'all' },
+};
+export const CHARM_IDS = Object.keys(CHARMS);
 
 // v0.52: the Tincture Stand is a goal reward now, so it is not a collectable card (and never in packs).
 export const NON_CARDS = ['tincture', 'fruitstand'];   // v0.61: the Fruit Stand is free with the Orchard, no longer a pack card
@@ -252,7 +301,7 @@ export const WATER_TRUCK = { perBarrel: 10 };
 // exactly 100% and every card keeps its odds relative to the others.
 // v0.52 (later): cards added after the tier-odds plan (the Tea Stand) take their share from inside their own tier, so every
 // tier keeps exactly the planned odds below (Basic 34.62 … Other World 0.70) and the tier's other cards shrink in proportion.
-export const PLAN_LATE = ['teastand', 'press', 'fruitstand', ...Object.keys(TREES)];   // carved out of their tier: tier totals stay on the plan
+export const PLAN_LATE = ['teastand', 'press', 'fruitstand', ...Object.keys(TREES), ...Object.keys(CHARMS)];   // v0.65: + the garden charms   // carved out of their tier: tier totals stay on the plan
 const RAW_ALL = Object.fromEntries(Object.entries(CARDS).map(([k, c]) => [k, c.packW || 0]));
 const RAW_W = Object.fromEntries(Object.entries(RAW_ALL).map(([k, w]) => [k, PLAN_LATE.includes(k) ? 0 : w]));
 const RAW_TOTAL = Object.values(RAW_W).reduce((a, b) => a + b, 0);
@@ -292,7 +341,7 @@ export const TINC_DUP_COINS = 10;
 export const CARD_LEVELS = {
   thresholds: [3, 6, 10],          // copies needed for Lv2, Lv3, Lv4 (max)
   plant: { sell: 0.10, grow: 0.05, statPip: 1, bonusFlowerAt: 4 },
-  upgradable: (id, card) => !!card.tier || id === 'parking' || id === 'windmill' || id === 'irrigation',
+  upgradable: (id, card) => !!card.tier || id === 'parking' || id === 'windmill' || id === 'irrigation' || !!CHARMS[id],   // v0.65: + garden charms
   parking: { extraItem: 0.10 },   // v0.52: spots / cars per arrival / gap per level live in PARKING; each level adds +10% extra-item chance
 };
 // v0.41: Card Packs cost Jewels, not coins (1 Jewel = one standard pack). Add more pack types here (e.g. a premium pack at 3 Jewels).
@@ -343,7 +392,7 @@ export const BLOOM = { perJewel: 6, min: 1, max: 5 };
 export const bloomJewels = (n) => Math.min(BLOOM.max, Math.max(BLOOM.min, Math.ceil(n / BLOOM.perJewel)));
 export const RUSH = { jewels: 1, ms: 150000, gapK: 0.2, firstMs: 1200 };
 export const BUILDING_LV = {
-  stand: { cost: [250, 750, 2000], space: [0, 4, 8, 12], sell: [0, 0, 0.05, 0.10] },   // +shelf space · +% coins on Farm Stand sales
+  stand: { cost: [250, 750, 2000], space: [0, 6, 12, 18], sell: [0, 0, 0.05, 0.10] },   // +shelf space · +% coins on Farm Stand sales
   rack:  { cost: [150, 450, 1200], slots: [3, 4, 5, 6], faster: [0, 0.10, 0.20, 0.30] }, // drying slots · % shorter drying time
 };
 export const DRY_S = 40;
@@ -455,7 +504,7 @@ for (const [sp, r] of Object.entries(STILL.recipes)) {
   ITEMS[hydroId(sp)] = { name: rose ? 'Rose Water' : `${nm} Hydrosol`, sell: Math.round(r.sell * (rose ? HYDROSOL.roseShare : HYDROSOL.share)), icon: ['hydrosol', hydroTint(src.fruitC || src.color)], hydrosol: true };
 }
 // ---------------- v0.6 Sunflower seed bags ----------------
-// A Sunflower harvest is 100 seeds (no flowers). Seeds sell for 1 coin each singly; a bag of 50 sells for 85 and a bag of 100
+// A Sunflower harvest is 50 seeds (v0.65; was 100) (no flowers). Seeds sell for 1 coin each singly; a bag of 50 sells for 85 and a bag of 100
 // for 200 (2 a seed) — about a fair Legendary harvest (e.g. Rosemary: ~2.5 flowers × 46 + 4 seeds × 19 ≈ 191).
 export const SEED_BAGS = { sunflower: [{ n: 50, sell: 85 }, { n: 100, sell: 200 }] };
 export const bagId = (sp, n) => `bag${n}_${sp}`;
@@ -505,7 +554,7 @@ for (const [C, pre] of [[PRESS, 'press_'], [FRUITSTAND, 'jar_']]) for (const r o
 export const itemLoc = (id) => (id.startsWith('fruit_') || id.startsWith('jar_') ? 'orchard' : id.startsWith('press_') ? 'both' : 'home');
 export const sellsAt = (id, loc) => { const w = itemLoc(id); return w === 'both' || w === loc; };
 // v0.61: the Orchard Stand — the Orchard's selling stand (like the Home Farm Stand), built on its spot by the Orchard road
-export const ORCH_STAND = { coins: 300, wood: 30, cap: 12 };
+export const ORCH_STAND = { coins: 300, wood: 30, cap: 18 };   // v0.65: cap 12 → 18
 // v0.61: Garden Workers (after every Home plot is bought). One per plot; a shift is 6 real hours (offline time counts).
 // hire = the price of the last Home plot; wage = about a tenth of what a busy plot earns in 6 hours.
 // v0.61: every crafting stand can also be unlocked with coins (no real money needed). In the order players reach them;
@@ -546,7 +595,12 @@ export function registerTea(id) {
 
 export const WOOD = { tree: 3, stump: 1, bush: 0, rock: 0 };
 export const BED_COSTS = [12, 20, 28, 36, 44, 52];   // wood per raised bed, escalating
-export const STAND_CAP = 12;
+export const STAND_CAP = 18;   // v0.65: was 12
+// v0.65: customers may buy several kinds of item per visit; index = Farm Stand level − 1 (the Orchard Stand uses Lv1).
+// kinds = [min, max] different items, upTo = most units of each. (Before v0.65: 1 kind, 40% → 2; up to 3 of each.)
+export const STAND_BUY = { kinds: [[1, 3], [1, 3], [2, 3], [2, 4]], upTo: [3, 3, 4, 5] };
+// v0.65: the Bulk Sell Box at each location — instant sale of extra goods at half the stand price (min 1 coin each).
+export const BULK = { k: 0.5 };
 export const MARKET_GOAL = 100;                        // coins earned at the stand to unlock the Rebuild Market project
 export const WATER_REGEN_S = 30, WATER_REGEN_MAX = 12; // v0.63: +1 water every 30 s (was 60 s), Lv1 barrel holds 12 (was 10), offline too
 // v0.63 WATER ECONOMY. A raised bed (3×3) pays water twice per grow cycle: to START growing and again to BUD (growth stalls
@@ -676,16 +730,16 @@ export const JEWEL_BUNDLES = [
 export const PARKING = { spots: [2, 3, 4, 6], cars: [2, 2, 3, 3], gapMult: [1.4, 1.2, 1.25, 1.15], extraItem: 0.3 };
 export const parkLv = (lv) => Math.max(1, Math.min(4, lv || 1)) - 1;
 export const WINDMILL = { regenS: [15, 13, 11, 10] };   // v0.63: base refill is now 30 s (was 60), so the Windmill is 15/13/11/10 s (was 20/18/17/15)
-export const BILLBOARD = { boostMs: 5 * 60000, cooldownMs: 60 * 60000, mult: 2, jewels: 1 };  // Run ad: 2× traffic for 5 min · free once an hour · 1 Jewel to skip the wait
+export const BILLBOARD = { boostMs: 5 * 60000, cooldownMs: 60 * 60000, mult: 2, jewels: 1 };  // Run ad: 2× traffic for 5 min · free, then a 1 h cool-off after each run (v0.65) · 1 Jewel runs another
 export const TIPS = {
   parking: 'Your <b>Parking Lot</b> is open! Customers now come in <b>groups of 2 cars</b> — each car is a customer. Stack Parking Lot cards to level it up: more spots (2 → 3 → 4 → 6), bigger groups and shorter gaps. Some customers buy an extra item.',
   windmill: 'Your <b>Windmill</b> is turning! Every rain barrel that’s connected to a stand now refills every <b>15 s</b> instead of 30 s (faster with card levels).',
-  billboard: 'Your <b>Billboard</b> is up! Tap it and <b>Run ad</b> for twice the traffic for 5 minutes. It’s free once an hour; during the wait you can spend 1 Jewel to run it now.',
+  billboard: 'Your <b>Billboard</b> is up! Tap it and <b>Run ad</b> for twice the traffic for 5 minutes. It’s free, then the Billboard cools off for 1 hour after each ad; while it cools off you can spend 1 Jewel to run another.',
   chop: 'An old wooded lot. <b>Tap a tree</b> to chop it down — you’ll get <b>Wood</b>.',
   stump: 'Stumps stay behind. <b>Tap a stump</b> to dig it out and clear the ground.',
   find: 'Something glints! <b>Tap the sparkle</b> to pick up what you found.',
   finds: 'Found items go to <b>Bag → Finds</b>. <b>Restore</b> them into something useful, or <b>recycle</b> them.',
-  sapling: 'A <b>tree sapling</b>! Plant it from the <b>Supply Market</b> (Tree sapling › Plant) on open ground. Trees grow slowly but give lots of Wood.',
+  sapling: 'A <b>tree sapling</b>! Trees grow only in the <b>Orchard</b> — it waits in your <b>Orchard Bag</b>; plant it on open Orchard ground. Trees grow slowly but give lots of Wood.',
   build: 'Nice clearing! Tap <b>Build</b> and place a <b>raised bed</b> on a fully cleared patch.',
   standbp: 'Next: build your <b>Farm Stand</b> by the road. Tap the glowing blueprint or open <b>Build</b>.',
   water: 'Seeds need a drink. <b>Tap the planted tile</b> and water it.',
