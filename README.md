@@ -1,4 +1,4 @@
-# Petalspire v0.65
+# Petalspire v0.66
 
 A cozy 3D flower-garden prototype for iPhone Safari (portrait, one thumb). Also plays on desktop with a mouse.
 This is a **prototype**: version numbers stay below 1.0 until the first official release.
@@ -20,6 +20,27 @@ This is a **prototype**: version numbers stay below 1.0 until the first official
 7. **Land for sale.** Five wooded plots, each with a floating For Sale sign: 150 → 300 → 600 → 1000 → 1500 coins.
 
 Drag with one finger to pan, pinch to zoom, and twist with two fingers to turn. On desktop, right-drag or shift-drag turns the view.
+
+## New in v0.66 — optional boosts, a Starter Pack (placeholder), More from Schwarze Spiele, and a studio splash
+
+**Optional boosts (rewarded ads).** Now and then a small badge slides up above the tab bar. Watching the ad (the same Watch Ad break as before) gives the boost; tapping × or waiting 20 s lets it slip away.
+
+| Boost | When it can appear | What the ad gives |
+|---|---|---|
+| Double Harvest | right after a harvest | the same flowers and seeds again |
+| Double Sale | right after a stand sale of 20+ coins | the sale's coins again |
+| Fast-Grow | right after watering a plant with 60+ s left | that one plot is ready to pick |
+
+Badges only start after 3 harvests, show for about half of the moments, and at most one every 4 minutes. Never during a pack reveal, a dialog, the Map, or building.
+
+**Starter Pack.** 10 Jewels, 2 Card Packs, 500 coins and 50 Wood for $1.99. It first appears after about 15 minutes of play, 8 harvests and 3 customers. Then it shows rarely: at most 4 times, at least 3 days apart. Each offer window lasts 48 h, with a gentle "Available for …" timer. You can close it with × or "Maybe later". While the window is open it is also listed at the top of the Jewel Shop. The copy uses no pressure wording.
+- *Placeholder purchase hook:* `Payments.purchaseOffer()` in `js/payments.js` is where the iPhone in-app purchase goes (product id `com.petalspire.starter`). On the web it charges nothing and grants nothing; it only says the pack arrives with the iPhone app. The contents are granted once, and only after a verified receipt (`grantStarter`).
+
+**More from Schwarze Spiele.** Settings has a "More from Schwarze Spiele" section with a card for **Market Plot** (a solo sandbox invent-and-market farming game from the same studio). It is marked Coming soon and has a Wishlist toggle that is remembered. The same card pops up once after a session milestone (20+ minutes of play plus the Map unlock, the Orchard, or every 50th harvest), at most 3 times and 3 days apart. There is no link yet: set `url` / `wishlistUrl` for `market_plot` in `OTHER_GAMES` (`js/data.js`).
+
+**Studio brand.** A short Schwarze Spiele splash (white logo, "presents") plays on load and can be tapped away. The title screen and Settings carry the studio credit. Logos are in `assets/studio/`.
+
+**Fix.** Toast messages no longer block taps on buttons underneath them.
 
 ## New in v0.65 — garden charms, delivery van, one Bag per place, a fairer economy, walking Gardeners and a storybook Map
 

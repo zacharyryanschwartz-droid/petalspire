@@ -4,7 +4,7 @@ import { createWorld } from './world.js';
 import { buildPlant } from './plants.js';
 import { CHARMS, CHARM_IDS, STAND_BUY, BULK, BLOOM, bloomJewels, RUSH, STAND_UNLOCK, WORKER, itemLoc, sellsAt, ORCH_STAND, parkLv, hydroId, HYDROSOL, NON_CARDS, ROAD_SCRAP, TINC_DUP_COINS, SPECIES, FANTASY_SPECIES, PLANT_TIERS, cardTier, FEATURE_TIER_FROM_OLD, TIER_ORDER, PACK_W, DRYING, rollSeeds, FEATURES, CARDS, RARITY, ITEMS, SELL_ORDER, TIPS, RESALE, PACKS, PACK_JEWELS, JEWEL_EXCHANGE, JEWEL_DROP, PARKING, BILLBOARD, WINDMILL, DUP_COINS, SUPPLY_CARDS, SUPPLY_DUP, WATER_TRUCK, CARD_LEVELS, RACK_SLOTS, BUILDING_LV, CONS, consJewels,  DAILY, PACK_LOOT, rollLoot, PACK_MIX, OWNED_K, WATER, BARREL_LV, DRY_S, BARREL, BASES, TINCTURE, STILL, oilId, tinctureId, TINCTURE_NAMES,
   WOOD, BED_COSTS, STAND_CAP, MARKET_GOAL, WATER_REGEN_S, WATER_REGEN_MAX, STARTER, STARTER_FILL, STARTER_JEWELS,
-  BUILDS, FINDS, FIND_IDS, FIND_CHANCE, SAPLING_CHANCE, RESTORE_HURRY_JEWELS, ATMOS_STEP, ATMOS_MAX, TREE, SHOP, JEWEL_BUNDLES, NO_ADS_BUNDLE, ADS, ADS_MODE, OTHER_GAMES, SOCIALS, FOLLOW_REWARD, SHADE, TEA, teaInfo, teaId, teaSps, registerTea, DRY_TIER_S, PACK_W_ORCH, TREES, TREE_IDS, PRESS, FRUITSTAND, SEED_BAGS, bagId } from './data.js';
+  BUILDS, FINDS, FIND_IDS, FIND_CHANCE, SAPLING_CHANCE, RESTORE_HURRY_JEWELS, ATMOS_STEP, ATMOS_MAX, TREE, SHOP, JEWEL_BUNDLES, NO_ADS_BUNDLE, ADS, ADS_MODE, OTHER_GAMES, BOOSTS, STARTER_PACK, STUDIO, CROSS_PROMO, SOCIALS, FOLLOW_REWARD, SHADE, TEA, teaInfo, teaId, teaSps, registerTea, DRY_TIER_S, PACK_W_ORCH, TREES, TREE_IDS, PRESS, FRUITSTAND, SEED_BAGS, bagId } from './data.js';
 import { ROAD, LOTS, SIGNS, LOT_FOR_SALE, LOT_PRICES, SITES, OBSTACLES, SPOTS, PARK_X, BEHIND, FRONT, BED_N, TILE, SITE_HALF, siteById, obstacleById, inSite, lotCenter, lotAt, ORCHARD_TREE_SPOTS, OWNABLE_LOTS, LOCATIONS, ORCHARD_PRICE, ORCH_X, ORCH_FOR_SALE, ORCH_PLOT_PRICES, ORCH_LOTS, lotLoc } from './layout.js';
 import { ICONS, itemIcon, FEATURE_ART, findIcon, decorIcon } from './icons.js';
 import { Payments } from './payments.js';
@@ -14,7 +14,7 @@ import { shadeAt, speedFor, sunLabel, rebaseStart } from './shade.js';
 
 // Save format: v0.3, v0.31 and v0.4 share one localStorage key (schema v: 3). `build` records which prototype build last wrote the save;
 // v0.3 / v0.31 saves (no `build`, no per-plot barrels) are migrated on load (migrate04 below); v0.4 saves load as-is and are re-tagged. Prototype builds stay below 1.0.
-export const BUILD = '0.65';
+export const BUILD = '0.66';
 // v0.65: anonymous player tracking (Games Backend on Appwrite; no API key in the game, nothing personal). Skipped for automated runs (navigator.webdriver).
 try { if (!navigator.webdriver) initTracker({ endpoint: 'https://nyc.cloud.appwrite.io/v1', projectId: '6ae0a41a002ce0a48fac', gameId: 'petalspire', platform: 'web', appVersion: BUILD }); } catch (_) {}
 const SAVE_KEY = 'petalspire.v03', V02_KEY = 'petalspire.v02', OLD_KEYS = ['petalspire.v01'];
@@ -78,7 +78,7 @@ function freshState() {
     pressBuilt: false, pressPos: null, pressSlots: Array(PRESS.slots).fill(null), fruitstandBuilt: false, fruitstandPos: null, fruitstandSlots: Array(FRUITSTAND.slots).fill(null), orchard: {},   // v0.6   // v0.52 Tea Stand   // v0.41 Essential Oil Stand
     windmillBuilt: false, windmillPos: null,   // v0.41 Windmill (global barrel boost)
     parkingBuilt: false, billboardBuilt: false, bb: { until: 0, readyAt: 0, runs: 0, jewelRuns: 0 },   // v0.41 Parking Lot + Billboard (timestamps, so they keep counting while closed)
-    packs: 0, tips: {}, goal: 0, introDone: false,
+    packs: 0, tips: {}, goal: 0, introDone: false, monet: { playMs: 0, boostAt: 0, starter: {}, promo: {}, wish: {} },   // v0.66
     stats: { chopped: 0, stumps: 0, harvests: 0, watered: 0, stocked: 0, customers: 0, standEarned: 0, sold: 0,
       cleared: 0, finds: 0, restored: 0, recycled: 0, treesPlanted: 0, grownChopped: 0, jewelsBought: 0, jewelsFound: 0, jewelsTraded: 0, adBreaks: 0, adRewards: 0, irrigated: 0, tinctures: 0, oils: 0 },
   };
@@ -1434,7 +1434,8 @@ function water(i, auto = false) {
   const bw = bedWater(bed, i), prog = bw.need ? ` · bed ${bw.have}/${bw.need}` : '';
   const msg = started ? `Growing!${prog}` : budded ? `Budding!${prog}` : p.sp === 'bluelotus' && !p.wateredAt ? `Barrel ${LOTUS_TXT[lotusFill(p)]}${prog}` : `Watered${prog}`;
   if (auto) { if (!quiet) { W.irrigPulse(bed); popAt(W.tileWorld(i).setY(1), `<i data-icon="water"></i>${started || budded ? msg : 'Irrigated' + prog}`); } checkGoals(); return true; }
-  tip('growing'); if (p.sun < 0.85) tip('shade'); if (S.stats.watered === 3) tip('barrel');
+  if (started && p.wateredAt && p.growMs - (now() - p.wateredAt) > BOOSTS.kinds.grow.minLeftS * 1000) setTimeout(() => maybeBoost('grow', { i, sp: p.sp }), 700);   // v0.66
+    tip('growing'); if (p.sun < 0.85) tip('shade'); if (S.stats.watered === 3) tip('barrel');
   popAt(W.tileWorld(i).setY(1), `<i data-icon="water"></i>${msg}`); checkGoals(); return true;
 }
 // ---------------- v0.4: card stacks & levels ----------------
@@ -1479,8 +1480,10 @@ function harvestCore_(i) {   // normal yields/seeds rules, shared by the hand ha
 }
 function harvest(i) {
   const p = S.tiles[i]; if (!p || stageOf(p) < 3) return;
-  const sp = SPECIES[p.sp]; const { f, s } = harvestCore(i);
+  const sp = SPECIES[p.sp], loc = tileLoc(i); const { f, s } = harvestCore(i);
   syncTile(i); save(); hud();
+  setTimeout(() => maybeBoost('harvest', { loc, sp: p.sp, f, s }), 900);   // v0.66: now and then, offer a Double Harvest
+  if (S.stats.harvests % 50 === 0) promoMilestone('harvest' + S.stats.harvests);
   const at = W.tileWorld(i);
   if (f) { popAt(at.clone().setY(1.2), `+${f} ${sp.name}`); setTimeout(() => popAt(at.clone().setY(0.8), `+${s} seed${s > 1 ? 's' : ''}`), 350); }
   else popAt(at.clone().setY(1.2), `${itemSvg('seed_' + p.sp)}+${s} ${sp.name} seeds`);
@@ -2064,7 +2067,7 @@ function claimFollow(id) {
   return true;
 }
 function settingsHTML() {
-  const games = OTHER_GAMES.map((g) => `<div class="game-row" data-game="${g.id}"><div class="game-art">${gameArt(g.id)}</div>
+  const games = OTHER_GAMES.filter((g) => g.id !== CROSS_PROMO.gameId).map((g) => `<div class="game-row" data-game="${g.id}"><div class="game-art">${gameArt(g.id)}</div>
     <div class="meta"><b>${g.name}${g.status === 'soon' ? ' <span class="soon-tag">Coming soon</span>' : ''}</b><small class="gr-tag">${g.tagline}</small><small>${g.blurb}</small></div>
     ${g.status === 'live' && g.url ? `<a class="btn btn-primary sm" href="${g.url}" target="_blank" rel="noopener">Play</a>` : ''}</div>`).join('');
   const adsRow = ADS_MODE === 'off' ? '' : S.noAds
@@ -2076,11 +2079,12 @@ function settingsHTML() {
       <em>${got ? '✓ Claimed' : `+${FOLLOW_REWARD} <i data-icon="jewel"></i>`}</em></a>`; }).join('');
   const nGot = SOCIALS.filter((p) => S.follows?.[p.id]).length;
   return `<div class="sec-title" id="follow-us">Follow us</div><p class="muted follow-note">${nGot < SOCIALS.length ? `Follow Petalspire for news and sneak peeks — get ${FOLLOW_REWARD} free Jewel for each one (once per platform).` : 'Thanks for following Petalspire everywhere!'}</p><div class="follow-list">${follow}</div>
-    <div class="sec-title" id="play-other-games">Play Other Games</div><div class="list games">${games}</div>
+    <div class="sec-title" id="play-other-games">More from ${STUDIO.name}</div>${studioHeadHTML()}<div class="list games">${promoCardHTML()}${games}</div>
     ${adsRow ? `<div class="sec-title">Ads</div><div class="list">${adsRow}</div>` : ''}
     <div class="sec-title">Help</div><div class="list"><button class="row set-btn" data-act="tips-again"><b>Show tips again</b><small>Replay the helpful hints from the start</small></button></div>
     <div class="sec-title">Your save</div><div class="list"><div class="row"><div class="meta"><b>Autosaves on this device</b><small>Progress is kept in this browser, even while the game is closed.</small></div></div>
     <button class="row set-btn danger" data-act="reset"><b>Reset garden…</b><small>Erase all progress and start again in the woods</small></button></div>
+    <div class="studio-credit-set" data-studio-credit><img src="${STUDIO.logo}" alt="${STUDIO.name}" /><small>Petalspire is made by ${STUDIO.name}</small></div>
     <p class="muted" style="margin:14px 4px 0;text-align:center">Petalspire v${BUILD} · prototype${Payments.isTest ? ' · <span class="test-tag" style="margin:0">Test mode</span>' : ''}</p>`;
 }
 function bagHTML() {
@@ -2465,6 +2469,131 @@ function playRewardAd(r) {
     save(); hud(); toast(`<i data-icon="${AD_PICK[r][0]}"></i> +${amt} ${AD_PICK[r][1]} · thanks for watching`); if (panel) renderPanel();
   });
 }
+// v0.66: Schwarze Spiele studio splash — a short logo card on load (tap to skip). Automated browsers skip it unless the URL has ?splash.
+(() => { const sp = $('#studio-splash'); if (!sp) return;
+  if (navigator.webdriver && !/[?&]splash/.test(location.search)) { sp.remove(); return; }
+  const out = () => { if (!sp.isConnected || sp.classList.contains('out')) return; sp.classList.add('out'); setTimeout(() => sp.remove(), 650); };
+  sp.addEventListener('click', out); setTimeout(out, /[?&]splash=hold/.test(location.search) ? 1e9 : 1700); })();
+// ---------------- v0.66: opt-in boosts (rewarded ads), Starter Pack offer, Schwarze Spiele cross-promo ----------------
+// Automated test browsers see none of these unless a test opts in (localStorage 'petalspire.monetTest'), so older tests are untouched.
+const monetOn = () => !(navigator.webdriver && !localStorage.getItem('petalspire.monetTest'));
+const M = () => (S.monet ||= { playMs: 0, boostAt: 0, starter: {}, promo: {}, wish: {} });
+const modalOpen = () => !!(adPickEl || dailyEl || starterEl || promoEl || Ads.showing) || !$('#reveal').classList.contains('hidden') || !$('#confirm').classList.contains('hidden') || !$('#map').classList.contains('hidden');
+setInterval(() => { if (S.introDone && !document.hidden) { M().playMs += 5000; } }, 5000);   // play time (saved with the 5 s autosave)
+// ---- boosts ----
+let boostEl = null, boostTimer = 0;
+function hideBoost() { clearTimeout(boostTimer); boostEl?.remove(); boostEl = null; }
+function boostText(kind, d) {
+  if (kind === 'harvest') return d.f ? `+${d.f} ${SPECIES[d.sp].name} · +${d.s} seed${d.s > 1 ? 's' : ''}` : `+${d.s} ${SPECIES[d.sp].name} seeds`;
+  if (kind === 'sale') return `+${fmtC(d.coins)} coins`;
+  return `${SPECIES[d.sp].name} ready now`;
+}
+function maybeBoost(kind, d, force = false) {
+  const B = BOOSTS, K = B.kinds[kind]; if (!K || !Ads.rewardOn || !monetOn() || !S.introDone || boostEl || adBlocked() || modalOpen()) return false;
+  if (!force) {
+    if ((S.stats.harvests || 0) < B.minHarvests) return false;
+    if (now() - (M().boostAt || 0) < B.cooldownMs) return false;
+    if (kind === 'sale' && d.coins < K.minCoins) return false;
+    if (Math.random() > B.chance) return false;
+  }
+  showBoost(kind, d); return true;
+}
+function showBoost(kind, d) {
+  hideBoost(); const K = BOOSTS.kinds[kind]; M().boostAt = now(); (S.stats.boostOffers ||= {})[kind] = (S.stats.boostOffers[kind] || 0) + 1; save();
+  const e = boostEl = el('div', 'boost-offer'); e.dataset.boost = kind;
+  e.innerHTML = `<button class="bo-main" data-boost-go><span class="bo-ico"><i data-icon="${K.icon}"></i><em>▶</em></span><span class="bo-txt"><b>${K.name}?</b><small>Watch an ad · ${boostText(kind, d)}</small></span></button>
+    <button class="bo-x" data-boost-x aria-label="No thanks">×</button><i class="bo-time" style="animation-duration:${BOOSTS.showMs}ms"></i>`;
+  const tb = $('#tabbar').getBoundingClientRect(); e.style.bottom = (innerHeight - tb.top + 12) + 'px';
+  $('#ui').appendChild(e); fillIcons(e);
+  e.querySelector('[data-boost-x]').addEventListener('click', (ev) => { ev.stopPropagation(); hideBoost(); });
+  e.querySelector('[data-boost-go]').addEventListener('click', (ev) => { ev.stopPropagation(); hideBoost(); Ads.rewarded(() => applyBoost(kind, d)); });
+  boostTimer = setTimeout(hideBoost, BOOSTS.showMs);
+  return e;
+}
+function applyBoost(kind, d) {
+  const st = (S.stats.boosts ||= {}); st[kind] = (st[kind] || 0) + 1;
+  if (kind === 'harvest') { inBag(d.loc, () => { if (d.f) S.inv['flower_' + d.sp] = (S.inv['flower_' + d.sp] || 0) + d.f; S.inv['seed_' + d.sp] = (S.inv['seed_' + d.sp] || 0) + d.s; });
+    toast(`<i data-icon="sprout"></i> Double Harvest · ${boostText(kind, d)}`); }
+  else if (kind === 'sale') { S.coins += d.coins; S.stats.boostCoins = (S.stats.boostCoins || 0) + d.coins; toast(`<i data-icon="coin"></i> Double Sale · +${fmtC(d.coins)} coins`); }
+  else if (kind === 'grow') { const p = S.tiles[d.i];
+    if (!p || p.sp !== d.sp || !p.wateredAt || stageOf(p) >= 3) { toast('That plant is already done — enjoy the ad bonus next time'); }
+    else { const t = now(); p.bud = true; p.wu = 0; if (p.sp === 'bluelotus') p.fill = 2; p.wateredAt = t - p.growMs - 1; syncTile(d.i); W.splash?.(d.i); toast(`<i data-icon="sparkle"></i> Fast-Grow · ${SPECIES[d.sp].name} is ready to pick`); } }
+  save(); hud(); if (panel) renderPanel();
+}
+// ---- Starter Pack ----
+let starterEl = null;
+const starterLeft = () => Math.max(0, (M().starter.until || 0) - now());
+const starterLive = () => !M().starter.bought && starterLeft() > 0;
+function starterReady() {
+  const P = STARTER_PACK, st = M().starter, F = P.firstAfter;
+  if (st.bought || (st.shows || 0) >= P.maxShows) return false;
+  if (M().playMs < F.playMs || (S.stats.harvests || 0) < F.harvests || (S.stats.customers || 0) < F.customers) return false;
+  return !st.lastShow || now() - st.lastShow >= P.gapMs;
+}
+function maybeStarter() { if (!monetOn() || !S.introDone || panel || placing || buildMode || modalOpen() || !starterReady()) return; showStarter(true); }
+setInterval(maybeStarter, 7000);
+const starterRows = () => { const P = STARTER_PACK; return [['jewel', `${P.jewels} Jewels`], ['pack', `${P.packs} Card Packs`], ['coin', `${fmtC(P.coins)} coins`], ['wood', `${P.wood} Wood`]]; };
+function starterCardHTML(compact = false) {
+  const P = STARTER_PACK;
+  return `<div class="starter-card${compact ? ' compact' : ''}" data-starter-card><div class="sp-head"><span class="sp-gift"><i data-icon="gift"></i></span><div><b>Starter Pack</b><small>A little head start for your garden</small></div></div>
+    <ul class="sp-items">${starterRows().map(([ic, t]) => `<li><i data-icon="${ic}"></i>${t}</li>`).join('')}</ul>
+    <p class="sp-timer" data-starter-timer>Available for <b>${fmtTime(starterLeft())}</b></p>
+    <button class="btn btn-gold" data-starter-buy>Get it · ${P.price}</button>
+    <p class="sp-note" data-starter-note>Placeholder: purchases come with the iPhone app. This web prototype never charges.</p></div>`;
+}
+function showStarter(auto = false) {
+  const P = STARTER_PACK, st = M().starter; if (st.bought) return null;
+  if (auto) { st.shows = (st.shows || 0) + 1; st.lastShow = now(); if (!starterLive()) st.until = now() + P.windowMs; save(); }
+  starterEl?.remove(); const e = starterEl = el('div', 'cozy-modal starter-modal'); e.id = 'starter';
+  e.innerHTML = `<div class="cozy-card"><button class="close-btn" data-starter-x aria-label="Close">×</button><h3>A little welcome gift</h3>${starterCardHTML()}<button class="btn sm sp-later" data-starter-x>Maybe later</button></div>`;
+  $('#ui').appendChild(e); fillIcons(e);
+  const tick = setInterval(() => { if (!e.isConnected) return clearInterval(tick); const t = e.querySelector('[data-starter-timer] b'); if (t) t.textContent = fmtTime(starterLeft()); }, 1000);
+  e.addEventListener('click', (ev) => { if (ev.target === e || ev.target.closest('[data-starter-x]')) { e.remove(); starterEl = null; return; } if (ev.target.closest('[data-starter-buy]')) buyStarter(e); });
+  return e;
+}
+async function buyStarter(root) {
+  const r = await Payments.purchaseOffer(STARTER_PACK);
+  if (r.ok) return grantStarter(r.receipt);
+  const n = root?.querySelector('[data-starter-note]'); if (n) { n.textContent = r.reason; n.classList.add('on'); }
+  S.stats.starterTaps = (S.stats.starterTaps || 0) + 1; save(); return false;
+}
+// Called only with a verified store receipt (the iPhone app). Hands out the pack contents once.
+function grantStarter(receipt) {
+  const P = STARTER_PACK, st = M().starter; if (st.bought) return false;
+  st.bought = true; st.receipt = receipt || null; S.jewels += P.jewels; S.freePacks = (S.freePacks || 0) + P.packs; S.coins += P.coins; S.wood += P.wood;
+  save(); hud(); starterEl?.remove(); starterEl = null; if (panel) renderPanel(); toast('<i data-icon="gift"></i> Starter Pack added · thank you!'); return true;
+}
+// ---- More from Schwarze Spiele ----
+let promoEl = null;
+const promoGame = () => OTHER_GAMES.find((g) => g.id === CROSS_PROMO.gameId) || OTHER_GAMES[0];
+function promoCardHTML() {
+  const g = promoGame(), wished = !!M().wish[g.id];
+  const act = g.status === 'live' && g.url ? `<a class="btn btn-primary sm" href="${g.url}" target="_blank" rel="noopener">Play ${g.name}</a>`
+    : `<button class="btn ${wished ? '' : 'btn-blush '}sm" data-wish="${g.id}">${wished ? '♥ On your wishlist' : '♡ Wishlist'}</button>`;
+  return `<div class="promo-card" data-promo="${g.id}"><div class="pc-art">${gameArt(g.id)}</div><div class="pc-meta"><b>${g.name}${g.status === 'soon' ? ' <span class="soon-tag">Coming soon</span>' : ''}</b><small class="gr-tag">${g.tagline}</small><small>${g.blurb}</small>
+    <div class="pc-acts">${act}${wished && g.status !== 'live' ? '<small class="pc-wished">We’ll let you know right here when it’s out.</small>' : ''}</div></div></div>`;
+}
+const studioHeadHTML = () => `<div class="studio-head"><img src="${STUDIO.icon}" alt="" /><div><b>More from ${STUDIO.name}</b><small>The little studio behind Petalspire</small></div></div>`;
+function wish(id) { const g = OTHER_GAMES.find((x) => x.id === id); if (!g) return; M().wish[id] = !M().wish[id]; save();
+  if (M().wish[id] && g.wishlistUrl) window.open(g.wishlistUrl, '_blank', 'noopener');
+  toast(M().wish[id] ? `♥ ${g.name} is on your wishlist` : `Removed ${g.name} from your wishlist`);
+  for (const r of document.querySelectorAll('.promo-card')) { r.outerHTML = promoCardHTML(); } fillIcons($('#ui')); }
+function promoMilestone(tag, force = false) {
+  if (!monetOn() && !force) return false; const P = CROSS_PROMO, pr = M().promo;
+  if (!force && ((pr.shows || 0) >= P.maxShows || M().playMs < P.firstAfterMs || (pr.last && now() - pr.last < P.minGapMs))) return false;
+  const go = () => { if (panel || placing || buildMode || modalOpen()) return setTimeout(go, 4000); showPromo(tag); };
+  setTimeout(go, force ? 0 : 3500); return true;
+}
+function showPromo(tag = '') {
+  const pr = M().promo; pr.shows = (pr.shows || 0) + 1; pr.last = now(); pr.tag = tag; save();
+  promoEl?.remove(); const e = promoEl = el('div', 'cozy-modal promo-modal'); e.id = 'promo';
+  e.innerHTML = `<div class="cozy-card"><button class="close-btn" data-promo-x aria-label="Close">×</button>${studioHeadHTML()}<p class="muted">Lovely garden! If you enjoy Petalspire, here’s what we’re making next.</p>${promoCardHTML()}<button class="btn sm sp-later" data-promo-x>Back to the garden</button></div>`;
+  $('#ui').appendChild(e); fillIcons(e);
+  e.addEventListener('click', (ev) => { if (ev.target === e || ev.target.closest('[data-promo-x]')) { e.remove(); promoEl = null; } });
+  return e;
+}
+document.addEventListener('click', (ev) => { const w = ev.target.closest?.('[data-wish]'); if (w) { ev.stopPropagation(); wish(w.dataset.wish); return; }
+  const b = ev.target.closest?.('[data-shop-starter] [data-starter-buy]'); if (b) { ev.stopPropagation(); buyStarter(b.closest('[data-shop-starter]')); } }, true);
 // v0.63: daily streak. Days are LOCAL calendar days (YYYY-MM-DD). One claim per day; claiming the day after keeps the streak,
 // a gap of 2+ days restarts at Day 1. Clock guard: never two claims on the same day, and nothing is claimable while the
 // device clock reads earlier than the last claim (setting the clock back can't farm gifts).
@@ -3262,7 +3391,7 @@ function buyOrchard() {
   S.coins -= ORCHARD_PRICE.coins; S.wood -= ORCHARD_PRICE.wood; S.lots.orchard = true;
   S.owned.fruitstand = S.unlocked.fruitstand = S.discovered.fruitstand = true; S.fsFree = true; save(); syncOShed();   // v0.61: the Fruit Stand comes free with it
   closePanel(); hud(); renderMap(); toast('The Orchard is yours! · a free Fruit Stand is in your Build menu'); checkGoals();
-  setTimeout(() => travel('orchard'), 600);
+  setTimeout(() => travel('orchard'), 600); promoMilestone('orchard');   // v0.66
   return true;
 }
 const MAP_PLACES = [
@@ -3441,6 +3570,7 @@ function unlockMapIfReady() {
   const b = $('#btn-map'); b.classList.add('just-unlocked'); setTimeout(() => b.classList.remove('just-unlocked'), 2400);
   const r = b.getBoundingClientRect(); sparkles($('#ui'), r.left + r.width / 2, r.top + r.height / 2, 16); buzz([20, 40, 20]);
   setTimeout(() => toast('<i data-icon="sparkle"></i> All Home plots are yours — the Map is unlocked!'), 900);
+  promoMilestone('map');   // v0.66
   return true;
 }
 function openMap() { if (mapLocked()) { toast(`<i data-icon="lock"></i> Buy all plots to unlock the Map · ${homeLotsOwned()}/${LOT_FOR_SALE.length} Home plots`); return false; }
@@ -3467,7 +3597,7 @@ function tradeJewel(what) {
 function jewelsHTML() {
   const cards = JEWEL_BUNDLES.map((b) => `<button class="jewel-card${b.best ? ' best' : ''}" data-jewels="${b.id}">${b.best ? '<span class="best-tag">Best value</span>' : ''}
     <span class="jc-art">${'<i data-icon="jewel"></i>'.repeat(b.n >= 50 ? 3 : b.n >= 10 ? 2 : 1)}</span><b>${b.n} Jewel${b.n > 1 ? 's' : ''}</b><em>${b.price}</em></button>`).join('');
-  return `<div class="jewel-hero"><i data-icon="jewel"></i><div><b>${S.jewels}</b><small>Jewels</small></div></div>
+  return `${starterLive() ? `<div class="shop-starter" data-shop-starter>${starterCardHTML(true)}</div>` : ''}<div class="jewel-hero"><i data-icon="jewel"></i><div><b>${S.jewels}</b><small>Jewels</small></div></div>
     <p class="muted" style="margin:6px 4px 12px">Jewels open Card Packs (${PACK_JEWELS} each), finish a restoration instantly (${RESTORE_HURRY_JEWELS}), grow a planted tree by a stage (${TREE.hurryJewels}) or complete the market rebuild (${BUILDS.market.hurryJewels}).</p>
     <div class="jewel-grid">${cards}</div>
     <div class="sec-title">Spend Jewels</div>
@@ -3648,6 +3778,7 @@ function purchase(c) {
     c.bubble.innerHTML = `<span class="thanks">${extra ? '♥ One more, please!' : '♥ Thank you!'}</span>`;
     const p = c.car.group.position; popAt(new THREE.Vector3(p.x, 1.9, p.z), `<i data-icon="coin"></i>+${total}`, 'coinpop');
     for (let k = 0; k < Math.min(6, items + 2); k++) setTimeout(() => coinFly(c.car.group.position), k * 90);
+    if (curLoc() === 'home') setTimeout(() => maybeBoost('sale', { coins: total, loc: 'home' }), 1500);   // v0.66
   } else c.bubble.innerHTML = `<span class="thanks">Sold out… next time!</span>`;
   syncStand(); save(); hud(); checkGoals(); if (panel === 'stand') renderPanel();
   setTimeout(() => { c.done = true; leaveQueue(); }, 1400);
@@ -3686,6 +3817,7 @@ function opurchase(c) {
     c.bubble.innerHTML = '<span class="thanks">♥ Thank you!</span>';
     const p = c.car.group.position; popAt(new THREE.Vector3(p.x, 1.9, p.z), `<i data-icon="coin"></i>+${total}`, 'coinpop');
     if (curLoc() === 'orchard') for (let k = 0; k < Math.min(6, items + 2); k++) setTimeout(() => coinFly(c.car.group.position), k * 90);
+    if (curLoc() === 'orchard') setTimeout(() => maybeBoost('sale', { coins: total, loc: 'orchard' }), 1500);   // v0.66
   } else c.bubble.innerHTML = '<span class="thanks">Sold out… next time!</span>';
   syncOStand(); save(); hud(); checkGoals(); if (panel === 'ostand') renderPanel();
   setTimeout(() => { c.done = true; c.car.leave(); c.bubble.remove(); ocusts.splice(ocusts.indexOf(c), 1); nextOCust = Math.max(nextOCust, now() + 2500); if (panel === 'ostand') renderPanel(); }, 1400);
@@ -4170,7 +4302,7 @@ window.__ps = {
   setClock: (t) => { clockAt = t; },
   BUILD, adMult, adPicks, standHTML, itemVal, byValue, sortRows, rewardHTML, get fromBuild() { return fromBuild; }, get bags() { return S.bags; }, get migBags() { return migBags; }, inBag, bagOf, sendGoods, tileLoc, standLoc, splitOrchardGoods, buildHTML, marketHTML, satchelHTML, billboardHTML, bbStatusText, bbReadyIn, BILLBOARD, CHARMS, CHARM_IDS, charmV, charmLv, charmText, craftK, shiftH, standPrice, ostandPrice, custGap, harvestCore, setCharmRoll(v) { charmRoll = v; }, freeGFSpot, bulkSell, bulkAll, bulkPrice, bulkItems, bulkHTML, rollWants, STAND_BUY, BULK, GF_IDS, gfOn, gfPlaced, placeGF, storeGF, onMapOnly, charmAt, oGap, TRUCK, orderDelivery, deliverTrip, syncDeliv, inTransit, get deliv() { return S.deliv; }, get vanOut() { return vanOut.size; }, migGF065, get mig065() { return mig065; }, regenNow: () => regenS(), SWAP_TIERS, swapPool, get bagTab() { return bagTab; }, setBagTab(t) { bagTab = t; }, shelfMig063, rollIds, rollPackLoot, catTierOdds, drawPlant, drawOther, isPlantCard, PACK_LOOT, OWNED_K, setForcedLoot(L) { forcedLoot = L; }, consLeft, finishCons, hurryCons, startCons, plantTile: plant, syncTile, bloomTargets, instantBloom, askBloom, customerRush, askRush, rushLeft, rushReady, syncJewelDock, get rush() { return S.rush; }, get nextCustAt() { return nextCust; }, get nextOCustAt() { return nextOCust; }, swapCard, swapIn, swapPool, swapTierOdds, SWAP, setSwapForced(id) { swapForced = id; }, get revealCards() { return revealCards; }, upgLeft, finishUpg, hurryUpg, deselect, get upg() { return S.upg; }, toolLeft, get cons() { return S.cons; }, dailyStatus, claimDaily, showDaily, maybeDaily, dayKey, watchAd, playRewardAd, DAILY, upgradeBuilding, get standLv() { return S.standLv; }, cardFix063, normalizeCards,
   TIPS, JEWEL_DROP, obsState, PACKS,
-  hud, syncBarrels, lotRoofs, standsLine, buildBarrelAt: (lot, x, z) => buildBarrel(lot, x, z), openMap, closeMap, mapLocked, syncMapBtn, unlockMapIfReady, travel, buyOrchard, claimFollow, SOCIALS, setLoc, loc: () => curLoc(), orchardLocked, mapPlaces: () => MAP_PLACES.map((p) => ({ id: p.id, name: p.name, soon: !!p.soon, state: placeState(p) })), ORCHARD_PRICE, casterIds: () => casters().map((c) => c.id + (c.h != null ? ":box" : ":tree")), checkGoals, regenBarrels, feedLot, reachLots,  get barrelReachTargets() { return W.bedTargets.children.map((g) => ({ b: g.userData.b, ok: g.userData.ok })); }, barrelRoof, lotRoofs, barrelStands, barrelPerTick, get gutterLots() { return [...W.gutters.keys()]; }, gutterPipes(lot) { return W.gutters.get(lot)?.userData.pipes || 0; },
+  hud, syncBarrels, lotRoofs, standsLine, buildBarrelAt: (lot, x, z) => buildBarrel(lot, x, z), openMap, closeMap, mapLocked, syncMapBtn, maybeBoost, showBoost, applyBoost, hideBoost, showStarter, grantStarter, buyStarter, starterLive, starterReady, maybeStarter, promoMilestone, showPromo, wish, settingsHTML, jewelsHTML, unlockMapIfReady, travel, buyOrchard, claimFollow, SOCIALS, setLoc, loc: () => curLoc(), orchardLocked, mapPlaces: () => MAP_PLACES.map((p) => ({ id: p.id, name: p.name, soon: !!p.soon, state: placeState(p) })), ORCHARD_PRICE, casterIds: () => casters().map((c) => c.id + (c.h != null ? ":box" : ":tree")), checkGoals, regenBarrels, feedLot, reachLots,  get barrelReachTargets() { return W.bedTargets.children.map((g) => ({ b: g.userData.b, ok: g.userData.ok })); }, barrelRoof, lotRoofs, barrelStands, barrelPerTick, get gutterLots() { return [...W.gutters.keys()]; }, gutterPipes(lot) { return W.gutters.get(lot)?.userData.pipes || 0; },
   get tincGrandfathered() { return tincGrandfathered; }, tincProblem, tincSpots, buildTincture, placeTincture, buildStill, placeStill, distill, collectOil, STILL, TEA, teaInfo, teaId, teaSps, registerTea, buildTea, placeTea, brewTea, collectTea, teaAdd, teaRemove, get teaPick() { return [...teaPick]; }, set teaPick(v) { teaPick = [...v]; }, teaHTML, syncTea, DRY_TIER_S,
   CRAFT, PRESS, FRUITSTAND, TREES, TREE_IDS, SEED_BAGS, bagId, bagSeeds, buildCraft, placeCraft, craftMake, craftCollect, craftHTML, syncCraft, orchardSpots, orchardProblem, plantOrchard, pickTree, syncOrchard, orchStage, orchRipe, orchardTreeHTML, startTreePlace, orchardLocked, packW, cardOdds, tierOdds, featureOdds, drawNonBasic, collIds, get sunflowerRefund() { return sunflowerRefund; }, ORCHARD_TREE_SPOTS,
   RESALE, sellPlaced, stockAntique, sellRestored, installShelf, uninstallShelf, shelfOn, syncShelf, SHELF_BONUS, STAND_CAP, focusThing, get atmosphere() { return atmosphere(); }, get standCap() { return standCap(); },

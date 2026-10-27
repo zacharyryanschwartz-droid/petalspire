@@ -715,7 +715,9 @@ export const SOCIALS = [
 export const FOLLOW_REWARD = 1;   // Jewels per platform
 export const OTHER_GAMES = [
   { id: 'market_plot', name: 'Market Plot', status: 'soon', tagline: 'Invent it. Grow it. Sell it.',
-    blurb: 'A cozy invent-and-market farming game: dream up new crops and handmade goods, then run your own little market.', url: null },
+    blurb: 'A solo sandbox farming game: invent new crops and handmade goods, then market them your way.',
+    url: null,            // v0.66: set the store / play link here when Market Plot launches (status → 'live')
+    wishlistUrl: null },  // v0.66: set a wishlist page here (Steam / App Store pre-order); null = the Wishlist button just remembers it in the save
 ];
 
 export const JEWEL_BUNDLES = [
@@ -805,3 +807,34 @@ export const SHADE = {
   slowerBelow: 0.95,              // sun under this shows 'growing slower'
   muchSlowerBelow: 0.3,
 };
+
+// ---------------- v0.66: monetization + studio ----------------
+// Opt-in boost offers: a small badge offers a rewarded ad right after a moment that matters (a harvest, a stand sale, watering
+// a new plant). Offered now and then, never constantly: one offer at most every cooldownMs, only `chance` of eligible moments,
+// and it slips away after showMs. They use the same rewarded-ad flow as Watch Ad (the ad has to play to the end).
+export const BOOSTS = {
+  cooldownMs: 4 * 60000, showMs: 20000, chance: 0.5, minHarvests: 3,
+  kinds: {
+    harvest: { name: 'Double Harvest', icon: 'sprout' },   // doubles the flowers and seeds of the harvest you just picked
+    sale:    { name: 'Double Sale',    icon: 'coin', minCoins: 20 },   // doubles the coins of the stand sale that just happened
+    grow:    { name: 'Fast-Grow',      icon: 'sparkle', minLeftS: 60 },  // the plant you just watered is ready to pick right away
+  },
+};
+// Starter Pack: an occasional, cheap bundle. PRICE IS A PLACEHOLDER for the iPhone App Store product (productId); the web
+// build has NO real payments, so buying it here charges nothing and grants nothing (see Payments.purchaseOffer).
+// First shown after the player has played a while (firstAfter), then rarely: at most one popup every gapMs, maxShows in all.
+// Each showing opens a windowMs 'limited time' window during which the Jewel Shop also lists it.
+export const STARTER_PACK = {
+  id: 'starter_pack', productId: 'com.petalspire.starter', price: '$1.99',
+  jewels: 10, packs: 2, coins: 500, wood: 50,
+  windowMs: 48 * 3600e3, gapMs: 3 * 864e5, maxShows: 4,
+  firstAfter: { playMs: 15 * 60000, harvests: 8, customers: 3 },
+};
+// The studio. Logos live in assets/studio (copied from the Schwarze Spiele brand kit).
+export const STUDIO = {
+  name: 'Schwarze Spiele',
+  logo: 'assets/studio/schwarze-spiele-logo.png', logoWhite: 'assets/studio/schwarze-spiele-logo-white.png', icon: 'assets/studio/schwarze-spiele-icon.png',
+};
+// Cross-promo card ('More from Schwarze Spiele'): always in Settings; also offered once after a session milestone
+// (all Home plots, the Orchard, every 50th harvest) — at most every minGapMs, maxShows in all, never before firstAfterMs of play.
+export const CROSS_PROMO = { gameId: 'market_plot', firstAfterMs: 20 * 60000, minGapMs: 3 * 864e5, maxShows: 3 };
