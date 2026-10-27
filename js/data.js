@@ -147,7 +147,7 @@ export const FEATURES = {
   irrigation: {
     id: 'irrigation', name: 'Irrigation', rarity: 'basic', type: 'Feature · Water',
     price: 45, stats: { Growth: 4, Beauty: 2, Yield: 3, Atmosphere: 2 },
-    blurb: 'Hook your raised beds up to their rain barrel: a drip line pays each bed’s water for you. Duplicates level the card up — a full bed’s water per stage (to start, then to bud): Lv1 9 · Lv2 7 · Lv3 5 · Lv4 3.',
+    blurb: 'A drip line from a rain barrel pays a raised bed’s water for you. Buy one per bed; every purchase or duplicate levels the card up — a full bed’s water per stage (to start, then to bud): Lv1 9 · Lv2 7 · Lv3 5 · Lv4 3.',
   },
   tincture: {
     id: 'tincture', name: 'Tincture Stand', rarity: 'epic', type: 'Feature · Crafting',

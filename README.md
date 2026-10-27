@@ -21,6 +21,13 @@ This is a **prototype**: version numbers stay below 1.0 until the first official
 
 Drag with one finger to pan, pinch to zoom, and twist with two fingers to turn. On desktop, right-drag or shift-drag turns the view.
 
+## New in v0.7.1: menu fixes (Home + Orchard)
+
+- **Parking Lot and Billboard leave the Build menu once built**, at Home and at the Orchard (and are not listed as "Built at …" in the other place's menu). Parking Lot cards are still bought in the Supply Market at both places and level the lot up; tap a Billboard to run an ad.
+- **Irrigation is a plain price to buy** (45 coins): one raised bed per purchase. You buy it, then tap the bed to place it; each purchase is also a card copy, so it levels the card up. The "Hook up" buttons and the "free with your card" row are gone (Market, Bag row, rain-barrel panel).
+- **Irrigation can only be bought when something needs it.** At Home it is disabled with "No beds need irrigation" when every bed is irrigated (or there are no beds). At the Orchard, tree-row Irrigation is disabled with "No tree rows need irrigation" in both the Market and the Build menu.
+- Saves from v0.7 load unchanged: irrigated beds, Irrigation copies, Parking level and built lots are kept.
+
 ## New in v0.7: music, sound effects, sound settings, and 1-hour Gardeners
 
 ### Music
