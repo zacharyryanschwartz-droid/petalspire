@@ -59,11 +59,16 @@ function roundedBox(w, h, d, r) {
 
 export function createWorld(canvas) {
   const labels = [];
-  function label(text, opts = {}) { const s = textSprite(text, opts); s.userData.opts = opts; labels.push(s); return s; }
+  function label(text, opts = {}) { const s = textSprite(text, opts); s.userData.opts = opts; s.userData.text = text; labels.push(s); return s; }
   function setLabel(s, text, opts = s.userData.opts) { if (s.userData.text === text && opts === s.userData.opts) return; const f = textSprite(text, opts); s.material.map?.dispose(); s.material.map = f.material.map; s.material.needsUpdate = true; s.scale.copy(f.scale); s.userData.text = text; s.userData.opts = opts; }
   function relabel() { for (const s of labels) { const t = s.userData.text; s.userData.text = null; setLabel(s, t, s.userData.opts); } }
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  // v0.63 (iOS crash fix): iPhone Safari kills the tab when GPU memory runs out. Cap the drawing buffer harder on iOS
+  // (1.5× instead of the 3× screen; 2× elsewhere) and use a smaller shadow map there.
+  const IOS = /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  const PR_CAP = IOS ? 1.5 : 2;
+  let paused = false, pausedFrames = 0;   // v0.63: see setPaused()
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, PR_CAP));
   renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.02;
   renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
@@ -91,7 +96,7 @@ export function createWorld(canvas) {
   scene.add(new THREE.HemisphereLight('#D3E6EC', '#B9C99A', 0.95));
   const sun = new THREE.DirectionalLight('#FFC27A', 3.3);
   sun.position.copy(sunDir).multiplyScalar(26).setY(14);
-  sun.castShadow = true; sun.shadow.mapSize.set(2048, 2048);
+  sun.castShadow = true; sun.shadow.mapSize.set(IOS ? 1024 : 2048, IOS ? 1024 : 2048);
   Object.assign(sun.shadow.camera, { left: -16, right: 16, top: 16, bottom: -16, near: 1, far: 70 });
   sun.shadow.bias = -0.0008; sun.shadow.normalBias = 0.03; sun.shadow.radius = 4;
   scene.add(sun); scene.add(sun.target);
@@ -557,12 +562,24 @@ export function createWorld(canvas) {
   }
   function makeBarrel(lot, x, z) {
     const g = new THREE.Group(); g.position.set(x, 0, z); scene.add(g);
-    const b = shadowy(new THREE.Mesh(new THREE.CylinderGeometry(0.34, 0.3, 0.75, 12), woodM)); b.position.y = 0.38; g.add(b);
-    for (const y of [0.15, 0.6]) { const r = new THREE.Mesh(new THREE.TorusGeometry(0.33, 0.025, 4, 16), mat('#7C6A5A')); r.rotation.x = Math.PI / 2; r.position.y = y; g.add(r); }
-    const w = new THREE.Mesh(new THREE.CircleGeometry(0.29, 14), mat('#A8D2E0', { roughness: 0.2, emissive: '#7FB3C6', emissiveIntensity: 0.15 })); w.rotation.x = -Math.PI / 2; w.position.y = 0.72; g.add(w); g.userData.surface = w;
+    const bd = new THREE.Group(); g.add(bd); g.userData.body = bd;   // v0.63: the barrel itself (scaled up with its size level)
+    const b = shadowy(new THREE.Mesh(new THREE.CylinderGeometry(0.34, 0.3, 0.75, 12), woodM)); b.position.y = 0.38; bd.add(b);
+    for (const y of [0.15, 0.6]) { const r = new THREE.Mesh(new THREE.TorusGeometry(0.33, 0.025, 4, 16), mat('#7C6A5A')); r.rotation.x = Math.PI / 2; r.position.y = y; bd.add(r); }
+    const w = new THREE.Mesh(new THREE.CircleGeometry(0.29, 14), mat('#A8D2E0', { roughness: 0.2, emissive: '#7FB3C6', emissiveIntensity: 0.15 })); w.rotation.x = -Math.PI / 2; w.position.y = 0.72; bd.add(w); g.userData.surface = w;
     const hit = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 1.1, 8), new THREE.MeshBasicMaterial({ visible: false })); hit.position.y = 0.55; g.add(hit);
     const info = new THREE.Sprite(new THREE.SpriteMaterial({ transparent: true, depthWrite: false, depthTest: false })); info.renderOrder = 12; info.position.y = 1.35; info.visible = false; info.userData.barrelInfo = lot; g.add(info);
     g.userData.kind = 'barrel'; g.userData.lot = lot; g.userData.info = info; g.visible = false; barrels.set(lot, g); return g;
+  }
+  // v0.63: barrel size levels — the barrel grows a little per level and gains a honey-brass band per level (shared geometry)
+  const BAND_Y = [0.38, 0.27, 0.49, 0.06], BAND_S = [1, 1.08, 1.16, 1.25, 1.34]; let bandGeo = null, bandMat = null;
+  function setBarrelLv(lot, lv, pop = false) {
+    const g = barrels.get(lot); if (!g) return; lv = Math.max(1, Math.min(5, lv | 0)); if (g.userData.lv === lv && !pop) return; g.userData.lv = lv;
+    const bd = g.userData.body, sc = BAND_S[lv - 1]; bd.scale.set(sc, sc, sc); g.userData.info.position.y = 1.35 * sc + 0.05 * (lv - 1);
+    const bands = g.userData.bands || (g.userData.bands = []);
+    if (!bandGeo) { bandGeo = new THREE.TorusGeometry(0.335, 0.03, 4, 18); bandMat = mat('#D9B45A', { roughness: 0.35, metalness: 0.4 }); }
+    while (bands.length < lv - 1) { const r = new THREE.Mesh(bandGeo, bandMat); r.rotation.x = Math.PI / 2; r.position.y = BAND_Y[bands.length]; bd.add(r); bands.push(r); }
+    bands.forEach((r, k) => (r.visible = k < lv - 1));
+    if (pop) { bd.scale.set(sc * 1.12, sc * 1.12, sc * 1.12); setTimeout(() => bd.scale.set(sc, sc, sc), 220); }
   }
   const barrels = new Map();
   const barrel = makeBarrel('home', SPOTS.barrel[0], SPOTS.barrel[1]);
@@ -1100,7 +1117,8 @@ export function createWorld(canvas) {
   rack.userData.kind = 'rack'; rack.visible = false;
   function setRack(slots) {
     slots.forEach((s, k) => {
-      const b = bundles[k]; b.group.visible = !!s; if (!s) return;
+      const b = bundles[k]; if (!b) return;   // v0.63: an upgraded rack has more slots than the 3 drawn bundles
+      b.group.visible = !!s; if (!s) return;
       b.cone.material = mat(s.done ? '#C9A08E' : '#F7C5C5');
       b.group.children.forEach((c) => { if (c.isMesh && c.geometry.type === 'SphereGeometry') c.material = mat(s.done ? '#B98E7E' : '#F2AEB3'); });
       b.glow.visible = !!s.done;
@@ -1113,6 +1131,15 @@ export function createWorld(canvas) {
 
   // ---------- v0.3: build animation (scaffold rises, sawdust, structure pops in) ----------
   const builds = [];
+  // v0.63: a stand under construction wears a scaffold (made once per stand, then just shown / hidden) and a 'Building · N%' label
+  function setCons(obj, size, k) {
+    if (!obj) return; const u = obj.userData, L = u.label || obj.children.find((c) => c.isSprite);
+    if (k == null) { if (u.consSc) u.consSc.visible = false; if (L && u.consBase) { setLabel(L, u.consBase.text, u.consBase.opts); u.consBase = null; } u.consPct = -1; return; }
+    if (!u.consSc) { u.consSc = makeScaffold(...size); obj.add(u.consSc); }
+    u.consSc.visible = true;
+    const pct = Math.floor(Math.min(0.99, k) * 20) * 5;
+    if (L) { if (!u.consBase) u.consBase = { text: L.userData.text, opts: L.userData.opts }; if (u.consPct !== pct) { u.consPct = pct; setLabel(L, `Building · ${pct}%`, { h: 0.46, color: '#8A6418', border: '#F5D07A' }); } }
+  }
   function buildAnim(obj, size, onDone) {
     const sc = makeScaffold(...size); sc.position.copy(obj.position); sc.rotation.y = obj.rotation.y; sc.scale.set(obj.scale.x, 0.01, obj.scale.z); scene.add(sc);
     obj.visible = false; builds.push({ t0: performance.now(), sc, obj, size, onDone, puffs: 0, shown: false });
@@ -1307,21 +1334,25 @@ export function createWorld(canvas) {
   const bodyG = roundedBox(2.0, 0.55, 1.0, 0.2), cabG = roundedBox(1.15, 0.52, 0.86, 0.18), bumpG = roundedBox(0.14, 0.16, 1.02, 0.06);
   const wheelG = new THREE.CylinderGeometry(0.2, 0.2, 0.16, 14); wheelG.rotateX(Math.PI / 2);
   const hubG = new THREE.CylinderGeometry(0.09, 0.09, 0.17, 10); hubG.rotateX(Math.PI / 2);
+  // v0.63: every car part shares ONE geometry (cars used to build 7–8 new geometries each and never dispose them, so GPU
+  // buffers grew with every customer — part of the iOS Safari memory crash)
+  const sideG = new THREE.BoxGeometry(0.86, 0.26, 0.9), windG = new THREE.BoxGeometry(0.06, 0.28, 0.66), lampG = new THREE.SphereGeometry(0.075, 10, 8),
+    headG = new THREE.SphereGeometry(0.14, 12, 10), hairG = new THREE.SphereGeometry(0.15, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2), roofG = new THREE.BoxGeometry(0.7, 0.05, 0.6), boxG = roundedBox(0.5, 0.22, 0.4, 0.06);
   function makeCar(col) {
     const g = new THREE.Group();
     const body = shadowy(new THREE.Mesh(bodyG, mat(col, { roughness: 0.5 }))); body.position.y = 0.5; g.add(body);
     const cab = shadowy(new THREE.Mesh(cabG, mat('#FFF9F0', { roughness: 0.5 }))); cab.position.set(-0.12, 0.96, 0); g.add(cab);
     const glass = mat('#A9CCD8', { roughness: 0.15, metalness: 0.1 });
-    const side = new THREE.Mesh(new THREE.BoxGeometry(0.86, 0.26, 0.9), glass); side.position.set(-0.12, 1.0, 0); g.add(side);
-    const wind = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.28, 0.66), glass); wind.position.set(0.46, 0.99, 0); wind.rotation.z = 0.25; g.add(wind);
+    const side = new THREE.Mesh(sideG, glass); side.position.set(-0.12, 1.0, 0); g.add(side);
+    const wind = new THREE.Mesh(windG, glass); wind.position.set(0.46, 0.99, 0); wind.rotation.z = 0.25; g.add(wind);
     for (const x of [1.0, -1.0]) { const b = new THREE.Mesh(bumpG, mat('#FFF9F0')); b.position.set(x, 0.36, 0); g.add(b); }
-    for (const z of [0.28, -0.28]) { const h = new THREE.Mesh(new THREE.SphereGeometry(0.075, 10, 8), mat('#FFF6D8', { emissive: '#FFE1A0', emissiveIntensity: 0.9 })); h.position.set(1.0, 0.56, z); g.add(h); }
+    for (const z of [0.28, -0.28]) { const h = new THREE.Mesh(lampG, mat('#FFF6D8', { emissive: '#FFE1A0', emissiveIntensity: 0.9 })); h.position.set(1.0, 0.56, z); g.add(h); }
     const wheels = [];
     for (const x of [0.62, -0.62]) for (const z of [0.46, -0.46]) { const w = shadowy(new THREE.Mesh(wheelG, mat('#5A4A44'))); w.position.set(x, 0.2, z); g.add(w); const hb = new THREE.Mesh(hubG, mat('#FFF9F0')); w.add(hb); wheels.push(w); }
-    const head = new THREE.Mesh(new THREE.SphereGeometry(0.14, 12, 10), mat(['#F2CDB4', '#D9A988', '#A77B5B', '#F7D9C4'][Math.floor(Math.random() * 4)])); head.position.set(0.02, 1.02, 0.18); g.add(head);
-    const hair = new THREE.Mesh(new THREE.SphereGeometry(0.15, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2), mat(['#6B4B3A', '#3B3330', '#C98B4E', '#8E6A4E'][Math.floor(Math.random() * 4)])); hair.position.copy(head.position).setY(1.05); g.add(hair);
-    const rack = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.05, 0.6), woodD); rack.position.set(-0.15, 1.25, 0); g.add(rack);
-    if (Math.random() < 0.5) { const bx = new THREE.Mesh(roundedBox(0.5, 0.22, 0.4, 0.06), mat(['#F5D07A', '#B7D4B5', '#F7C5C5'][Math.floor(Math.random() * 3)])); bx.position.set(-0.15, 1.38, 0); g.add(bx); }
+    const head = new THREE.Mesh(headG, mat(['#F2CDB4', '#D9A988', '#A77B5B', '#F7D9C4'][Math.floor(Math.random() * 4)])); head.position.set(0.02, 1.02, 0.18); g.add(head);
+    const hair = new THREE.Mesh(hairG, mat(['#6B4B3A', '#3B3330', '#C98B4E', '#8E6A4E'][Math.floor(Math.random() * 4)])); hair.position.copy(head.position).setY(1.05); g.add(hair);
+    const rack = new THREE.Mesh(roofG, woodD); rack.position.set(-0.15, 1.25, 0); g.add(rack);
+    if (Math.random() < 0.5) { const bx = new THREE.Mesh(boxG, mat(['#F5D07A', '#B7D4B5', '#F7C5C5'][Math.floor(Math.random() * 3)])); bx.position.set(-0.15, 1.38, 0); g.add(bx); }
     g.userData.wheels = wheels;
     return g;
   }
@@ -1396,6 +1427,7 @@ export function createWorld(canvas) {
   let locHome = null;   // v0.6: the camera's resting spot for the current location (null = Home)
   function setLocation(target) { locHome = target; resize(); ctl.moved = false; ctl.glide = null; ctl.target.copy(ctl.home); ctl.az = DEF.az; ctl.pol = DEF.pol; ctl.zoom = 1; updateCamera(); }
   function resize() {
+    pausedFrames = 0;   // a resized canvas is cleared: draw one fresh frame even while paused
     const w = window.innerWidth, h = window.innerHeight;
     renderer.setSize(w, h, false); camera.aspect = w / h; camera.fov = w / h < 0.8 ? 46 : 40; camera.updateProjectionMatrix();
     ctl.base = fitDist(); if (locHome) ctl.home.set(locHome[0], 0.3, locHome[2] + (w / h < 0.8 ? 0.6 : 0)); else ctl.home.set(-0.3, 0.3, w / h < 0.8 ? 0.2 : -0.4);
@@ -1546,15 +1578,17 @@ export function createWorld(canvas) {
     }
     bundles.forEach((b, k) => { b.group.rotation.z = Math.sin(t * 1.2 + k) * 0.04; });
     for (const f of frameHooks) f(dt, t);
-    renderer.render(scene, camera);
+    if (!paused || pausedFrames++ < 1) renderer.render(scene, camera);   // v0.63: while a full-screen overlay (Card Pack reveal) covers the farm, keep the last frame instead of re-drawing the 3D scene under it
   }
+  function setPaused(on) { on = !!on; if (on !== paused) { paused = on; pausedFrames = 0; } }
 
   return {
-    renderer, scene, camera, ctl, DEF, tiles, beds, obs, stand, rack, market, barrel, still, setStill, teastand, setTea, press, fruitstand, setCraft, addOrchardTree, setOrchardTree, removeOrchardTree, orchardTrees, makeFruitTree, parking, setParking, windmill, billboard, setBillboard, spotGhosts, setSpotGhosts, bedTargets, setBedTargets, barrels, addBarrel, removeBarrel, gutters, setGutter, setBarrelInfo, hives, addHive, removeHive, setBeeBeds, tincture, setTincture, cars, frameHooks,
+    setPaused, PR_CAP, IOS,
+    renderer, scene, camera, ctl, DEF, tiles, beds, obs, stand, rack, market, barrel, still, setStill, teastand, setTea, press, fruitstand, setCraft, addOrchardTree, setOrchardTree, removeOrchardTree, orchardTrees, makeFruitTree, parking, setParking, windmill, billboard, setBillboard, spotGhosts, setSpotGhosts, bedTargets, setBedTargets, barrels, addBarrel, removeBarrel, gutters, setGutter, setBarrelInfo, setBarrelLv, hives, addHive, removeHive, setBeeBeds, tincture, setTincture, cars, frameHooks,
     updateCamera, resize, glide, intro, pick, project, tileWorld, sickleSweep, plowFurrows, fxCount: () => fxs.length,
     setObstacle, chop, clearObstacle, addBed, setGhosts, setLotOwned, setLocation, orchardScene, orchardShed, setOStandStock, setStandShelf, standShelf, setStandStock, setMarketOpen, setRack, appear, spawnCar, spawnTruck, poof,
     tilePlant: (i) => tiles[i]?.plant || null, addWorker, removeWorker, setWorker, workerAt, setPlant, attachPlant, setIcon, setShade, bgTrees, setIrrigation, irrigPulse, irrig, select, splash, render, textSprite, relabel, groundAt,
-    buildAnim, makeBlueprint, setBlueprint, setMarketState, addLoot, removeLoot, addDecor, removeDecor, addGrown, setGrown, removeGrown, loots, decors,
+    buildAnim, setCons, makeBlueprint, setBlueprint, setMarketState, addLoot, removeLoot, addDecor, removeDecor, addGrown, setGrown, removeGrown, loots, decors,
     iconWorld(i) { const t = tiles[i]; t.icon.updateWorldMatrix(true, false); return new THREE.Vector3().setFromMatrixPosition(t.icon.matrixWorld); },
   };
 }

@@ -1,4 +1,4 @@
-# Petalspire v0.62
+# Petalspire v0.63
 
 A cozy 3D flower-garden prototype for iPhone Safari (portrait, one thumb). Also plays on desktop with a mouse.
 This is a **prototype**: version numbers stay below 1.0 until the first official release.
@@ -20,6 +20,118 @@ This is a **prototype**: version numbers stay below 1.0 until the first official
 7. **Land for sale.** Five wooded plots, each with a floating For Sale sign: 150 → 300 → 600 → 1000 → 1500 coins.
 
 Drag with one finger to pan, pinch to zoom, and twist with two fingers to turn. On desktop, right-drag or shift-drag turns the view.
+
+## New in v0.63 — iPhone crash fix, pack bonuses, daily gifts, Watch Ad, building upgrades, build timers, a water economy, stacking Irrigation and bigger rain barrels
+
+v0.63 (build `0.63`, label "v0.63 prototype") is v0.62 plus the changes below. Saves migrate on load with nothing lost.
+
+### iPhone memory crash (opening many packs)
+- The 3D renderer ran at the phone's full 3× pixel ratio and kept drawing the whole garden behind the full-screen pack reveal, whose huge blurred/blended layers were extra full-screen GPU surfaces. Some objects (cars) also made new geometry each time. On iOS Safari that adds up until the tab is killed.
+- Now: pixel ratio capped (1.5 on iPhone), the 3D view pauses while the reveal is open and resumes after, reveal layers are smaller with no blur/blend on big layers, car geometry is shared, and at most ~70 petals are alive at once. A 32-pack test keeps geometries, textures, shader programs, listeners and heap flat.
+
+### Card upgrades (e.g. Lavender Lv1 ×11 with no Upgrade button)
+- Some older saves stored card stacks whose level/copies weren't clean whole numbers or whose id wasn't an exact card id; the level lookup then failed silently and hid the button. Every load now repairs stacks (merge into the real id, whole numbers, levels 1–4, earned levels never taken away). Cards that don't level up say so; Lv4 shows "Max level".
+
+### Farm Stand and Drying Rack upgrades (coins, instant)
+| Level | Farm Stand cost | Shelf space | Sell bonus | Drying Rack cost | Slots | Faster drying |
+|---|---|---|---|---|---|---|
+| 1 | — | +0 | +0% | — | 3 | 0% |
+| 2 | 250 | +4 | +0% | 150 | 4 | 10% |
+| 3 | 750 | +8 | +5% | 450 | 5 | 20% |
+| 4 | 2000 | +12 | +10% | 1200 | 6 | 30% |
+
+### Card packs
+- Every pack is **2 plant cards + 1 non-plant card** (feature, tool, stand or supply). Cards you already own are 40% as likely. Odds are shown per slot type in the Market.
+- Every pack also gives a bonus: **1–500 coins, 1–100 wood and 1–25 Scrap Metal**, each rolled on its own (`1 + floor(max × u⁴)`), so big amounts are rare. The reveal counts up with sparkles, and rolls ≥ 90% of max get a "WOW!" flourish.
+- 10,000-pack averages: coins 99.5 (median 32), wood 20.7 (median 6), Scrap 5.6 (median 2). Max roll: coins 0.03%, wood 0.31%, Scrap 0.93%.
+
+### Daily Garden Gift (streak)
+One claim per local calendar day. Claiming the next day continues the streak; missing a day restarts at Day 1. Turning the clock back doesn't give extra claims. After Day 15 the calendar loops while the streak keeps counting.
+
+| Day | Gift | Day | Gift | Day | Gift |
+|---|---|---|---|---|---|
+| 1 | 25 coins | 6 | 15 wood | 11 | 5 Scrap |
+| 2 | 10 wood | 7 | 4 Scrap | 12 | 80 coins |
+| 3 | 3 Scrap | 8 | 60 coins | 13 | 25 wood |
+| 4 | 40 coins | 9 | 20 wood | 14 | 6 Scrap |
+| **5** | **100 coins + 30 wood + 8 Scrap** | **10** | **200 coins + 50 wood + 12 Scrap + 1 Card Pack** | **15** | **400 coins + 100 wood + 20 Scrap + 3 Jewels** |
+
+### Watch Ad
+"▶ Watch" at the Farm Stand and at the top of the Market: pick **+50 coins, +20 wood or +5 Scrap Metal**, then watch the (placeholder) ad to the end to get it. No cooldown and no daily limit. Works with No More Ads too (rewarded ads are opt-in). `js/ads.js` has `registerProvider()` for a real ad network.
+
+### Sickle and Plow rest
+Rest is 30 s at Lv1, 15% shorter per card level (25.5 s at Lv2, 21 s at Lv3, 16.5 s at Lv4). While resting, a **Skip · 1 💎** button ends the rest.
+
+### Stand build times
+After you place a stand it shows a construction scaffold and a timer and only opens for business when done (no sales, stocking or worker restocking until then). Timers use the real clock, are saved, and keep running while the game is closed. Stands built before v0.63 stay built. **Finish now** costs 1 Jewel per started 5 minutes left (minimum 1). Coin upgrades stay instant.
+
+| Stand | Build time | Finish now at start |
+|---|---|---|
+| Farm Stand | 20 s | 1 Jewel |
+| Drying Rack | 20 s | 1 Jewel |
+| Fruit Stand | 1 min | 1 Jewel |
+| Tincture Stand | 3 min | 1 Jewel |
+| Essential Oil Stand | 5 min | 1 Jewel |
+| Tea Stand | 8 min | 2 Jewels |
+| Pressed Oil Stand | 15 min | 3 Jewels |
+| Orchard Stand | 20 min | 4 Jewels |
+
+### Water economy: start water and bud water
+- A raised bed now needs water twice per crop: **water to start growing** and **water to reach the bud stage**. Growth stops at the end of the Sprout stage (halfway) until the bud water is in. A stalled plant shows the water icon, and its sheet says "Sprout · thirsty".
+- Water is shared by the bed. The plants waiting for the same stage move on **together** once the bed has its water. The tile sheet shows the progress (**"Bed water 4/9 to start growing"**) with a bar. **Pour 1** pours 1 water per tap, and **Fill bed** pours until the bed has its water or the barrels run dry. Leftover water from the last pour carries over.
+- Base cost (no Irrigation, or Irrigation Lv1): **1 water per plant per stage**, so a full 9-plant bed takes **9 to start + 9 to bud = 18 per crop**. A bed with fewer plants pays less (one plant: 1 + 1).
+- **Blue Lotus**: 2 water to start (half full after the 1st, full after the 2nd), then 2 more at the bud stage. With Irrigation Lv4 it needs just **1 water for the whole grow**.
+
+    | Irrigation (hooked bed) | Full bed to start | Full bed to bud | Full bed per crop | Blue Lotus (per plant, whole grow) |
+    |---|---|---|---|---|
+    | none / Lv1 | 9 | 9 | 18 | 4 |
+    | Lv2 | 7 | 7 | 14 | 3.1 (28/9) |
+    | Lv3 | 5 | 5 | 10 | 2.2 (20/9) |
+    | Lv4 | **3** | **3** | **6** | **1** |
+
+  "Lv4 waters a whole bed for 3 water" means **3 per stage** (3 to start + 3 to bud).
+- The level applies to beds hooked up to a barrel, whether the drip line or your can does the pouring.
+- A Gardener pours from the barrel until the bed has the water it needs, then keeps harvesting and replanting.
+- Saves are migrated without wiping anything. Plants that are already growing finish this crop with no bud stop. A half-filled lotus barrel keeps its half. The bud stop applies from their next crop.
+- **Rebalance so early game stays playable:**
+
+    | | v0.62 | v0.63 |
+    |---|---|---|
+    | Barrel refill | 1 per 60 s | **1 per 30 s** |
+    | Barrel size (Lv1) | 10 | **12** (upgradable to 60) |
+    | Starter Seed Pack fill | 10 | **12** |
+    | Windmill Lv1–4 | 20 / 18 / 17 / 15 s | **15 / 13 / 11 / 10 s** |
+
+  The Brass Watering Can still halves the refill time (no Windmill 15 s; with Windmill Lv1–4 7.5 / 6.5 / 5.5 / 5 s) and still adds +5 to every barrel's size.
+
+### Irrigation is one stacking card
+- No more "assign a spare card to a bed". Irrigation is a single card that **stacks and levels up** like the others: **3 / 6 / 10 copies → Lv2 / Lv3 / Lv4**, with the usual Upgrade button in Bag › Cards.
+- Owning it lets you **hook up any raised bed** to its rain barrel (the Irrigation row in the Market, the card, or a barrel's "Hook up a bed"). Each barrel still feeds up to 8 beds. The card's level sets the water a hooked bed needs (table above).
+- The card text, the Market row and the pack reveal tag show the level and cost, e.g. "Lv2 · a full bed uses 7 water to start + 7 to bud (Lv3: 5)" and "Stacked ×4 · Lv2: full bed 7 water/stage". The Market sells the card only once.
+- Saves are migrated: every bed that was irrigated stays hooked up, and all the old Irrigation cards become copies on the one card (e.g. 5 cards → ×5, so the Lv2 upgrade is ready).
+
+### Bigger rain barrels
+- Tap a rain barrel to open its panel. It has an **Upgrade** card that shows **only the next size and its price**. When you can't afford it, the button is greyed out with a "Need 50 more coins" hint. At the top it says **Max size**.
+- Upgrades are **per barrel** (each plot's barrel is upgraded on its own), instant, saved and permanent. The barrel model grows a little and gains a honey-brass band per level.
+
+    | Level | Holds | Cost |
+    |---|---|---|
+    | Lv1 | 12 | — |
+    | Lv2 | 20 | 150 coins |
+    | Lv3 | 30 | 450 coins + 20 Wood |
+    | Lv4 | 45 | 1,200 coins + 40 Wood + 8 Scrap Metal |
+    | Lv5 | 60 | 3,000 coins + 80 Wood + 20 Scrap Metal |
+
+  The Brass Watering Can adds +5 on top at every level.
+- Screenshots: `108-bed-water-4-of-9`, `109-bud-stall-2-of-9`, `110-barrel-upgrade-need-more`, `111-barrel-max-size`, `112-market-irrigation-lv3`.
+
+### Crate Shelf is a permanent upgrade
+
+- The Crate Shelf (a restored **Old Crate**, +4 Farm Stand shelf space) leaves the Bag the moment it is installed. It is part of the Farm Stand for good: it is saved and kept on reload, there is no **Take out** button any more, and it can't be sold from the Bag.
+- The Farm Stand panel shows it as "installed · +4 space · permanent".
+- A second restored Crate Shelf is listed in the Bag as a **Spare**. It can be sold or stocked as an antique, but it can't be installed, because the stand already has one. Restoring another one no longer switches off the installed shelf.
+- **Save migration:** before v0.63, one flag meant both "you own a shelf" and "it is in your Bag", so an installed shelf also showed in the Bag. On load, an installed shelf on a built stand stays installed and that duplicate Bag entry is removed. A shelf that was only in the Bag stays there. Raw Old Crate finds are never touched.
+- Screenshots: `92-crate-shelf-in-bag-before`, `93-crate-shelf-installed-bag-after`.
 
 ## New in v0.62 — find the card first, coins as the backup
 

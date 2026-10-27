@@ -15,6 +15,9 @@ export function createAds({ root, noAds, onHouseAd, onRemoveAds, onEvent = () =>
   const on = () => ADS_MODE !== 'off' && !noAds();
   const partnerOn = () => on() && ADS_MODE === 'placeholder';   // 'sdk' mode: real partner SDK goes here
   let lastBreak = 0, open = null, houseIdx = 0;
+  // v0.63: rewarded-ad providers. 'placeholder' is the built-in simulated ad. An AdMob / AppLovin MAX bridge only needs
+  // { showRewarded({ unit, onDone(finished) }) } — call onDone(true) from the SDK's 'user earned reward' callback.
+  const providers = { placeholder: { showRewarded: ({ onDone }) => overlay('reward', onDone) } };
   const banner = document.createElement('button');
   banner.id = 'ad-banner'; banner.type = 'button'; banner.className = 'ad-banner hidden';
   root.appendChild(banner);
@@ -29,7 +32,7 @@ export function createAds({ root, noAds, onHouseAd, onRemoveAds, onEvent = () =>
     const show = on() && ADS.banner && OTHER_GAMES.length > 0;
     if (show && !banner.innerHTML) renderBanner();
     banner.classList.toggle('hidden', !show); document.body.classList.toggle('ads-on', show);
-    if (!on() && open) open.close(false);
+    if (!on() && open && open.kind === 'break') open.close(false);   // an opt-in rewarded ad keeps playing
   }
   // full-screen partner placeholder; kind = 'break' (skippable interstitial) | 'reward' (opt-in, pays out when finished)
   function overlay(kind, onDone) {
@@ -39,7 +42,7 @@ export function createAds({ root, noAds, onHouseAd, onRemoveAds, onEvent = () =>
       <div class="ad-art"><svg viewBox="0 0 120 80"><rect x="4" y="4" width="112" height="72" rx="14" fill="#FFF9F0" stroke="#B7D4B5" stroke-width="3" stroke-dasharray="7 6"/><path d="M48 28l26 12-26 12z" fill="#B7D4B5"/></svg></div>
       <h3>Partner ad</h3><p>${kind === 'reward' ? 'Watch to the end for your bonus.' : 'A short ad from our ad partner would play here.'}<br/><b>Placeholder only</b> · no ad network, nothing is loaded or tracked.</p>
       <div class="ad-bar"><em></em></div>
-      <button class="btn btn-blush ad-noads" type="button">No More Ads + 10 Jewels · $8.99</button></div>`;
+      ${noAds() ? '' : '<button class="btn btn-blush ad-noads" type="button">No More Ads + 10 Jewels · $8.99</button>'}</div>`;
     root.appendChild(O);
     const skip = O.querySelector('.ad-skip'), bar = O.querySelector('.ad-bar em'), t0 = performance.now();
     let done = false;
@@ -50,8 +53,8 @@ export function createAds({ root, noAds, onHouseAd, onRemoveAds, onEvent = () =>
       else if (!done) skip.querySelector('b').textContent = Math.ceil((wait - (performance.now() - t0)) / 1000);
     }, 100);
     skip.addEventListener('click', () => done && close(true));
-    O.querySelector('.ad-noads').addEventListener('click', () => { close(false); onRemoveAds(); });
-    open = { close }; onEvent(kind + '-open');
+    O.querySelector('.ad-noads')?.addEventListener('click', () => { close(false); onRemoveAds(); });
+    open = { close, kind }; onEvent(kind + '-open');
   }
   return {
     get mode() { return ADS_MODE; }, get enabled() { return on(); }, get partner() { return partnerOn(); }, get showing() { return !!open; },
@@ -61,7 +64,16 @@ export function createAds({ root, noAds, onHouseAd, onRemoveAds, onEvent = () =>
       if (!partnerOn() || open || blocked || (lastBreak && performance.now() - lastBreak < ADS.minGapMs)) return false;
       lastBreak = performance.now(); overlay('break'); onEvent('break:' + reason); return true;
     },
-    rewarded(onReward) { if (!partnerOn() || open) return false; overlay('reward', (ok) => ok && onReward()); return true; },
+    // v0.63: opt-in rewarded ads stay available after No More Ads (the player asks for them). No cooldown, no daily cap.
+    // The reward is paid ONLY when the provider reports the ad finished. A real network plugs in with registerProvider().
+    get rewardOn() { return ADS_MODE !== 'off'; },
+    rewarded(onReward, onClose = () => {}) {
+      if (ADS_MODE === 'off' || open) return false;
+      const p = providers[ADS.partner.network] || providers.placeholder;
+      p.showRewarded({ unit: ADS.partner.rewardedUnit, onDone: (finished) => { onClose(finished); if (finished) onReward(); } });
+      return true;
+    },
+    registerProvider(name, impl) { providers[name] = impl; },
     _resetGap() { lastBreak = 0; },
   };
 }

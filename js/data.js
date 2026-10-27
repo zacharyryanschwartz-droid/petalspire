@@ -136,7 +136,7 @@ export const FEATURES = {
   rainbarrel: {
     id: 'rainbarrel', name: 'Rain Barrel', rarity: 'basic', type: 'Feature · Water',
     stats: { Growth: 3, Beauty: 2, Yield: 3, Atmosphere: 3 },
-    blurb: 'Unlocks the Rain Barrel in the Build menu (40 coins): place it in a plot you bought to give that plot its own water — 1 a minute, up to 10, feeding up to 8 irrigated beds (its plot and the plot behind it).',
+    blurb: 'Unlocks the Rain Barrel in the Build menu (40 coins): place it in a plot you bought to give that plot its own water — 1 every 30 s, up to 12 (upgrade it to hold up to 60), feeding up to 8 irrigated beds (its plot and the plot behind it).',
   },
   beehive: {
     id: 'beehive', name: 'Honeybee Skep', rarity: 'legendary', type: 'Feature · Pollinators',
@@ -146,7 +146,7 @@ export const FEATURES = {
   irrigation: {
     id: 'irrigation', name: 'Irrigation', rarity: 'basic', type: 'Feature · Water',
     price: 45, stats: { Growth: 4, Beauty: 2, Yield: 3, Atmosphere: 2 },
-    blurb: 'Assign it to one raised bed: a drip line from the rain barrel waters that bed’s thirsty plants for you (1 water each). Each card covers one bed.',
+    blurb: 'Hook your raised beds up to their rain barrel: a drip line pays each bed’s water for you. Duplicates level the card up — a full bed’s water per stage (to start, then to bud): Lv1 9 · Lv2 7 · Lv3 5 · Lv4 3.',
   },
   tincture: {
     id: 'tincture', name: 'Tincture Stand', rarity: 'epic', type: 'Feature · Crafting',
@@ -160,13 +160,13 @@ export const FEATURES = {
   },
   sickle: {
     id: 'sickle', name: 'Harvest Sickle', rarity: 'epic', type: 'Tool · Harvest',
-    price: 80, stats: { Growth: 1, Beauty: 2, Yield: 4, Atmosphere: 2 }, cooldownS: 8,
-    blurb: 'Harvest a whole raised bed at once. Tap the Sickle, then a raised bed: every ripe plant in that bed is harvested in one sweep (normal yields and seeds). Rests 8 s between sweeps.',
+    price: 80, stats: { Growth: 1, Beauty: 2, Yield: 4, Atmosphere: 2 }, cooldownS: 30,
+    blurb: 'Harvest a whole raised bed at once. Tap the Sickle, then a raised bed: every ripe plant in that bed is harvested in one sweep (normal yields and seeds). Rests 30 s between sweeps (15% shorter per card level; skip the rest for 1 Jewel).',
   },
   plow: {
     id: 'plow', name: 'Hand Plow', rarity: 'epic', type: 'Tool · Planting',
-    price: 90, stats: { Growth: 3, Beauty: 1, Yield: 3, Atmosphere: 2 }, cooldownS: 8,
-    blurb: 'Plant a whole raised bed at once. Tap the Plow, pick a seed, then a raised bed: every empty tile in that bed is planted, as far as your seeds go. Rests 8 s between uses.',
+    price: 90, stats: { Growth: 3, Beauty: 1, Yield: 3, Atmosphere: 2 }, cooldownS: 30,
+    blurb: 'Plant a whole raised bed at once. Tap the Plow, pick a seed, then a raised bed: every empty tile in that bed is planted, as far as your seeds go. Rests 30 s between uses (15% shorter per card level; skip the rest for 1 Jewel).',
   },
   parking: {
     id: 'parking', name: 'Parking Lot', rarity: 'legendary', type: 'Feature · Traffic',
@@ -176,7 +176,7 @@ export const FEATURES = {
   windmill: {
     id: 'windmill', name: 'Windmill', rarity: 'legendary', type: 'Feature · Water',
     price: 160, stats: { Growth: 3, Beauty: 4, Yield: 3, Atmosphere: 4 },
-    blurb: 'Pumps for every rain barrel on your land: connected barrels refill every 20 s instead of 60 s (faster with card levels, and it stacks with the Brass Watering Can). Build it once anywhere on your cleared ground for 20 Wood + 5 Scrap Metal.',
+    blurb: 'Pumps for every rain barrel on your land: connected barrels refill every 15 s instead of 30 s (faster with card levels, and it stacks with the Brass Watering Can). Build it once anywhere on your cleared ground for 20 Wood + 5 Scrap Metal.',
   },
   teastand: {
     id: 'teastand', name: 'Tea Stand', rarity: 'epic', type: 'Feature · Crafting',
@@ -287,12 +287,13 @@ export const TINC_DUP_COINS = 10;
 // Copies are kept as progress (never consumed): at 3 / 6 / 10 copies the card can be upgraded to Lv2 / Lv3 / Lv4 with a tap.
 // Plant levels: +10% sell price and -5% grow time per level above 1, +1 Beauty/Yield pip per level, and +1 flower per harvest at Lv4.
 // Seeds per harvest always follow the plant's tier rule (PLANT_TIERS) — levels never change them.
-// Tool levels (Sickle, Plow): -15% rest time per level. Irrigation: every copy is one more card (= one more irrigated bed).
+// Tool levels (Sickle, Plow): -15% rest time per level. Irrigation (v0.63): owning one card hooks up any number of beds
+// (barrel limit applies); its level lowers the water a hooked bed needs per stage (see WATER.stage).
 export const CARD_LEVELS = {
   thresholds: [3, 6, 10],          // copies needed for Lv2, Lv3, Lv4 (max)
   plant: { sell: 0.10, grow: 0.05, statPip: 1, bonusFlowerAt: 4 },
   tool: { cooldown: 0.15 },
-  upgradable: (id, card) => !!card.tier || id === 'sickle' || id === 'plow' || id === 'parking' || id === 'windmill',
+  upgradable: (id, card) => !!card.tier || id === 'sickle' || id === 'plow' || id === 'parking' || id === 'windmill' || id === 'irrigation',
   parking: { extraItem: 0.10 },   // v0.52: spots / cars per arrival / gap per level live in PARKING; each level adds +10% extra-item chance
 };
 // v0.41: Card Packs cost Jewels, not coins (1 Jewel = one standard pack). Add more pack types here (e.g. a premium pack at 3 Jewels).
@@ -303,6 +304,42 @@ export const JEWEL_EXCHANGE = { coins: 1000, wood: 250 };
 export const JEWEL_DROP = { clear: 0.01 };   // v0.52: 1% (was 4%) — chance that clearing a tree, stump, bush or rock (without a find) turns up 1 Jewel
 export const DUP_COINS = 8;
 export const RACK_SLOTS = 3;
+// v0.63: the Farm Stand and the Drying Rack level up with coins (Lv1 → Lv4, permanent). Index = level − 1; cost[k] buys level k + 2.
+// Balanced against the stand milestones (Tincture Stand at 1,000 earned, Essential Oil Stand at 2,500): the first step is a few
+// good sales, the last is a mid-game goal.
+// v0.63: every Card Pack also holds coins, wood and Scrap Metal. Each rolls on its own: 1 + floor(max · u^CURVE) (capped at max),
+// u uniform 0–1. CURVE 4 = mostly small amounts, rare big ones (median ≈ 6% of max, mean ≈ 20%, top 10% of the range ≈ 2.6%).
+export const PACK_LOOT = { coins: 500, wood: 100, scrap: 25, curve: 4, bigAt: 0.9 };
+export const rollLoot = (max, rnd = Math.random, curve = PACK_LOOT.curve) => Math.min(max, 1 + Math.floor(max * Math.pow(rnd(), curve)));
+// v0.63: every pack = 2 plant cards + 1 non-plant card (feature, tool, stand, supply…). Cards you already own are drawn at
+// OWNED_K × their weight (the tier odds shown in the Market are for cards you don't have yet).
+export const PACK_MIX = { plants: 2, other: 1 }, OWNED_K = 0.4;
+// v0.63: daily streak — one gift per consecutive local calendar day. Miss a day and it starts again at Day 1. After Day 15 the
+// 15-day calendar loops (Day 16 pays like Day 1 …) while the streak counter keeps counting. Milestones: 5, 10 (+ a Card Pack), 15 (+ Jewels).
+export const DAILY = {
+  days: [
+    { coins: 25 }, { wood: 10 }, { scrap: 3 }, { coins: 40 },
+    { coins: 100, wood: 30, scrap: 8, milestone: true },
+    { wood: 15 }, { scrap: 4 }, { coins: 60 }, { wood: 20 },
+    { coins: 200, wood: 50, scrap: 12, pack: 1, milestone: true },
+    { scrap: 5 }, { coins: 80 }, { wood: 25 }, { scrap: 6 },
+    { coins: 400, wood: 100, scrap: 20, jewels: 3, milestone: true, grand: true },
+  ],
+};
+// v0.63: stands take real time to build. After paying & placing, a stand is under construction (wall-clock, saved, keeps
+// running while the game is closed) and only works when done. 'Finish now' costs 1 Jewel per started 5 minutes left (min 1).
+// Seconds per stand:
+export const CONS = {
+  s: { stand: 20, rack: 20, fruitstand: 60, tincture: 180, still: 300, teastand: 480, press: 900, oshed: 1200 },
+  jewelPerMin: 5,
+};
+export const consJewels = (msLeft) => Math.max(1, Math.ceil(msLeft / (CONS.jewelPerMin * 60000)));
+// v0.63: a resting tool can be woken right away for Jewels
+export const TOOL_SKIP_JEWELS = 1;
+export const BUILDING_LV = {
+  stand: { cost: [250, 750, 2000], space: [0, 4, 8, 12], sell: [0, 0, 0.05, 0.10] },   // +shelf space · +% coins on Farm Stand sales
+  rack:  { cost: [150, 450, 1200], slots: [3, 4, 5, 6], faster: [0, 0.10, 0.20, 0.30] }, // drying slots · % shorter drying time
+};
 export const DRY_S = 40;
 
 // ---------- v0.4: one rain barrel per plot ----------
@@ -505,8 +542,22 @@ export const WOOD = { tree: 3, stump: 1, bush: 0, rock: 0 };
 export const BED_COSTS = [12, 20, 28, 36, 44, 52];   // wood per raised bed, escalating
 export const STAND_CAP = 12;
 export const MARKET_GOAL = 100;                        // coins earned at the stand to unlock the Rebuild Market project
-export const WATER_REGEN_S = 60, WATER_REGEN_MAX = 10; // rain barrel by the stand: +1 water per minute (v0.31), offline too
-export const STARTER = { seed_lavender: 4, seed_calendula: 3 }, STARTER_FILL = 10;   // v0.4: no bag water — the starter pack fills the home barrel instead
+export const WATER_REGEN_S = 30, WATER_REGEN_MAX = 12; // v0.63: +1 water every 30 s (was 60 s), Lv1 barrel holds 12 (was 10), offline too
+// v0.63 WATER ECONOMY. A raised bed (3×3) pays water twice per grow cycle: to START growing and again to BUD (growth stalls
+// at the end of the sprout stage until the bud water is in). Costs are in ninths of a water per plant ("units"), so a full bed
+// of 9 plants pays stage[lv-1] water per stage. Hand watering pours 1 water (9 units) per tap into the bed; leftovers carry
+// over (S.bedCredit). Beds hooked up to Irrigation pay the Irrigation card's level cost (hand or drip); other beds pay Lv1.
+// Blue Lotus: 2 water to start (barrel half full after the 1st, full after the 2nd) and 2 to bud; Lv4 Irrigation: 1 water for the whole grow.
+export const WATER = { unit: 9, budAt: 0.5, stage: [9, 7, 5, 3], lotus: [[18, 18], [14, 14], [10, 10], [5, 4]] };
+// v0.63: rain barrel sizes — per barrel, bought with coins (+ wood / Scrap Metal at the top). The Brass Watering Can adds +5 to any size.
+export const BARREL_LV = [
+  { cap: 12 },
+  { cap: 20, coins: 150 },
+  { cap: 30, coins: 450, wood: 20 },
+  { cap: 45, coins: 1200, wood: 40, scrap: 8 },
+  { cap: 60, coins: 3000, wood: 80, scrap: 20 },
+];
+export const STARTER = { seed_lavender: 4, seed_calendula: 3 }, STARTER_FILL = 12;   // v0.4: no bag water — the starter pack fills the home barrel instead
 export const STARTER_JEWELS = 3;
 
 // ---------- v0.3: things you build ----------
@@ -589,7 +640,9 @@ export const ADS = {
   interstitialAfterPack: true,  // …and after opening a bought Card Pack
   minGapMs: 90 * 1000,          // never more than one ad break per 90 s
   skipAfterMs: 3000,            // ad breaks can be skipped after 3 s
-  rewarded: { coins: 10, cooldownMs: 3 * 60 * 1000, watchMs: 3000 },   // opt-in 'watch an ad' at the stand
+  // v0.63: opt-in 'Watch Ad' — the player picks Coins, Wood or Scrap Metal first. NO cooldown and NO daily limit: watch as many
+  // as you like, but the ad has to play to the end before anything is paid. Still offered after No More Ads (it's opt-in).
+  rewarded: { watchMs: 5000, picks: { coins: 50, wood: 20, scrap: 5 } },
 };
 
 // Settings → Play Other Games. Add more entries here; status 'soon' | 'live' (live entries need a url).
@@ -616,11 +669,11 @@ export const JEWEL_BUNDLES = [
 // customer) and the multiplier on the gap between arrivals (base 15–30 s, no lot = 1 car, gap counted from when it leaves).
 export const PARKING = { spots: [2, 3, 4, 6], cars: [2, 2, 3, 3], gapMult: [1.4, 1.2, 1.25, 1.15], extraItem: 0.3 };
 export const parkLv = (lv) => Math.max(1, Math.min(4, lv || 1)) - 1;
-export const WINDMILL = { regenS: [20, 18, 17, 15] };   // v0.52: seconds per water at card Lv1..Lv4 (was 40/36/33/30; base 60 s) — global: every connected barrel; ×½ again with the Brass Watering Can
+export const WINDMILL = { regenS: [15, 13, 11, 10] };   // v0.63: base refill is now 30 s (was 60), so the Windmill is 15/13/11/10 s (was 20/18/17/15)
 export const BILLBOARD = { boostMs: 5 * 60000, cooldownMs: 60 * 60000, mult: 2, jewels: 1 };  // Run ad: 2× traffic for 5 min · free once an hour · 1 Jewel to skip the wait
 export const TIPS = {
   parking: 'Your <b>Parking Lot</b> is open! Customers now come in <b>groups of 2 cars</b> — each car is a customer. Stack Parking Lot cards to level it up: more spots (2 → 3 → 4 → 6), bigger groups and shorter gaps. Some customers buy an extra item.',
-  windmill: 'Your <b>Windmill</b> is turning! Every rain barrel that’s connected to a stand now refills every <b>20 s</b> instead of 60 s (faster with card levels).',
+  windmill: 'Your <b>Windmill</b> is turning! Every rain barrel that’s connected to a stand now refills every <b>15 s</b> instead of 30 s (faster with card levels).',
   billboard: 'Your <b>Billboard</b> is up! Tap it and <b>Run ad</b> for twice the traffic for 5 minutes. It’s free once an hour; during the wait you can spend 1 Jewel to run it now.',
   chop: 'An old wooded lot. <b>Tap a tree</b> to chop it down — you’ll get <b>Wood</b>.',
   stump: 'Stumps stay behind. <b>Tap a stump</b> to dig it out and clear the ground.',
@@ -634,7 +687,7 @@ export const TIPS = {
   bloom: 'A bloom! <b>Tap the sparkling plant</b> to harvest it.',
   harvested: 'Harvests give flowers <i>and</i> seeds. Put spares on your <b>Farm Stand</b> by the road.',
   stand: 'Your <b>Farm Stand</b> is built! Tap it to stock flowers — drivers will pull over to buy.',
-  barrel: 'Each <b>rain barrel</b> refills by <b>1 water a minute</b> (up to 10), even while the game is closed — the badge shows when the next drop lands. Hand watering uses the bed’s own plot barrel first, then the nearest other barrel. Water only comes from rain barrels.',
+  barrel: 'Each <b>rain barrel</b> refills by <b>1 water every 30 s</b> (up to 12 — tap it to upgrade its size), even while the game is closed — the badge shows when the next drop lands. Hand watering uses the bed’s own plot barrel first, then the nearest other barrel. Water only comes from rain barrels.',
   plotbarrel: 'This plot has no rain barrel yet. Build a <b>Rain Barrel</b> from the Build menu (40 coins) and place it here: its own water for irrigation, up to <b>8 beds</b> (this plot and the one behind it). A barrel only collects rain through a gutter from a <b>stand on the same plot</b> (Tincture or Essential Oil Stand) — it connects automatically. Until then, hand watering borrows from your nearest barrel. <b>Goal reward:</b> a free <b>Tincture Stand</b> — place it on that plot and its roof feeds the barrel.',
   sickle: 'You own the <b>Harvest Sickle</b>! Tap the sickle button on the left, then tap a glowing raised bed to harvest every ripe plant in that bed at once.',
   plow: 'You own the <b>Hand Plow</b>! Tap the plow button on the left, pick a seed, then tap a glowing raised bed to plant every empty tile in that bed.',

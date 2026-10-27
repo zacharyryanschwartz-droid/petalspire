@@ -838,3 +838,92 @@ body.modal-open .tooldock, body.modal-open .goal, body.modal-open .bubble{visibi
 .cu-hint{margin:8px 0 0;padding:8px 10px;border-radius:12px;background:#FFF0EF;border:1.5px dashed var(--blush);color:#8E4950;font-size:13px;font-weight:700}
 .confirm-acts .btn{min-height:46px}
 .cu-panel .confirm-acts .btn{white-space:nowrap;font-size:14px;padding:10px 8px}
+/* v0.63: level status in Bag › Cards — Max level (honey) and "doesn't level up" (muted) */
+.stack-row .meta small.lv-max{color:#9A7A2E;font-weight:800}
+.stack-row .meta small.lv-none{color:#8C9584;font-style:italic}
+/* v0.63: Farm Stand / Drying Rack upgrade card (sage / honey / cream) */
+.upg-card{display:flex;align-items:center;gap:10px;margin:2px 4px 10px;padding:10px 12px;border-radius:16px;background:linear-gradient(180deg,#FFFBEF,#FBF1D6);border:1.5px solid #EED9A2;box-shadow:0 2px 0 #E6CF92}
+.upg-card .upg-lv{flex:0 0 auto;width:42px;height:42px;border-radius:50%;display:grid;place-items:center;font-family:Fraunces,serif;font-weight:800;font-size:15px;color:#5A4214;background:radial-gradient(circle at 35% 30%,#FCE7A8,#EDBF5C);box-shadow:inset 0 -2px 0 #C99A3A}
+.upg-card .upg-meta{display:flex;flex-direction:column;gap:2px;min-width:0;flex:1}
+.upg-card .upg-meta b{font-family:Fraunces,serif;font-size:15px;color:#3F4A3A}
+.upg-card .upg-meta small{font-size:12px;color:#6C7A63;line-height:1.3}
+.upg-card .upg-next{color:#5E7F5A;font-weight:700}
+.upg-card .upg-need{color:#C0767D;font-weight:800}
+.upg-card .btn{flex:0 0 auto;white-space:nowrap}
+.upg-card.max{background:linear-gradient(180deg,#F3F8EE,#E6F0DD);border-color:#BFD6B4;box-shadow:0 2px 0 #B5CDA9}
+.upg-card.max .upg-lv{background:radial-gradient(circle at 35% 30%,#D7EBCB,#9CC48C);color:#2F4A2A;box-shadow:inset 0 -2px 0 #7FA870}
+/* v0.63 iOS crash fix: the pack reveal's ray / aurora layers were 180–220vmax squares (≈5,600 device px a side at 3×, ~120 MB of
+   GPU texture EACH on iPhone) with blend modes and a 28px blur on top. Same look, layers sized to the screen, no blend/blur. */
+.rays{width:125vmax;height:125vmax;-webkit-mask:radial-gradient(circle,#000 0,transparent 62%);mask:radial-gradient(circle,#000 0,transparent 62%)}
+.hr-rays{width:125vmax;height:125vmax;mix-blend-mode:normal;-webkit-mask:radial-gradient(circle,#000 0,transparent 66%);mask:radial-gradient(circle,#000 0,transparent 66%)}
+.hr-rays{opacity:.55}.hr-rays.r2{opacity:.3}
+.aurora{inset:-6% -8% 45%;filter:none;mix-blend-mode:normal;opacity:.5;
+  background:radial-gradient(40% 60% at 25% 55%,rgba(125,240,200,.55),transparent 70%),radial-gradient(40% 60% at 52% 45%,rgba(140,155,224,.55),transparent 70%),radial-gradient(40% 60% at 78% 55%,rgba(242,167,224,.5),transparent 70%)}
+.holo{mix-blend-mode:soft-light}
+/* v0.63: pack bonus — coins / wood / Scrap Metal count up under the title */
+.pack-loot{display:flex;justify-content:center;gap:8px;margin:2px 0 10px;position:relative;z-index:2}
+.loot-chip{position:relative;display:flex;flex-direction:column;align-items:center;min-width:84px;padding:7px 10px 6px;border-radius:16px;background:#FFF9F0;border:1.5px solid #EED9A2;box-shadow:0 3px 0 #E2C98A;animation:loot-in .45s cubic-bezier(.3,1.6,.5,1) both}
+.loot-chip i{width:22px;height:22px;display:block}.loot-chip i svg{width:100%;height:100%}
+.loot-chip b{font-family:Fraunces,serif;font-size:20px;color:#5A4214;font-variant-numeric:tabular-nums;line-height:1.1}
+.loot-chip small{font-size:11px;color:#7C8A73;font-weight:700}
+.loot-chip.done{animation:loot-pop .35s ease-out}
+.loot-chip.big{background:linear-gradient(180deg,#FFF3C4,#F8DC93);border-color:#D9A93F;box-shadow:0 3px 0 #B8892E,0 0 18px rgba(245,208,122,.85)}
+.loot-chip .loot-wow{position:absolute;top:-10px;right:-8px;padding:1px 6px;border-radius:9px;background:#EDA3A8;color:#fff;font:800 10px Nunito,sans-serif;font-style:normal;transform:rotate(8deg);opacity:0}
+.loot-chip.big.done .loot-wow{opacity:1;animation:loot-pop .5s ease-out}
+.pack-loot.jackpot .loot-chip.big{animation:loot-glow 1.4s ease-in-out infinite alternate}
+@keyframes loot-in{from{opacity:0;transform:translateY(10px) scale(.8)}}
+@keyframes loot-pop{40%{transform:scale(1.14)}}
+@keyframes loot-glow{to{box-shadow:0 3px 0 #B8892E,0 0 28px rgba(245,208,122,1)}}
+.odds .odds-label{flex-basis:100%;font-size:11px;font-weight:800;color:#5E7F5A;margin:4px 2px 0}
+/* v0.63: cozy modals — Watch Ad picker & Daily Garden Gift */
+.cozy-modal{position:absolute;inset:0;z-index:78;display:grid;place-items:center;padding:18px;background:rgba(40,52,41,.55);animation:fade .25s ease}
+.cozy-card{position:relative;width:100%;max-width:360px;background:var(--cream);border:2px solid var(--sage);border-radius:22px;padding:16px 14px 12px;box-shadow:0 10px 30px rgba(40,52,41,.3);text-align:center}
+.cozy-card h3{font-family:Fraunces,serif;font-size:22px;color:var(--moss);margin:2px 0 4px}
+.cozy-card .muted{font-size:13px;margin:0 6px 10px}
+.cozy-card .close-btn{position:absolute;top:8px;right:8px}
+.ap-row{display:flex;gap:8px}
+.ap-pick{flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;padding:12px 4px 10px;border-radius:16px;border:1.5px solid #EED9A2;background:#FFFBF0;box-shadow:0 3px 0 #E2C98A;font-family:Nunito,sans-serif;cursor:pointer}
+.ap-pick:active{transform:translateY(2px);box-shadow:0 1px 0 #E2C98A}
+.ap-pick i{width:30px;height:30px}.ap-pick i svg{width:100%;height:100%}
+.ap-pick b{font-family:Fraunces,serif;font-size:20px;color:#5A4214}.ap-pick small{font-size:12px;font-weight:700;color:var(--ink-soft)}
+.ap-note{font-size:11.5px;font-weight:700;color:#7C8A73;margin:10px 0 0}
+.daily-strip{display:flex;align-items:center;justify-content:space-between;width:calc(100% - 4px);margin:0 2px 10px;padding:9px 12px;border-radius:14px;border:1.5px solid var(--blush);background:#FFF5F3;font-family:Nunito,sans-serif;color:var(--ink)}
+.daily-strip b{font-size:14px}.daily-strip small{font-size:12px;font-weight:700;color:#B8666C}
+.dl-tiles{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;margin:4px 0 8px}
+.dl-tile{position:relative;min-height:58px;border-radius:12px;background:#fff;border:1.5px solid #E4EBDD;padding:4px 2px;display:flex;flex-direction:column;align-items:center;gap:2px}
+.dl-tile em{font-style:normal;font-size:10px;font-weight:800;color:var(--ink-soft)}
+.dl-gift{display:flex;flex-wrap:wrap;justify-content:center;gap:1px 3px}
+.dl-gift span{display:flex;align-items:center;gap:1px;font-size:10.5px;font-weight:800;color:var(--ink)}
+.dl-gift i{width:12px;height:12px}.dl-gift i svg{width:100%;height:100%}
+.dl-gift .g-pack{color:#8A5BB0}
+.dl-tile.ms{background:#FFF9EC;border-color:#EED9A2}
+.dl-tile.grand{background:linear-gradient(180deg,#FFF3C4,#FBE6A9)}
+.dl-tile.done{background:#EEF5EC;border-color:var(--sage);opacity:.85}
+.dl-check{font-size:20px;color:#5E825F;line-height:1.3}
+.dl-tile.today{border:2px solid var(--gold);box-shadow:0 0 0 3px rgba(245,208,122,.45);animation:loot-pop 1.6s ease-in-out infinite}
+.dl-tile.next-ms:not(.today){border:2px dashed #E07F86;box-shadow:0 0 12px rgba(247,197,197,.9)}
+.dl-tile.next-ms::after{content:'★';position:absolute;top:-8px;right:-4px;font-size:14px;color:#E07F86}
+.dl-next{font-size:12.5px;margin:0 0 8px;display:flex;align-items:center;justify-content:center;gap:4px;flex-wrap:wrap}
+.dl-next span{display:inline-flex;align-items:center;gap:1px;font-weight:800}.dl-next i{width:13px;height:13px}.dl-next i svg{width:100%;height:100%}
+.dl-claim{width:100%}
+/* v0.63: Skip a resting tool for a Jewel */
+.tool-row{display:flex;align-items:center;gap:6px}
+.tool-skip{display:flex;align-items:center;gap:3px;height:30px;padding:0 9px;border-radius:999px;border:1.5px solid #D9A93F;background:linear-gradient(180deg,#FFF3C4,#F8DC93);color:#5A4214;font:800 12px Nunito,sans-serif;box-shadow:0 3px 8px rgba(61,90,64,.18);white-space:nowrap}
+.tool-skip i{width:15px;height:15px}.tool-skip i svg{width:100%;height:100%}
+.tool-skip.hidden{display:none}
+/* v0.63: a stand under construction */
+.cons-card{display:flex;flex-direction:column;align-items:center;text-align:center;gap:6px;background:#FFF9EC;border:1.5px dashed #E6CF97;border-radius:18px;padding:16px 14px;margin:2px 2px 10px}
+.cons-card .cons-sign{font-size:38px;line-height:1}
+.cons-card > b{font-family:Fraunces,serif;font-size:18px;color:var(--moss)}
+.cons-card > small{font-size:12.5px;color:var(--ink-soft);font-weight:600}
+.cons-card .progress{width:100%}
+.cons-left{margin:0;font-weight:800;color:#8A6418;font-variant-numeric:tabular-nums}
+.cons-card .btn{width:100%}
+.cons-note{font-size:11.5px;margin:0}
+/* v0.63: bed water progress (start / bud) */
+.bed-water{margin:4px 4px 8px;padding:8px 12px;border-radius:14px;background:linear-gradient(180deg,#F1F8F6,#E3F0EC);border:1.5px solid #BFD9D2}
+.bed-water .bw-top{display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-size:14px;color:#3F4A3A}
+.bed-water .bw-top b{font-family:Fraunces,serif;font-size:15px}
+.bed-water .bw-top small{color:#6C7A63;font-size:12px}
+.bed-water .bw-bar{display:block;height:8px;margin-top:6px;border-radius:6px;background:#FFFBEF;overflow:hidden;box-shadow:inset 0 1px 2px rgba(0,0,0,.08)}
+.bed-water .bw-bar em{display:block;height:100%;border-radius:6px;background:linear-gradient(90deg,#9CC9D6,#7FB3C6);transition:width .3s}
