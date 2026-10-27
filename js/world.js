@@ -321,7 +321,7 @@ export function createWorld(canvas) {
       for (let i = 0; i < 40; i++) { const x = ORCH_X - 40 + i * 2; m4.makeTranslation(x, 0.45, ROAD.z1 + 0.9); posts.setMatrixAt(i, m4); for (const y of [0.4, 0.72]) { m4.makeTranslation(x + 1, y, ROAD.z1 + 0.9); rails.setMatrixAt(r2++, m4); } }
       posts.castShadow = rails.castShadow = true; orchardScene.add(posts, rails); }
     const rowM = mat('#BCD596', { roughness: 1 });
-    for (const z of [-3.2, -5.6, -8.0]) { const r = new THREE.Mesh(new THREE.PlaneGeometry(12.6, 1.5), rowM); r.rotation.x = -Math.PI / 2; r.position.set(ORCH_X, 0.01, z); r.receiveShadow = true; orchardScene.add(r); }
+    for (const z of [...new Set(ORCHARD_TREE_SPOTS.filter((p) => p.lot === 'orchard').map((p) => p.z))]) { const r = new THREE.Mesh(new THREE.PlaneGeometry(12.6, 1.5), rowM); r.rotation.x = -Math.PI / 2; r.position.set(ORCH_X, 0.01, z); r.receiveShadow = true; orchardScene.add(r); }   // v0.68: 4 rows
     // v0.66.1: split-rail fence around the PURCHASED Orchard land only (the field + every bought Orchard plot), with a gate at
     // the lane; it is rebuilt whenever an Orchard plot is bought (setLotOwned), so unbought land always stays outside it.
     orchFenceG = new THREE.Group(); orchFenceG.userData.kind = 'orchfence'; orchardScene.add(orchFenceG); buildOrchFence();

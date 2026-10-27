@@ -1,4 +1,4 @@
-# Petalspire v0.67.1
+# Petalspire v0.68
 
 A cozy 3D flower-garden prototype for iPhone Safari (portrait, one thumb). Also plays on desktop with a mouse.
 This is a **prototype**: version numbers stay below 1.0 until the first official release.
@@ -20,6 +20,30 @@ This is a **prototype**: version numbers stay below 1.0 until the first official
 7. **Land for sale.** Five wooded plots, each with a floating For Sale sign: 150 → 300 → 600 → 1000 → 1500 coins.
 
 Drag with one finger to pan, pinch to zoom, and twist with two fingers to turn. On desktop, right-drag or shift-drag turns the view.
+
+## New in v0.68: polish pass (no new features)
+
+A full play-through of Home and the Orchard on a fresh save and on older saves, at iPhone size (390×844, touch). Fixes only:
+
+- **Orchard dead end fixed.** Buying the Orchard now gives you the **Apple Tree** card, so Apple saplings are in the Orchard Market right away. Before, a new Orchard had no tree cards, and those came only from Jewel packs. Older saves that own the Orchard with no tree card and no trees get the same card when they load.
+- **Card zoom works again.** Tapping a card in the Collection crashed the panel's click handler from v0.67.1 onward (`startsWith` on a button with no action). Fixed.
+- **Ads wait their turn.** An interstitial no longer opens while a panel, popup or the Map is open.
+- **Title screen is clean.** The HUD, tab bar and tool dock stay hidden until you tap Begin.
+- **The tool dock (Sickle/Plow) hides** where there are no raised beds, such as the Orchard.
+- **Home-only tips** (chop, stumps, beds, Farm Stand, blooms and so on) no longer show up while you're at the Orchard. They wait for your next Home visit.
+- **Orchard Bag hint:** the empty Orchard Bag now explains the Orchard: plant saplings from the Market, pick the fruit, sell it at the Orchard Stand or cook it at the Fruit Stand.
+- **Clearer wording:** "Your barrel is already full" (was "All 1 barrel already full"). The Sickle and Plow tips now say they work wherever you have raised beds.
+- **Bigger tap targets** for small link buttons and the goal hint.
+- **Market sorting fixed.** Glycerin and Vinegar singles and ×5 packs are now separate rows, so the Market list is highest to lowest price all the way down (the ×5 packs used to ride along with their single and break the order).
+- **Leaf icon fixed.** The leaf-bunch icon on tree cards had a broken SVG path, so its left leaves were missing and every draw logged an error.
+- **Barrel reach frames** now clear as soon as you deselect, instead of lingering until the next tap.
+- **Every Orchard plot is a 4×4 grid of 16 tree spots.** The Orchard was 3×4 and Pear Meadow, Plum Hollow and Hilltop Grove were 2×3. Every Orchard plot is now 16 m deep, and its ground, plot outline and fence were resized to fit. Hilltop Grove sits 2 m further back to make room. Tree-row Irrigation now has 4 rows per plot.
+  - **Saves:** trees on The Orchard keep their spots. Trees on the other plots move to the nearest spot in the new grid, on the same plot and in the same row order, with their growth timers kept. Irrigated rows follow their trees. Anything you placed on Hilltop Grove moves back with it.
+- **Press recipes are in the right places.** Rosehip Oil (from Damask Rose seeds, a Home plant) is pressed only at the Home Pressed Oil Stand. Almond Oil and Almond Butter (from Orchard almond trees) are pressed only at the Orchard Oil Press. Older saves:
+  - a press that was mid-way through a recipe that has moved gives its ingredients back to that place's Bag;
+  - a jar that was already finished stays ready to collect.
+- **New pack art.** The Starter Pack and Collector's Bundle heroes are now gift bouquets made of the actual contents: the Plow and Sickle, fanned plant cards, Jewels, coins and Wood, tucked in with a few flowers. The Collector's Bundle is the bigger one, with a glowing Other World plant and a Double Daily Rewards ribbon. The blurbs match.
+- Version label, page title and save stamp now read **v0.68**. Saves migrate without loss.
 
 ## New in v0.67.1: trees need water, tree-row Irrigation, no delivery van yet, Market fix, bouquet packs
 

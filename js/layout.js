@@ -17,12 +17,13 @@ export const LOTS = {
   northeast: { name: 'Bramble Woods',  x0: 4.6,   x1: 13.8, z0: -17.8, z1: -6.6 },
   backwoods: { name: 'Back Woods',     x0: -4.6,  x1: 4.6,  z0: -28.6, z1: -17.8 },   // v0.6: the last wooded plot at Home
   // v0.6: The Orchard is its own place on the Map (far from Home, so it reads as a separate scene). Bought on the Map
-  // once every Home plot is yours. Sunny open field: 2 raised-bed patches up front, 12 tree spots behind.
-  orchard:   { name: 'The Orchard',    x0: 293,   x1: 307,  z0: -10,   z1: 4, away: true },
+  // once every Home plot is yours. Sunny open field: 2 raised-bed patches up front, 16 tree spots behind (v0.68: 4×4).
+  // v0.68: every Orchard plot is 16 deep (z0 −12, was −10) so it holds a full 4×4 grid of trees; Hilltop Grove moved back 2 m to match
+  orchard:   { name: 'The Orchard',    x0: 293,   x1: 307,  z0: -12,   z1: 4, away: true },
   // v0.61: more Orchard land, open meadow (nothing to clear), bought from For Sale signs at the Orchard
-  orchwest:  { name: 'Pear Meadow',    x0: 279,   x1: 293,  z0: -10,   z1: 4, away: true },
-  orcheast:  { name: 'Plum Hollow',    x0: 307,   x1: 321,  z0: -10,   z1: 4, away: true },
-  orchnorth: { name: 'Hilltop Grove',  x0: 293,   x1: 307,  z0: -24,   z1: -10, away: true },
+  orchwest:  { name: 'Pear Meadow',    x0: 279,   x1: 293,  z0: -12,   z1: 4, away: true },
+  orcheast:  { name: 'Plum Hollow',    x0: 307,   x1: 321,  z0: -12,   z1: 4, away: true },
+  orchnorth: { name: 'Hilltop Grove',  x0: 293,   x1: 307,  z0: -28,   z1: -12, away: true },
 };
 export const ORCH_X = 300, ORCH_Z = -3;
 export const LOCATIONS = { home: { name: 'Home', target: [-0.3, 0.3, -0.4] }, orchard: { name: 'The Orchard', target: [ORCH_X, 0.3, ORCH_Z - 0.6] } };
@@ -40,17 +41,30 @@ export const ORCH_LOTS = ['orchard', ...ORCH_FOR_SALE];
 export const lotLoc = (lot) => (ORCH_LOTS.includes(lot) ? 'orchard' : 'home');
 export const OWNABLE_LOTS = [...LOT_FOR_SALE, ...ORCH_LOTS];
 export const ORCHARD = 'orchard';
-// 12 tree spots in the back of the Orchard (the front row keeps 2 raised-bed patches)
+// v0.68: every Orchard plot holds a 4×4 grid of tree spots (16), 4 rows per plot. Keys: 0–15 The Orchard (0–11 are the
+// old v0.6 spots, unchanged), 16–31 Pear Meadow, 32–47 Plum Hollow, 48–63 Hilltop Grove. Older saves are re-keyed in
+// main.js (migrateOrchGrid) using ORCH_GRID_OLD_TO_NEW below, so every planted tree keeps its plot, row and side.
+export const ORCH_GRID = { cols: [-4.5, -1.5, 1.5, 4.5], rows: { orchard: [-3.2, -5.6, -8.0, -10.4], orchwest: [-3.2, -5.6, -8.0, -10.4], orcheast: [-3.2, -5.6, -8.0, -10.4], orchnorth: [-14.0, -16.4, -18.8, -21.2] } };
 export const ORCHARD_TREE_SPOTS = [];
-for (const z of [-3.2, -5.6, -8.0]) for (const x of [-4.5, -1.5, 1.5, 4.5]) ORCHARD_TREE_SPOTS.push({ k: ORCHARD_TREE_SPOTS.length, x: ORCH_X + x, z, lot: 'orchard' });
-// v0.61: 6 more tree spots on each Orchard plot (2 rows of 3); keys 12–17 Pear Meadow, 18–23 Plum Hollow, 24–29 Hilltop Grove
-for (const [lot, zs] of [['orchwest', [-4.0, -7.4]], ['orcheast', [-4.0, -7.4]], ['orchnorth', [-12.6, -15.6]]]) {
+for (const lot of ['orchard', 'orchwest', 'orcheast', 'orchnorth']) {
   const cx = (LOTS[lot].x0 + LOTS[lot].x1) / 2;
-  for (const z of zs) for (const dx of [-4.2, 0, 4.2]) ORCHARD_TREE_SPOTS.push({ k: ORCHARD_TREE_SPOTS.length, x: cx + dx, z, lot });
+  for (const z of ORCH_GRID.rows[lot]) for (const dx of ORCH_GRID.cols) ORCHARD_TREE_SPOTS.push({ k: ORCHARD_TREE_SPOTS.length, x: cx + dx, z, lot });
 }
+// pre-v0.68 layout: The Orchard 3 rows × 4 (keys 0–11), each other plot 2 rows × 3 (12–17, 18–23, 24–29).
+// Old side-plot rows sat at z −4.0/−7.4 (Hilltop Grove −12.6/−15.6, before it moved back 2 m) → nearest new rows.
+export const ORCH_GRID_OLD_TO_NEW = (k) => {
+  k = +k; if (k < 12) return k;
+  if (k > 29) return null;
+  const L = Math.floor((k - 12) / 6), r = Math.floor((k - 12) % 6 / 3), c = (k - 12) % 3;
+  const newRow = L === 2 ? [0, 1][r] : [0, 2][r], newCol = [0, 1, 3][c];
+  return 16 + L * 16 + newRow * 4 + newCol;
+};
+export const ORCH_ROW_OLD_TO_NEW = { 'orchwest:-4': 'orchwest:-3.2', 'orchwest:-7.4': 'orchwest:-8', 'orcheast:-4': 'orcheast:-3.2', 'orcheast:-7.4': 'orcheast:-8', 'orchnorth:-12.6': 'orchnorth:-14', 'orchnorth:-15.6': 'orchnorth:-16.4' };
+// anything placed on Hilltop Grove before v0.68 (old bounds) moves back with it
+export const ORCH_NORTH_OLD = { x0: 293, x1: 307, z0: -24, z1: -10, dz: -2 };
 export const SIGNS = {
   west: [-5.25, -1.7], east: [5.15, -1.9], north: [1.2, -7.4], northwest: [-5.4, -7.4], northeast: [5.4, -7.4], backwoods: [0, -18.4],
-  orchwest: [291.4, 3.0], orcheast: [308.6, 3.0], orchnorth: [300, -11.2],
+  orchwest: [291.4, 3.0], orcheast: [308.6, 3.0], orchnorth: [300, -13.2],
 };
 
 export const BARREL_SPOT_HOME = [-1.15, 4.25];
@@ -62,7 +76,7 @@ export const SITES = [];
 for (const id of Object.keys(LOTS)) {
   const [cx, cz] = lotCenter(id);
   const xs = id === 'home' ? [-2.15, 2.15] : [cx - 2.3, cx + 2.3];
-  const zs = (id === 'home' || id === 'west' || id === 'east') ? [-0.55, -4.5] : id === 'orchard' ? [1.2] : id === 'orchnorth' ? [-20.6] : ORCH_LOTS.includes(id) ? [1.0] : [cz + 2.2, cz - 2.2];
+  const zs = (id === 'home' || id === 'west' || id === 'east') ? [-0.55, -4.5] : id === 'orchard' ? [1.2] : id === 'orchnorth' ? [-25.0] : ORCH_LOTS.includes(id) ? [1.0] : [cz + 2.2, cz - 2.2];
   for (const z of zs) for (const x of (ORCH_LOTS.includes(id) && id !== 'orchard' ? [cx - 3.2, cx + 3.2] : xs)) SITES.push({ id: `${id}-${SITES.filter((s) => s.lot === id).length}`, lot: id, x, z });
 }
 export const siteById = (id) => SITES.find((s) => s.id === id);

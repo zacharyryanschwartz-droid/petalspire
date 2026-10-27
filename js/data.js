@@ -187,7 +187,7 @@ export const FEATURES = {
   press: {
     id: 'press', name: 'Pressed Oil Stand', rarity: 'epic', type: 'Feature · Crafting',
     price: 140, stats: { Growth: 1, Beauty: 3, Yield: 5, Atmosphere: 4 },   // v0.6
-    blurb: 'A wooden screw press. Press Sunflower seeds into Sunflower Oil or Sun Butter, Damask Rose seeds into Rosehip Oil, Spiral Sunpetal seeds into glowing Sunpetal Oil — and, with an Orchard, olives, almonds and cacao into Olive Oil, Almond Oil, Almond Butter and Cocoa Butter. Buy it and place it on any plot you own (20 Wood).',
+    blurb: 'A wooden screw press. Press Sunflower seeds into Sunflower Oil or Sun Butter, Damask Rose seeds into Rosehip Oil, Spiral Sunpetal seeds into glowing Sunpetal Oil — and, with an Orchard, olives and cacao into Olive Oil and Cocoa Butter. (Almond Oil and Almond Butter are pressed at the Orchard Oil Press.) Buy it and place it on any plot you own (20 Wood).',
   },
   fruitstand: {
     id: 'fruitstand', name: 'Fruit Stand', rarity: 'epic', type: 'Feature · Crafting',
@@ -519,10 +519,10 @@ const R_ = (id, name, src, input, n, kind, icon, color, extra = {}) => ({ id, na
 export const PRESS = { slots: 2, mult: (o) => 1.7 + 0.25 * (o - 1), kinds: { oil: 1, butter: 1.06 }, recipes: [
   R_('sunoil', 'Sunflower Oil', 'sunflower', 'seed_sunflower', 30, 'oil', 'oilbottle', '#F2C53D', { sell: 110, s: 60 }),
   R_('sunbutter', 'Sun Butter', 'sunflower', 'seed_sunflower', 50, 'butter', 'butterjar', '#D9A441', { sell: 190, s: 90 }),
-  R_('rosehip', 'Rosehip Oil', 'damaskrose', 'seed_damaskrose', 3, 'oil', 'oilbottle', '#D4553A', { s: 120 }),
+  R_('rosehip', 'Rosehip Oil', 'damaskrose', 'seed_damaskrose', 3, 'oil', 'oilbottle', '#D4553A', { s: 120, only: 'home' }),   // v0.68: rose hips come from Home roses — Home press only
   R_('olive', 'Olive Oil', 'olive', 'fruit_olive', 6, 'oil', 'oilbottle', '#B5B03A', { s: 120 }),
-  R_('almondoil', 'Almond Oil', 'almond', 'fruit_almond', 6, 'oil', 'oilbottle', '#EAD3A8', { s: 120 }),
-  R_('almondbutter', 'Almond Butter', 'almond', 'fruit_almond', 8, 'butter', 'butterjar', '#B9895A', { s: 150 }),
+  R_('almondoil', 'Almond Oil', 'almond', 'fruit_almond', 6, 'oil', 'oilbottle', '#EAD3A8', { s: 120, only: 'orchard' }),   // v0.68: almonds grow on Orchard trees — Orchard Oil Press only
+  R_('almondbutter', 'Almond Butter', 'almond', 'fruit_almond', 8, 'butter', 'butterjar', '#B9895A', { s: 150, only: 'orchard' }),
   R_('cocoa', 'Cocoa Butter', 'cacao', 'fruit_cacao', 4, 'butter', 'butterjar', '#F1E0C0', { s: 180 }),
   R_('sunpetal', 'Sunpetal Oil', 'sunpetal', 'seed_sunpetal', 2, 'oil', 'oilbottle', '#FFD86A', { sell: 1600, s: 240, glow: 3 }),
 ] };
@@ -753,11 +753,11 @@ export const TIPS = {
   stand: 'Your <b>Farm Stand</b> is built! Tap it to stock flowers — drivers will pull over to buy.',
   barrel: 'Each <b>rain barrel</b> refills by <b>1 water every 30 s</b> (up to 12 — tap it to upgrade its size), even while the game is closed — the badge shows when the next drop lands. Hand watering uses the bed’s own plot barrel first, then the nearest other barrel. Water only comes from rain barrels.',
   plotbarrel: 'This plot has no rain barrel yet. Build a <b>Rain Barrel</b> from the Build menu (40 coins) and place it here: its own water for irrigation, up to <b>8 beds</b> (this plot and the one behind it). A barrel only collects rain through a gutter from a <b>stand on the same plot</b> (Tincture or Essential Oil Stand) — it connects automatically. Until then, hand watering borrows from your nearest barrel. <b>Goal reward:</b> a free <b>Tincture Stand</b> — place it on that plot and its roof feeds the barrel.',
-  sickle: 'You own the <b>Harvest Sickle</b>! Tap the sickle button on the left, then tap a glowing raised bed to harvest every ripe plant in that bed at once.',
-  plow: 'You own the <b>Hand Plow</b>! Tap the plow button on the left, pick a seed, then tap a glowing raised bed to plant every empty tile in that bed.',
+  sickle: 'You own the <b>Harvest Sickle</b>! Wherever you have raised beds, tap the sickle button on the left, then tap a glowing raised bed to harvest every ripe plant in that bed at once.',
+  plow: 'You own the <b>Hand Plow</b>! Wherever you have raised beds, tap the plow button on the left, pick a seed, then tap a glowing raised bed to plant every empty tile in that bed.',
   oils: 'The <b>Essential Oil Stand</b> is an Epic card: find it in a Card Pack, buy it at the Supply Market (150 coins), then build it (25 Wood) on one of your <b>other plots</b>. It distills <b>seeds</b> into oils worth far more than the seeds.',
   teastand: 'Your <b>Tea Stand</b> is ready! Tap it, pick any <b>three dried herbs</b> (duplicates allowed) and brew a tea — the predicted price shows as you pick. Rarer herbs make far pricier teas; three different herbs add 10%. Teas sell at your Farm Stand.',
-  press: 'Your <b>Pressed Oil Stand</b> is ready! Tap it and pick a recipe — Sunflower seeds become <b>Sunflower Oil</b> or <b>Sun Butter</b>; Damask Rose seeds, olives, almonds, cacao and Sunpetal seeds make richer oils.',
+  press: 'Your <b>Pressed Oil Stand</b> is ready! Tap it and pick a recipe — Sunflower seeds become <b>Sunflower Oil</b> or <b>Sun Butter</b>; Damask Rose seeds, olives, cacao and Sunpetal seeds make richer oils.',
   fruitstand: 'Your <b>Fruit Stand</b> is ready! Tap it to cook orchard fruit into <b>jellies, butters, sauces and canned fruit</b> — each sells for well above the raw fruit.',
   orchard: 'Welcome to <b>The Orchard</b>! Fruit-tree cards are in Card Packs now. Buy saplings at the Supply Market and plant them on the tree spots. Build beds and a rain barrel here too (the shed roof feeds it). Tap <b>Map</b> to go home: both places keep growing.',
   still: 'Your <b>Essential Oil Stand</b> is ready! Distill <b>seeds</b> into essential oils (5 Lavender, 4 Calendula or 3 Chamomile seeds each) — oils sell for a premium at the Farm Stand, far more than the seeds. Each distillation also leaves a <b>hydrosol</b> (Rose Water from Damask Rose) — a small extra to sell.',
@@ -831,9 +831,9 @@ export const BOOSTS = {
 // give more value per dollar. The Jewel Shop lists them highest value first. once: true = can be bought only once.
 // The Starter Pack pops up once, right after the beginning goals are done (the closing card), and stays in the Jewel Shop after.
 export const OFFER_PACKS = [
-  { id: 'starter_pack', productId: 'com.petalspire.starter2', name: 'Starter Pack', blurb: 'A bouquet of one plant from every tier, both tools and a gentle head start', price: '$4.99', usd: 4.99, once: true, starter: true,
+  { id: 'starter_pack', productId: 'com.petalspire.starter2', name: 'Starter Pack', blurb: 'A gift bouquet of everything inside: a plant from every tier, the Plow and Sickle, Jewels, coins and Wood', price: '$4.99', usd: 4.99, once: true, starter: true,
     jewels: 20, coins: 1000, wood: 100, tools: ['plow', 'sickle'], plantsPerTier: 1, seedsPerPlant: 3 },
-  { id: 'collector_bundle', productId: 'com.petalspire.collector', name: 'Collector’s Bundle', blurb: 'A grand bouquet: everything in the Starter Pack, a glowing Other World bloom, more Jewels, coins and Wood, and Double Daily Rewards for good', price: '$19.99', usd: 19.99,
+  { id: 'collector_bundle', productId: 'com.petalspire.collector', name: 'Collector’s Bundle', blurb: 'A grand gift bouquet: everything in the Starter Pack, a glowing Other World plant, more Jewels, coins and Wood, and Double Daily Rewards for good', price: '$19.99', usd: 19.99,
     plantsPerTier: 1, plantTier: 'otherworld', seedsPerPlant: 3, jewels: 120, coins: 6000, wood: 400, tools: ['plow', 'sickle'], dailyX2: true },
 ];
 // A tool the player already owns is swapped for TOOL_SUB_JEWELS Jewels (a fair substitute).
