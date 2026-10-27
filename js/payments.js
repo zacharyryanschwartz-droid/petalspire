@@ -19,14 +19,14 @@ export const Payments = {
     }
     return { ok: false, reason: 'Purchases are turned off.' };
   },
-  // v0.66: one-off offers (the Starter Pack). PLACEHOLDER PURCHASE HOOK — iPhone in-app purchase goes here.
+  // v0.66/v0.67: real-money packs (Starter Pack, Jewel Pouch, Gardener’s, Orchard, Collector’s). PLACEHOLDER PURCHASE HOOK — iPhone in-app purchase goes here.
   // The web build never fakes a real-money charge: outside a native app it refuses and grants nothing.
   // A wrapped iOS build: post { productId } to window.webkit.messageHandlers.iap, wait for StoreKit's verified
-  // transaction, then resolve { ok: true, receipt } — main.js then calls grantStarter(receipt) to hand out the contents.
+  // transaction, then resolve { ok: true, receipt } — main.js then calls grantOffer(id, receipt) to hand out the contents.
   async purchaseOffer(offer) {
     if (this.mode === 'apple-iap' && window.webkit?.messageHandlers?.iap) {
       return { ok: false, reason: 'Apple IAP bridge not implemented yet.', productId: offer.productId };
     }
-    return { ok: false, placeholder: true, productId: offer.productId, reason: 'The Starter Pack arrives with the iPhone app. Nothing was charged.' };
+    return { ok: false, placeholder: true, productId: offer.productId, reason: `${offer.name || 'This pack'} arrives with the iPhone app. Nothing was charged.` };
   },
 };

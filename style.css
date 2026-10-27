@@ -1067,3 +1067,34 @@ body.modal-open .tooldock, body.modal-open .jeweldock, body.bar-open .jeweldock,
 .boost-offer .bo-x{align-self:flex-start;background:none;border:0;font-size:20px;line-height:1;color:#8A7A62;padding:6px 10px;cursor:pointer}
 .boost-offer .bo-time{position:absolute;left:0;bottom:0;height:3px;width:100%;background:#B7D4B5;transform-origin:left;animation:boTime linear forwards}
 @keyframes boTime{to{transform:scaleX(0)}}
+/* v0.66.1: full-screen Map — the storybook paper runs edge to edge; header + place card float over it inside the iPhone safe areas */
+.map-screen{position:fixed;inset:0;padding:0;overflow:hidden;background:#F3EAD3}
+.map-body{position:absolute;inset:0;padding:0;display:block}
+.map-svg{display:block;width:100%;height:100%;max-width:none;overflow:visible}
+.map-head{position:absolute;left:0;right:0;top:0;z-index:2;display:flex;align-items:center;justify-content:space-between;gap:8px;
+  padding:calc(10px + env(safe-area-inset-top)) calc(12px + env(safe-area-inset-right)) 6px calc(12px + env(safe-area-inset-left));pointer-events:none}
+.map-head > *{pointer-events:auto}
+.map-head h2{font-size:22px;text-shadow:0 1px 0 #FFF9F0}
+.map-head-sp{width:84px}
+.map-back{min-width:84px;height:40px;border-radius:999px;border:2px solid #7A5A3C;background:#FFF9F0;color:#3D5A40;font:800 15px 'Nunito',system-ui,sans-serif;box-shadow:0 3px 10px rgba(61,90,64,.2);cursor:pointer}
+.map-back:active{transform:translateY(1px)}
+.map-card-wrap{position:absolute;left:0;right:0;bottom:0;z-index:2;min-height:0;pointer-events:none;
+  padding:8px calc(12px + env(safe-area-inset-right)) calc(12px + env(safe-area-inset-bottom)) calc(12px + env(safe-area-inset-left))}
+.map-card-wrap > *{pointer-events:auto}
+.map-card-wrap .map-hint{background:rgba(255,249,240,.92);border:1.5px solid #E3CFA2;border-radius:14px;padding:8px 12px;margin:0}
+.map-svg .m-price.m-soon rect{fill:#E9DFC6;stroke:#7A5A3C;stroke-width:1}
+.map-svg .m-price.m-soon text{fill:#7A5A3C;font-style:italic}
+/* v0.67: real-money packs */
+.shop-offers{display:flex;flex-direction:column;gap:10px;margin:0 0 12px}
+.starter-card.compact{margin:0}
+.starter-card .sp-head>div{flex:1;min-width:0}
+.starter-card .sp-val{font:800 11px 'Nunito',system-ui;font-style:normal;color:#3D5A40;background:#B7D4B5;border-radius:999px;padding:3px 8px;white-space:nowrap;display:inline-block;margin-top:4px}
+.starter-card .sp-head small{display:block}
+.starter-modal h3{padding:0 34px}
+.starter-card .sp-items li.wide{grid-column:1/-1}
+.starter-card.is-starter{border-color:#F7C5C5;background:linear-gradient(180deg,#FFEDEB,#FFF9F0)}
+.starter-card .sp-owned{margin:4px 0;text-align:center;font:800 14px 'Nunito',system-ui;color:#3D5A40}
+.starter-modal .sp-sub{margin:-2px 4px 10px;font-size:13px}
+.starter-modal .cozy-card{max-height:calc(100dvh - 40px);overflow:auto}
+.dl-x2{display:inline-block;vertical-align:middle;margin-left:6px;padding:1px 7px;border-radius:999px;background:#F5D07A;color:#3D5A40;font:900 12px 'Nunito',system-ui;letter-spacing:.02em;border:1.5px solid #3D5A40}
+.starter-card .sp-sub-tag{font-size:11px;color:#8A7A62;font-weight:700}

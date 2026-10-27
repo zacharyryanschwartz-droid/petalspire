@@ -820,16 +820,25 @@ export const BOOSTS = {
     grow:    { name: 'Fast-Grow',      icon: 'sparkle', minLeftS: 60 },  // the plant you just watered is ready to pick right away
   },
 };
-// Starter Pack: an occasional, cheap bundle. PRICE IS A PLACEHOLDER for the iPhone App Store product (productId); the web
-// build has NO real payments, so buying it here charges nothing and grants nothing (see Payments.purchaseOffer).
-// First shown after the player has played a while (firstAfter), then rarely: at most one popup every gapMs, maxShows in all.
-// Each showing opens a windowMs 'limited time' window during which the Jewel Shop also lists it.
-export const STARTER_PACK = {
-  id: 'starter_pack', productId: 'com.petalspire.starter', price: '$1.99',
-  jewels: 10, packs: 2, coins: 500, wood: 50,
-  windowMs: 48 * 3600e3, gapMs: 3 * 864e5, maxShows: 4,
-  firstAfter: { playMs: 15 * 60000, harvests: 8, customers: 3 },
-};
+// v0.67 REAL-MONEY PACKS. PRICES ARE PLACEHOLDERS for the iPhone App Store products (productId). The web build has NO real
+// payments: Payments.purchaseOffer refuses on the web, so nothing is charged and nothing is granted here (soft wording in the UI).
+// Contents: jewels, coins, wood, packs (Botanical Card Packs, opened free), tools (Hand Plow / Harvest Sickle), plantsPerTier
+// (1 random plant of EACH tier: its card + seedsPerPlant seeds), saplings (fruit-tree saplings for the Orchard).
+// Value = coin-equivalent (1 Jewel = 1,000 coins as in the Jewel trade, 1 Wood = 4 coins, a Card Pack = 1 Jewel, tools at their
+// Market price, a plant = seedsPerPlant x its tier's average seed price + its card at 2x that, a sapling = 140 coins). Bigger packs
+// give more value per dollar. The Jewel Shop lists them highest value first. once: true = can be bought only once.
+// The Starter Pack pops up once, right after the beginning goals are done (the closing card), and stays in the Jewel Shop after.
+export const OFFER_PACKS = [
+  { id: 'starter_pack', productId: 'com.petalspire.starter2', name: 'Starter Pack', blurb: 'One plant of every tier, both tools and a head start · one time only', price: '$4.99', usd: 4.99, once: true, starter: true,
+    jewels: 20, coins: 1000, wood: 100, tools: ['plow', 'sickle'], plantsPerTier: 1, seedsPerPlant: 3 },
+  { id: 'collector_bundle', productId: 'com.petalspire.collector', name: 'Collector’s Bundle', blurb: 'Everything in the Starter Pack, plus an extra Other World plant, more Jewels, coins and Wood — and Double Daily Rewards for good', price: '$19.99', usd: 19.99,
+    plantsPerTier: 1, plantTier: 'otherworld', seedsPerPlant: 3, jewels: 120, coins: 6000, wood: 400, tools: ['plow', 'sickle'], dailyX2: true },
+];
+// A tool the player already owns is swapped for TOOL_SUB_JEWELS Jewels (a fair substitute).
+export const TOOL_SUB_JEWELS = 2;
+// coin equivalents. Double Daily Rewards is valued as 30 days of doubled gifts (≈ the average daily gift x 30).
+export const OFFER_VALUE = { jewel: 1000, wood: 4, pack: 1000, sapling: 140, gardenerPerH: 2000 / 6, truck: 40, dailyX2: 30 };
+export const STARTER_PACK = OFFER_PACKS[0];
 // The studio. Logos live in assets/studio (copied from the Schwarze Spiele brand kit).
 export const STUDIO = {
   name: 'Schwarze Spiele',

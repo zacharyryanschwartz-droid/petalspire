@@ -4,7 +4,7 @@ import { createWorld } from './world.js';
 import { buildPlant } from './plants.js';
 import { CHARMS, CHARM_IDS, STAND_BUY, BULK, BLOOM, bloomJewels, RUSH, STAND_UNLOCK, WORKER, itemLoc, sellsAt, ORCH_STAND, parkLv, hydroId, HYDROSOL, NON_CARDS, ROAD_SCRAP, TINC_DUP_COINS, SPECIES, FANTASY_SPECIES, PLANT_TIERS, cardTier, FEATURE_TIER_FROM_OLD, TIER_ORDER, PACK_W, DRYING, rollSeeds, FEATURES, CARDS, RARITY, ITEMS, SELL_ORDER, TIPS, RESALE, PACKS, PACK_JEWELS, JEWEL_EXCHANGE, JEWEL_DROP, PARKING, BILLBOARD, WINDMILL, DUP_COINS, SUPPLY_CARDS, SUPPLY_DUP, WATER_TRUCK, CARD_LEVELS, RACK_SLOTS, BUILDING_LV, CONS, consJewels,  DAILY, PACK_LOOT, rollLoot, PACK_MIX, OWNED_K, WATER, BARREL_LV, DRY_S, BARREL, BASES, TINCTURE, STILL, oilId, tinctureId, TINCTURE_NAMES,
   WOOD, BED_COSTS, STAND_CAP, MARKET_GOAL, WATER_REGEN_S, WATER_REGEN_MAX, STARTER, STARTER_FILL, STARTER_JEWELS,
-  BUILDS, FINDS, FIND_IDS, FIND_CHANCE, SAPLING_CHANCE, RESTORE_HURRY_JEWELS, ATMOS_STEP, ATMOS_MAX, TREE, SHOP, JEWEL_BUNDLES, NO_ADS_BUNDLE, ADS, ADS_MODE, OTHER_GAMES, BOOSTS, STARTER_PACK, STUDIO, CROSS_PROMO, SOCIALS, FOLLOW_REWARD, SHADE, TEA, teaInfo, teaId, teaSps, registerTea, DRY_TIER_S, PACK_W_ORCH, TREES, TREE_IDS, PRESS, FRUITSTAND, SEED_BAGS, bagId } from './data.js';
+  BUILDS, FINDS, FIND_IDS, FIND_CHANCE, SAPLING_CHANCE, RESTORE_HURRY_JEWELS, ATMOS_STEP, ATMOS_MAX, TREE, SHOP, JEWEL_BUNDLES, NO_ADS_BUNDLE, ADS, ADS_MODE, OTHER_GAMES, BOOSTS, STARTER_PACK, OFFER_PACKS, OFFER_VALUE, TOOL_SUB_JEWELS, STUDIO, CROSS_PROMO, SOCIALS, FOLLOW_REWARD, SHADE, TEA, teaInfo, teaId, teaSps, registerTea, DRY_TIER_S, PACK_W_ORCH, TREES, TREE_IDS, PRESS, FRUITSTAND, SEED_BAGS, bagId } from './data.js';
 import { ROAD, LOTS, SIGNS, LOT_FOR_SALE, LOT_PRICES, SITES, OBSTACLES, SPOTS, PARK_X, BEHIND, FRONT, BED_N, TILE, SITE_HALF, siteById, obstacleById, inSite, lotCenter, lotAt, ORCHARD_TREE_SPOTS, OWNABLE_LOTS, LOCATIONS, ORCHARD_PRICE, ORCH_X, ORCH_FOR_SALE, ORCH_PLOT_PRICES, ORCH_LOTS, lotLoc } from './layout.js';
 import { ICONS, itemIcon, FEATURE_ART, findIcon, decorIcon } from './icons.js';
 import { Payments } from './payments.js';
@@ -14,7 +14,7 @@ import { shadeAt, speedFor, sunLabel, rebaseStart } from './shade.js';
 
 // Save format: v0.3, v0.31 and v0.4 share one localStorage key (schema v: 3). `build` records which prototype build last wrote the save;
 // v0.3 / v0.31 saves (no `build`, no per-plot barrels) are migrated on load (migrate04 below); v0.4 saves load as-is and are re-tagged. Prototype builds stay below 1.0.
-export const BUILD = '0.66';
+export const BUILD = '0.67';
 // v0.65: anonymous player tracking (Games Backend on Appwrite; no API key in the game, nothing personal). Skipped for automated runs (navigator.webdriver).
 try { if (!navigator.webdriver) initTracker({ endpoint: 'https://nyc.cloud.appwrite.io/v1', projectId: '6ae0a41a002ce0a48fac', gameId: 'petalspire', platform: 'web', appVersion: BUILD }); } catch (_) {}
 const SAVE_KEY = 'petalspire.v03', V02_KEY = 'petalspire.v02', OLD_KEYS = ['petalspire.v01'];
@@ -40,10 +40,13 @@ const seeded = (k, salt) => frac(Math.sin(k * 12.9898 + salt * 78.233) * 43758.5
 // v0.6: the two crafting stands share one engine (state keys, recipes, slots)
 const CRAFT = {
   press:      { def: PRESS, name: 'Pressed Oil Stand', built: 'pressBuilt', pos: 'pressPos', slots: 'pressSlots', verb: 'Press', doing: 'Pressing', slotName: 'Press', size: [2.3, 3.0, 1.3], blurb: 'Press seeds, nuts and fruit into oils and butters' },
+  // v0.66.1: the Orchard gets its own Oil Press (same recipes, presses from the Orchard Bag) — the Home one stays at Home
+  opress:     { def: PRESS, name: 'Orchard Oil Press', built: 'opressBuilt', pos: 'opressPos', slots: 'opressSlots', verb: 'Press', doing: 'Pressing', slotName: 'Press', size: [2.3, 3.0, 1.3], blurb: 'Press fruit, nuts and seeds from your Orchard Bag into oils and butters' },
   fruitstand: { def: FRUITSTAND, name: 'Fruit Stand', built: 'fruitstandBuilt', pos: 'fruitstandPos', slots: 'fruitstandSlots', verb: 'Cook', doing: 'Cooking', slotName: 'Jar', size: [2.1, 2.6, 1.3], blurb: 'Cook orchard fruit into jellies, butters, sauces and canned fruit' },
 };
 // v0.61: where each stand may stand — the Fruit Stand only at the Orchard, the Pressed Oil Stand at both, every other stand Home only (for now)
-const STAND_WHERE = { fruitstand: 'orchard', press: 'both' };
+const STAND_WHERE = { fruitstand: 'orchard', press: 'home', opress: 'orchard' };   // v0.66.1: press = Home, opress = Orchard (an older save's press already at the Orchard keeps working there)
+BUILDS.opress ||= BUILDS.press; FEATURE_ART.opress ||= FEATURE_ART.press; CONS.s.opress ||= CONS.s.press; SHADE.boxes.opress ||= SHADE.boxes.press;
 const standWhere = (what) => STAND_WHERE[what] || 'home';
 const standOkAt = (what, loc) => { const w = standWhere(what); return w === 'both' || w === loc; };
 const whereTag = (what) => (standWhere(what) === 'orchard' ? 'Orchard only' : standWhere(what) === 'home' ? 'Home only' : 'Home or Orchard');
@@ -75,7 +78,7 @@ function freshState() {
     barrels: {}, barrelInv: 0, tinctureBuilt: false, tinc: Array(TINCTURE.slots).fill(null), tincBase: 'glycerin',
     stillBuilt: false, stills: Array(STILL.slots).fill(null), stillPos: null,
     teaBuilt: false, teas: Array(TEA.slots).fill(null), teaPos: null,
-    pressBuilt: false, pressPos: null, pressSlots: Array(PRESS.slots).fill(null), fruitstandBuilt: false, fruitstandPos: null, fruitstandSlots: Array(FRUITSTAND.slots).fill(null), orchard: {},   // v0.6   // v0.52 Tea Stand   // v0.41 Essential Oil Stand
+    pressBuilt: false, pressPos: null, pressSlots: Array(PRESS.slots).fill(null), opressBuilt: false, opressPos: null, opressSlots: Array(PRESS.slots).fill(null), fruitstandBuilt: false, fruitstandPos: null, fruitstandSlots: Array(FRUITSTAND.slots).fill(null), orchard: {},   // v0.6   // v0.52 Tea Stand   // v0.41 Essential Oil Stand
     windmillBuilt: false, windmillPos: null,   // v0.41 Windmill (global barrel boost)
     parkingBuilt: false, billboardBuilt: false, bb: { until: 0, readyAt: 0, runs: 0, jewelRuns: 0 },   // v0.41 Parking Lot + Billboard (timestamps, so they keep counting while closed)
     packs: 0, tips: {}, goal: 0, introDone: false, monet: { playMs: 0, boostAt: 0, starter: {}, promo: {}, wish: {} },   // v0.66
@@ -160,7 +163,7 @@ const STAGES = ['Seed', 'Sprout', 'Bud', 'Bloom'];
 const obsState = (id) => { const v = S.obs[id]; if (v === 'x') return 'gone'; if (v === 's') return 'stump'; return obstacleById(id).type === 'stump' ? 'stump' : 'full'; };
 const SITE_OBS = Object.fromEntries(SITES.map((s) => [s.id, OBSTACLES.filter((o) => inSite(o, s)).map((o) => o.id)]));
 // v0.6: a crafting stand standing on an empty Roadside bed patch keeps a bed off it (the Roadside Lot has no other free ground)
-const STAND_POS = [['teaBuilt', 'teaPos'], ['pressBuilt', 'pressPos'], ['fruitstandBuilt', 'fruitstandPos']];
+const STAND_POS = [['teaBuilt', 'teaPos'], ['pressBuilt', 'pressPos'], ['opressBuilt', 'opressPos'], ['fruitstandBuilt', 'fruitstandPos']];
 const siteStands = (s) => STAND_POS.filter(([, p]) => S[p] && S[p].lot === s.lot && Math.abs(S[p].x - s.x) < TILE * BED_N / 2 + 0.9 && Math.abs(S[p].z - s.z) < TILE * BED_N / 2 + 0.7).map(([, p]) => S[p]);
 const siteThings = (id) => { const s = siteById(id); return [...S.decor, ...S.trees].filter((d) => inSite(d, s)).concat(siteStands(s)); };
 const siteClear = (id) => SITE_OBS[id].every((o) => obsState(o) === 'gone') && !siteThings(id).length;
@@ -338,7 +341,7 @@ function handSource(i) {
 // v0.41: a barrel only collects rain through a gutter from a roof on the SAME plot. Connection is automatic: any roofed
 // building on that plot (Farm Stand, Supply Market — even boarded up —, Tincture Stand, Essential Oil Stand). The Home
 // barrel uses the Farm Stand once built, and the Market roof before that, so the starter barrel always works.
-const ROOF_NAMES = { stand: 'Farm Stand', market: 'Supply Market', tincture: 'Tincture Stand', still: 'Essential Oil Stand', teastand: 'Tea Stand', press: 'Pressed Oil Stand', fruitstand: 'Fruit Stand', orchardshed: 'Orchard Stand' };
+const ROOF_NAMES = { stand: 'Farm Stand', market: 'Supply Market', tincture: 'Tincture Stand', still: 'Essential Oil Stand', teastand: 'Tea Stand', press: 'Pressed Oil Stand', opress: 'Orchard Oil Press', fruitstand: 'Fruit Stand', orchardshed: 'Orchard Stand' };
 function lotRoofs(lot) {
   const out = [];
   if (lot === 'home') { if (S.standBuilt) out.push('stand'); out.push('market'); }
@@ -512,7 +515,7 @@ function catchUpShade() {   // offline: re-apply shade each time a planted tree 
   }
   applyShade(end);
 }
-const shadeSignature = () => `${S.beds.join(',')}|${S.standBuilt}|${S.rackBuilt}|${S.tinctureBuilt}|${S.stillBuilt}|${S.windmillBuilt}|${S.billboardBuilt}|${S.teaBuilt}|${S.pressBuilt}|${S.fruitstandBuilt}|${Object.entries(S.orchard || {}).map(([k, t]) => t ? k + t.sp + orchStage(t) : '').join(',')}|${['stand', 'tincture', 'still', 'windmill', 'teastand', 'press', 'fruitstand'].map((k) => SPOTS[k] ? SPOTS[k].map((v) => v.toFixed(2)).join(':') : '').join(',')}|${Object.entries(S.hives || {}).map(([l, h]) => h ? l + h.x.toFixed(2) + h.z.toFixed(2) : '').join(',')}|${Object.entries(S.barrels || {}).map(([l, b]) => b ? l + b.x.toFixed(2) + b.z.toFixed(2) : '').join(',')}|${OBSTACLES.filter((o) => o.type === 'tree' && obsState(o.id) === 'full').length}|${S.trees.map((t) => t.id + (t.st === 'full' ? treeStageAt(t, now()) : 's')).join(',')}`;
+const shadeSignature = () => `${S.beds.join(',')}|${S.standBuilt}|${S.rackBuilt}|${S.tinctureBuilt}|${S.stillBuilt}|${S.windmillBuilt}|${S.billboardBuilt}|${S.teaBuilt}|${S.pressBuilt}|${S.opressBuilt}|${S.fruitstandBuilt}|${Object.entries(S.orchard || {}).map(([k, t]) => t ? k + t.sp + orchStage(t) : '').join(',')}|${['stand', 'tincture', 'still', 'windmill', 'teastand', 'press', 'fruitstand'].map((k) => SPOTS[k] ? SPOTS[k].map((v) => v.toFixed(2)).join(':') : '').join(',')}|${Object.entries(S.hives || {}).map(([l, h]) => h ? l + h.x.toFixed(2) + h.z.toFixed(2) : '').join(',')}|${Object.entries(S.barrels || {}).map(([l, b]) => b ? l + b.x.toFixed(2) + b.z.toFixed(2) : '').join(',')}|${OBSTACLES.filter((o) => o.type === 'tree' && obsState(o.id) === 'full').length}|${S.trees.map((t) => t.id + (t.st === 'full' ? treeStageAt(t, now()) : 's')).join(',')}`;
 function refreshShade(force = false) {
   const sig = shadeSignature(); if (!force && sig === shadeSig) return; shadeSig = sig;
   applyShade(); save(); if (selected != null || focus) renderSheet();
@@ -1065,6 +1068,14 @@ function migGF065() {
     S.gfInv[id] = 1;
     if (spot && placeGF(id, spot.x, spot.z, false)) (mig065 ||= {})[id] = 'placed'; else (mig065 ||= {})[id] = 'bag';
   }
+  // v0.66.1 save clean-up (every load, idempotent): a garden feature can only be in the Bag as many times as it was bought
+  // and is not standing on the map or riding the van; anything above that (old-state leftovers) is dropped from the Bag.
+  let fix0661 = 0;
+  for (const id of GF_IDS) { const n = S.gfInv[id] || 0; if (!n) continue;
+    const cap = Math.max(0, (S.gfBought?.[id] || 0) - (S.gf || []).filter((d) => d.id === id).length - (S.deliv || []).filter((d) => d.id === id).length);
+    if (n > cap) { fix0661 += n - cap; if (cap) S.gfInv[id] = cap; else delete S.gfInv[id]; if (S.cards[id] || S.discovered[id]) S.unlocked[id] = true; } }
+  markBuildsDone();
+  if (fix0661) writeSave();
   if (mig065) { writeSave(); setTimeout(() => toast(Object.entries(mig065).map(([id, w]) => `${FEATURES[id].name} ${w === 'placed' ? 'now stands in your garden — tap it to move it' : 'is in your Bag — place it to switch it on'}`).join(' · ')), 1500); }
 }
 function placeGF(id, x, z, animate = true) {
@@ -1080,7 +1091,7 @@ function storeGF(key) {
   S.gf = S.gf.filter((x) => x !== d); S.gfInv[d.id] = (S.gfInv[d.id] || 0) + 1; W.removeFeat(key); deselect(); save(); hud();
   toast(`${FEATURES[d.id].name} put back in your bag · its effect pauses until you place it again`);
 }
-const BUILT_FLAG = { windmill: 'windmillBuilt', parking: 'parkingBuilt', billboard: 'billboardBuilt', still: 'stillBuilt', tincture: 'tinctureBuilt', teastand: 'teaBuilt', press: 'pressBuilt', fruitstand: 'fruitstandBuilt' };
+const BUILT_FLAG = { windmill: 'windmillBuilt', parking: 'parkingBuilt', billboard: 'billboardBuilt', still: 'stillBuilt', tincture: 'tinctureBuilt', teastand: 'teaBuilt', press: 'pressBuilt', opress: 'opressBuilt', fruitstand: 'fruitstandBuilt' };
 // true when every unit of this feature is on the map (so it has no reason to be in the bag)
 const onMapOnly = (k) => (k === 'beehive' ? !(S.hiveInv > 0) && Object.keys(S.hives || {}).length > 0 : isGF(k) ? !(S.gfInv?.[k] > 0 && S.gfBought?.[k]) : BUILT_FLAG[k] ? !!S[BUILT_FLAG[k]] : false);
 const gfBagRow = (k) => { const n = S.gfInv?.[k] || 0;
@@ -1226,7 +1237,7 @@ function glideTo(k) { W.ctl.moved = true; glideW({ target: V3(SPOTS[k][0] > 150 
 // ---------------- v0.63: stand construction ----------------
 // S.cons[kind] = { start, ms } while a stand is being built. Wall-clock time (saved), so it keeps going while the game is closed.
 // Automated test browsers build instantly unless a test opts in (localStorage 'petalspire.consTest'), so older tests still run.
-const CONS_NAME = { stand: 'Farm Stand', rack: 'Drying Rack', tincture: 'Tincture Stand', still: 'Essential Oil Stand', teastand: 'Tea Stand', press: 'Pressed Oil Stand', fruitstand: 'Fruit Stand', oshed: 'Orchard Stand' };
+const CONS_NAME = { opress: 'Orchard Oil Press', stand: 'Farm Stand', rack: 'Drying Rack', tincture: 'Tincture Stand', still: 'Essential Oil Stand', teastand: 'Tea Stand', press: 'Pressed Oil Stand', fruitstand: 'Fruit Stand', oshed: 'Orchard Stand' };
 const CONS_PANEL = { stand: 'stand', ostand: 'oshed', rack: 'rack', tincture: 'tincture', still: 'still', teastand: 'teastand' };
 const consObj = (k) => (k === 'oshed' ? W.orchardShed : W[k]);
 const consSize = (k) => ({ stand: [2.3, 2.2, 1.5], rack: [1.9, 2.1, 1.3], oshed: [2.4, 2.6, 1.9] }[k] || CRAFT[k]?.size || [2.1, 2.6, 1.3]);
@@ -1689,7 +1700,7 @@ function tincProblem(x, z, what) {
     for (const st of SITES) if (st.lot === lot && Math.abs(st.x - x - dx) < BED_HALF + 0.1 && Math.abs(st.z - z - dz) < BED_HALF + 0.1 && !(lot === 'home' && ANY_PLOT.has(what) && !S.beds.includes(st.id))) return 'That’s a bed patch — keep it free for a raised bed'; }
   return null;
 }
-const ANY_PLOT = new Set(['teastand', 'press', 'fruitstand']);   // v0.52/v0.6: these stands may go on any owned plot, the Roadside Lot too
+const ANY_PLOT = new Set(['teastand', 'press', 'fruitstand', 'opress']);   // v0.52/v0.6: these stands may go on any owned plot, the Roadside Lot too
 const standLots = (what) => (ANY_PLOT.has(what) && standOkAt(what, 'home') ? ['home', ...tincLots(what)] : tincLots(what));
 function tincSpots(what) {
   const out = [];
@@ -1726,6 +1737,7 @@ const PLACE_BUY = {   // v0.6: + one entry per fruit tree (tree_<id>), added bel
   still:      { what: 'still', coins: () => FEATURES.still.price, wood: () => BUILDS.still.wood, apply: () => { S.owned.still = true; }, undo: () => { S.owned.still = false; } },
   teastand:   { what: 'teastand', coins: () => FEATURES.teastand.price, wood: () => BUILDS.teastand.wood, apply: () => { S.owned.teastand = true; }, undo: () => { S.owned.teastand = false; } },
   press:      { what: 'press', coins: () => FEATURES.press.price, wood: () => BUILDS.press.wood, apply: () => { S.owned.press = true; }, undo: () => { S.owned.press = false; } },
+  opress:     { what: 'opress', coins: () => FEATURES.press.price, wood: () => BUILDS.press.wood, apply: () => { S.owned.opress = true; }, undo: () => { S.owned.opress = false; } },
   fruitstand: { what: 'fruitstand', coins: () => FEATURES.fruitstand.price, wood: () => BUILDS.fruitstand.wood, apply: () => { S.owned.fruitstand = true; }, undo: () => { S.owned.fruitstand = false; } },
   parking:    { what: 'parking', coins: () => FEATURES.parking.price, wood: () => BUILDS.parking.wood, apply: () => { S.owned.parking = true; }, undo: () => { S.owned.parking = false; } },
   billboard:  { what: 'billboard', coins: () => FEATURES.billboard.price, wood: () => BUILDS.billboard.wood, apply: () => { S.owned.billboard = true; }, undo: () => { S.owned.billboard = false; } },
@@ -1743,6 +1755,7 @@ function commitBuy(p) {
 function rollbackBuy(p) { const b = p?.buy; if (!b?.paid) return; S.coins += b.paid; b.paid = 0; PLACE_BUY[b.id].undo(); S.stats.placeBuys--; save(); hud(); }
 function startBuy(id) {
   const B = PLACE_BUY[id]; if (!B || (FEATURES[id] && !S.unlocked[id])) return false;
+  if (id === 'opress' && (!S.unlocked.press || S.owned.opress)) return false;   // v0.66.1: needs the Pressed Oil Stand card (or its coin unlock)
   if (FEATURES[id] && S.owned[id] && id !== 'beehive') return false;   // v0.63: Irrigation is bought once (duplicates come from packs)
   if (id === 'irrigation' && hasIrrig()) return false;
   const c = buyCost(id); if (!canPay(c)) { toast(`${FEATURES[id]?.name || 'A tree sapling'} costs ${[coin(c.coins), c.wood && woodTag(c.wood), c.scrap && scrapTag(c.scrap)].filter(Boolean).join(' + ')} — you need ${missingText(c)}`); return false; }
@@ -1754,7 +1767,7 @@ function startBuy(id) {
   if (id === 'beehive' && !hiveLots().length) { toast('Every plot you own already has a beehive (one per plot)'); return false; }
   if (B.tree && !S.lots.orchard) { toast('Buy The Orchard on the Map first — fruit trees grow only there'); return false; }
   buyIntent = { id };
-  try { if (id === 'tincture' || id === 'still' || id === 'teastand' || CRAFT[id]) startStandPlace(id, FEATURES[id].name, c.wood); else if (B.tree) startTreePlace(B.tree); else enterPlace(B.what); } finally { buyIntent = null; }
+  try { if (id === 'tincture' || id === 'still' || id === 'teastand' || CRAFT[id]) startStandPlace(id, (FEATURES[id] || CRAFT[id]).name, c.wood); else if (B.tree) startTreePlace(B.tree); else enterPlace(B.what); } finally { buyIntent = null; }
   if (!placing || placing.what !== B.what) return false;
   placing.buy = { id };
   $('#buildbar-text').innerHTML += ` · <span class="buy-on-place">pay ${costHTML(c)} when you place it</span>`; fillIcons($('#buildbar'));
@@ -1765,7 +1778,7 @@ function startStandPlace(what, title, c) {
   closePanel(); deselect(); if (buildMode) exitBuild(); if (placing) exitPlace();
   const spots = tincSpots(what), ok = spots.filter((p) => p.ok), lots = standLots(what);
   placing = { what, spots }; W.setSpotGhosts(spots);
-  $('#buildbar-text').innerHTML = ok.length ? `<b>${title}</b> · tap a <b>green spot</b> on ${what === 'fruitstand' ? 'an Orchard plot' : what === 'press' ? 'any plot you own, Home or Orchard' : ANY_PLOT.has(what) ? 'any Home plot you own' : lots.map(lotName).join(' or ')}${buyIntent ? '' : ' · ' + woodTag(c)}` : `<b>${title}</b> · no clear spot yet — clear trees on ${lots.map(lotName).join(' or ')} first`;
+  $('#buildbar-text').innerHTML = ok.length ? `<b>${title}</b> · tap a <b>green spot</b> on ${what === 'fruitstand' ? 'an Orchard plot' : what === 'press' ? 'any Home plot you own' : what === 'opress' ? 'the Orchard or an Orchard plot you own' : ANY_PLOT.has(what) ? 'any Home plot you own' : lots.map(lotName).join(' or ')}${buyIntent ? '' : ' · ' + woodTag(c)}` : `<b>${title}</b> · no clear spot yet — clear trees on ${lots.map(lotName).join(' or ')} first`;
   fillIcons($('#buildbar')); $('#buildbar').classList.remove('hidden');
   const L = LOTS[(ANY_PLOT.has(what) ? ((ok.find((p) => lotLoc(p.lot) === curLoc()) || ok[0])?.lot || lots[0] || 'home') : (lots.includes(curLoc()) ? curLoc() : lots[0]))]; W.ctl.moved = true; glideW({ target: V3((L.x0 + L.x1) / 2, 0.3, (L.z0 + L.z1) / 2), zoom: Math.max(W.ctl.zoom, 1.0) }, 0.8);
   return true;
@@ -1900,7 +1913,7 @@ function craftHTML(c) {
   return `<div class="hero tea-hero craft-hero">${FEATURE_ART[c]}<p>${C.blurb} — they sell at your Farm Stand for well above the raw ingredients.</p></div>
     <div class="sec-title">${C.slotName === 'Jar' ? 'Jam pots' : 'Presses'} · ${slots.filter(Boolean).length}/${slots.length}</div><div class="tslots">${sl}</div>
     <div class="sec-title">Recipes</div><div class="list">${rows.trim() ? rows : '<p class="muted empty-hint" data-empty-hint>Open Card Packs to discover recipes.</p>'}</div>
-    <p class="muted" style="margin:10px 4px 0">${c === 'press' ? 'Oil = input value × (1.7 + 0.25 per tier above Basic); butters ×1.06 more. Sunflower bulk oils and Sunpetal Oil are hand-set.' : 'Price = fruit value × (1.6 + 0.25 per tier above Basic); jellies ×1.08, butters & preserves ×1.12. Cook time 40 s + 20 s per tier.'}</p>`;
+    <p class="muted" style="margin:10px 4px 0">${c === 'press' || c === 'opress' ? 'Oil = input value × (1.7 + 0.25 per tier above Basic); butters ×1.06 more. Sunflower bulk oils and Sunpetal Oil are hand-set.' : 'Price = fruit value × (1.6 + 0.25 per tier above Basic); jellies ×1.08, butters & preserves ×1.12. Cook time 40 s + 20 s per tier.'}</p>`;
 }
 // ---------- v0.6: the Orchard — fruit trees from cards, planted on fixed spots, fruit again and again ----------
 const treeLvK = (sp) => 1 - CARD_LEVELS.plant.grow * (cardLv(sp) - 1);
@@ -2139,7 +2152,9 @@ function satchelHTML() {
     byValue(['glycerin', 'vinegar'].filter((id) => S.inv[id] > 0 || S.owned.tincture)).map((id) => `<div class="inv">${itemSvg(id)}<b>${BASES[id].name}</b><small>×${S.inv[id]}</small></div>`).join('') +
     byValue(SELL_ORDER.filter((id) => ['tinc_', 'oil_', 'hydro_', 'tea_', 'press_', 'jar_', 'fruit_', 'bag'].some((p) => id.startsWith(p)) && S.inv[id] > 0)).map((id) => `<div class="inv">${itemSvg(id)}<b>${ITEMS[id].name}</b><small>×${S.inv[id]}</small>${locTagCell(id)}</div>`).join('');
   // v0.65: garden features show in the bag only while they are NOT on the map (placed/built ones leave it; picked up → back in)
-  const feats = Object.keys(S.owned).filter((k) => S.owned[k] && FEATURES[k] && k !== 'rainbarrel' && !onMapOnly(k)).sort((a, b) => (FEATURES[b].price || 0) - (FEATURES[a].price || 0) || FEATURES[a].name.localeCompare(FEATURES[b].name)).map((k) => isGF(k) ? gfBagRow(k) : `<div class="row"><div class="ico">${FEATURE_ART[k]}</div><div class="meta"><b>${FEATURES[k].name}</b><small>${k === 'beehive' ? `${Object.keys(S.hives).length} placed (${Object.keys(S.hives).map(lotName).join(', ') || 'none yet'}) · +${HIVE_BONUS} flower per harvest on that plot only` : k === 'tincture' ? (S.tinctureBuilt ? 'Built · steep flowers with Glycerin or Vinegar' : 'Bought · build it from the Build menu') : FEATURES[k].blurb.replace(/^Once bought( and placed)?, /, '').replace('A reusable tool. ', '')}</small></div>${FEATURES[k].tool ? `<div class="acts"><button class="btn btn-primary sm" data-act="use-${k}">Use</button></div>` : ''}</div>`).join('');
+  // v0.66.1: the Bag lists ONLY garden features bought at the Market and not placed yet (tools live on the tool dock,
+  // Irrigation on its barrels, built stands on the map). Unbuilt bought buildings keep their Place button below.
+  const feats = GF_IDS.filter((k) => S.gfInv?.[k] > 0 && S.gfBought?.[k]).sort((a, b) => (FEATURES[b].price || 0) - (FEATURES[a].price || 0) || FEATURES[a].name.localeCompare(FEATURES[b].name)).map(gfBagRow).join('');
   const here = curLoc(), sendable = S.lots.orchard ? [...ids, ...(here === 'home' ? ['sapling'] : []),   /* v0.65: saplings never go Home */ 'glycerin', 'vinegar', ...SELL_ORDER.filter((id) => !ids.includes(id))].filter((id, k, a) => a.indexOf(id) === k && S.inv[id] > 0) : [];
   const sendRows = byValue(sendable).map((id) => `<div class="row send-row" data-send-row="${id}"><div class="ico">${id === 'sapling' ? '<i data-icon="sapling" style="width:34px;height:34px"></i>' : itemSvg(id)}</div><div class="meta"><b>${id === 'sapling' ? 'Tree sapling' : ITEMS[id]?.name || BASES[id]?.name} ×${S.inv[id]}</b>${ITEMS[id] && !sellsAt(id, here) ? `<small><span class="loc-tag sm">${sellTag(id)}</span></small>` : ''}</div><div class="acts">${sendBtns(id)}</div></div>`).join('');
   return `<div class="bag-loc" data-bag-loc="${here}"><i data-icon="${here === 'orchard' ? 'sapling' : 'stand'}"></i><span><b>${here === 'orchard' ? 'Orchard Bag' : 'Home Bag'}</b><small>Goods here stay ${here === 'orchard' ? 'at the Orchard' : 'at Home'} · Coins, Wood, Scrap, Jewels and cards are shared</small></span></div>
@@ -2147,7 +2162,7 @@ function satchelHTML() {
     ${sendRows ? `<details class="send-box" data-send-box${sendOpen ? ' open' : ''}><summary>🚚 Send to ${here === 'orchard' ? 'Home' : 'the Orchard'} · by delivery van, free</summary><div class="list send-list">${sendRows}</div></details>` : ''}
     ${S.hiveInv > 0 ? `<div class="ts-actions" style="margin-top:10px"><button class="btn btn-primary" data-act="place-hive">🐝 Place your Honeybee Skep (${S.hiveInv})</button></div>` : ''}
     ${unbuiltHTML()}
-    ${feats || irrigHTML() ? `<div class="sec-title">Garden features</div><div class="list">${irrigHTML()}${feats}</div>` : ''}
+    ${feats ? `<div class="sec-title">Garden features</div><div class="list">${feats}</div>` : ''}
     ${S.gf?.length ? `<p class="muted" data-gf-onmap style="margin:8px 4px 0">${S.gf.length} garden feature${S.gf.length > 1 ? 's' : ''} on the map — tap one there to put it back in your bag.</p>` : ''}
     <p class="muted" style="margin:14px 4px 0">Chop trees for Wood, build raised beds, and sell your harvest at the Farm Stand by the road.</p>`;
 }
@@ -2332,6 +2347,14 @@ function projectCard(id) {
     return card(art, nm, sub, `<div class="cost">${woodTag(c)} <span class="${S.wood >= c ? 'ok' : 'no'}">you have ${S.wood}</span></div>
       <button class="btn btn-gold" data-act="build-${id}" ${S.wood >= c ? '' : 'disabled'}><i data-icon="build"></i> Build ${id === 'parking' ? 'by the stand' : 'by the road'}</button>`);
   }
+  if (id === 'opress') {   // v0.66.1: the Orchard's own Oil Press
+    const C = CRAFT.opress, art = FEATURE_ART.press, c = BUILDS.press.wood, sub = C.blurb + '.';
+    if (S.opressBuilt) return card(art, C.name, sub, status('done', `Built · ${lotName(S.opressPos?.lot || 'orchard')}`));
+    if (!S.unlocked.press) return card(art, C.name, sub, status('lock', '<i data-icon="lock"></i> Unlock the Pressed Oil Stand first — find its card in a Card Pack, or unlock it with coins in the Home Build menu'), 'gated');
+    if (!S.owned.opress) return buyBuildCard('opress', art, C.name, sub);
+    return card(art, C.name, sub, `<div class="cost">${woodTag(c)} <span class="${S.wood >= c ? 'ok' : 'no'}">you have ${S.wood}</span></div>
+      <button class="btn btn-gold" data-act="build-opress" ${S.wood >= c ? '' : 'disabled'}><i data-icon="build"></i> Choose a spot &amp; build</button><small class="opt-note">Goes on the Orchard or any Orchard plot you own</small>`);
+  }
   if (CRAFT[id]) {   // v0.6
     const C = CRAFT[id], art = FEATURE_ART[id], c = BUILDS[id].wood, sub = C.blurb + '.';
     if (S[C.built]) return card(art, C.name, sub, status('done', `Built · ${lotName(S[C.pos]?.lot || 'home')}`));
@@ -2397,7 +2420,7 @@ function projectCard(id) {
 function card(art, name, sub, extra, locked = false) { if (locked === true) return ''; return `<div class="build-card${locked ? ' locked' : ''}"><div class="bc-art">${art}</div><div class="meta"><b>${name}</b><small>${sub}</small>${extra || ''}</div></div>`; }
 // v0.61: the Build menu shows what can be built HERE; the rest is listed greyed with a "Home only" / "Orchard only" tag
 const BUILD_HOME = ['barrel', 'stand', 'rack', 'market', 'tincture', 'still', 'teastand', 'press', 'windmill', 'parking', 'billboard'];
-const BUILD_ORCH = ['barrel', 'ostand', 'fruitstand', 'press'];
+const BUILD_ORCH = ['barrel', 'ostand', 'fruitstand', 'opress'];   // v0.66.1: the Orchard's own Oil Press
 const BUILD_NAMES = { stand: 'Farm Stand', rack: 'Drying Rack', market: 'Supply Market', tincture: 'Tincture Stand', still: 'Essential Oil Stand', teastand: 'Tea Stand', windmill: 'Windmill', parking: 'Parking Lot', billboard: 'Roadside Billboard', fruitstand: 'Fruit Stand', ostand: 'Orchard Stand' };
 const BUILT_KEY = { stand: 'standBuilt', rack: 'rackBuilt', market: 'marketBuilt', tincture: 'tinctureBuilt', still: 'stillBuilt', teastand: 'teaBuilt', windmill: 'windmillBuilt', parking: 'parkingBuilt', billboard: 'billboardBuilt', fruitstand: 'fruitstandBuilt', ostand: 'oshedBuilt' };
 function ostandProjectCard() {
@@ -2413,8 +2436,14 @@ function elsewhereBuildRow(id, tag) {
   if (!st) return '';   // v0.61: never list something you haven't got
   return `<div class="row dim" data-elsewhere-build="${id}"><div class="ico">${art}</div><div class="meta"><b>${BUILD_NAMES[id]}</b>${st ? `<small>${st}</small>` : ''}</div><div class="acts"><span class="loc-tag">${tag}</span></div></div>`;
 }
+// v0.66.1: one-time buildings leave the Build menu for good once bought and built (S.buildDone, kept in the save).
+// The Rain Barrel is not one-time (one per plot) and stays. Upgrades are done by tapping the building on the map.
+const builtNow = (id) => !!(id === 'ostand' ? S.oshedBuilt : S[BUILT_KEY[id] || CRAFT[id]?.built]);
+function markBuildsDone() { S.buildDone ||= {}; for (const id of new Set([...BUILD_HOME, ...BUILD_ORCH])) if (id !== 'barrel' && builtNow(id)) S.buildDone[id] = true; }
+const buildGone = (id) => id !== 'barrel' && (S.buildDone?.[id] || builtNow(id));
 function buildHTML() {
-  const loc = curLoc(), here = loc === 'orchard' ? BUILD_ORCH : BUILD_HOME, there = loc === 'orchard' ? BUILD_HOME.filter((x) => !BUILD_ORCH.includes(x)) : BUILD_ORCH.filter((x) => !BUILD_HOME.includes(x));
+  markBuildsDone();
+  const loc = curLoc(), here = (loc === 'orchard' ? BUILD_ORCH : BUILD_HOME).filter((id) => !buildGone(id)), there = loc === 'orchard' ? BUILD_HOME.filter((x) => !BUILD_ORCH.includes(x)) : BUILD_ORCH.filter((x) => !BUILD_HOME.includes(x));
   const owned = SITES.filter((s) => S.lots[s.lot] && lotLoc(s.lot) === loc && !S.beds.includes(s.id)); const ready = owned.filter((s) => siteClear(s.id)).length;
   const cost = bedCost(); const can = S.wood >= cost;
   const best = owned.map((s) => siteLeft(s.id)).sort((a, b) => a - b)[0];
@@ -2520,49 +2549,103 @@ function applyBoost(kind, d) {
     else { const t = now(); p.bud = true; p.wu = 0; if (p.sp === 'bluelotus') p.fill = 2; p.wateredAt = t - p.growMs - 1; syncTile(d.i); W.splash?.(d.i); toast(`<i data-icon="sparkle"></i> Fast-Grow · ${SPECIES[d.sp].name} is ready to pick`); } }
   save(); hud(); if (panel) renderPanel();
 }
-// ---- Starter Pack ----
+// ---- v0.67: real-money packs (Starter Pack + Jewel Pouch, Gardener’s Pack, Orchard Pack, Collector’s Bundle) ----
+// The Starter Pack pops up ONCE, right after the beginning goals are finished (when the closing card is dismissed — or on load
+// for a save that finished them before v0.67), and then stays in the Jewel Shop until bought. All packs are listed in the Jewel
+// Shop, highest coin-equivalent value first. Purchases go through Payments.purchaseOffer: a placeholder on the web (nothing is
+// charged, nothing granted); a native iPhone build resolves it with a verified receipt and grantOffer hands out the contents.
 let starterEl = null;
-const starterLeft = () => Math.max(0, (M().starter.until || 0) - now());
-const starterLive = () => !M().starter.bought && starterLeft() > 0;
-function starterReady() {
-  const P = STARTER_PACK, st = M().starter, F = P.firstAfter;
-  if (st.bought || (st.shows || 0) >= P.maxShows) return false;
-  if (M().playMs < F.playMs || (S.stats.harvests || 0) < F.harvests || (S.stats.customers || 0) < F.customers) return false;
-  return !st.lastShow || now() - st.lastShow >= P.gapMs;
+const offerById = (id) => OFFER_PACKS.find((o) => o.id === id);
+const offerOwned = (o) => o.once && !!M().owned?.[o.id] || (o.starter && M().starter.bought);
+const starterUnlocked = () => S.goal >= GOALS.length;   // the beginning goals are done
+const starterLive = () => !M().starter.bought && starterUnlocked();
+const tierSeedAvg = (t) => { const ps = Object.values(SPECIES).filter((s) => s.tier === t && s.enabled !== false); return ps.reduce((a, s) => a + s.seedPrice, 0) / Math.max(1, ps.length); };
+// coin-equivalent value of a pack (see OFFER_VALUE in data.js)
+function offerValue(o) {
+  const V = OFFER_VALUE; let v = (o.jewels || 0) * V.jewel + (o.coins || 0) + (o.wood || 0) * V.wood + (o.packs || 0) * V.pack + (o.saplings || 0) * V.sapling;
+  for (const t of o.tools || []) v += S.owned?.[t] ? TOOL_SUB_JEWELS * V.jewel : FEATURES[t]?.price || 0;
+  if (o.plantsPerTier) for (const t of TIER_ORDER) v += o.plantsPerTier * tierSeedAvg(t) * ((o.seedsPerPlant || 0) + 2);
+  if (o.plantTier) v += tierSeedAvg(o.plantTier) * ((o.seedsPerPlant || 0) + 2);
+  if (o.dailyX2) v += V.dailyX2 * dailyAvgValue();
+  v += (o.gardenerH || 0) * V.gardenerPerH + (o.trucks || 0) * V.truck + (o.irrigation || 0) * (FEATURES.irrigation?.price || 0);
+  for (const [id, n] of Object.entries(o.seeds || {})) v += n * (SPECIES[id.slice(5)]?.seedPrice || 0);
+  return Math.round(v);
 }
-function maybeStarter() { if (!monetOn() || !S.introDone || panel || placing || buildMode || modalOpen() || !starterReady()) return; showStarter(true); }
-setInterval(maybeStarter, 7000);
-const starterRows = () => { const P = STARTER_PACK; return [['jewel', `${P.jewels} Jewels`], ['pack', `${P.packs} Card Packs`], ['coin', `${fmtC(P.coins)} coins`], ['wood', `${P.wood} Wood`]]; };
-function starterCardHTML(compact = false) {
-  const P = STARTER_PACK;
-  return `<div class="starter-card${compact ? ' compact' : ''}" data-starter-card><div class="sp-head"><span class="sp-gift"><i data-icon="gift"></i></span><div><b>Starter Pack</b><small>A little head start for your garden</small></div></div>
-    <ul class="sp-items">${starterRows().map(([ic, t]) => `<li><i data-icon="${ic}"></i>${t}</li>`).join('')}</ul>
-    <p class="sp-timer" data-starter-timer>Available for <b>${fmtTime(starterLeft())}</b></p>
-    <button class="btn btn-gold" data-starter-buy>Get it · ${P.price}</button>
-    <p class="sp-note" data-starter-note>Placeholder: purchases come with the iPhone app. This web prototype never charges.</p></div>`;
+const offersSorted = () => [...OFFER_PACKS].sort((a, b) => offerValue(b) - offerValue(a));
+function offerRows(o) {
+  const r = [];
+  if (o.plantsPerTier) r.push(['sprout', `${o.plantsPerTier} random plant of each tier (${TIER_ORDER.length}) · card + ${o.seedsPerPlant} seeds`, 'wide']);
+  if (o.plantTier) r.push(['sprout', `${o.plantsPerTier ? '+ 1 extra' : '1'} random ${PLANT_TIERS[o.plantTier].label} plant · card + ${o.seedsPerPlant} seeds`, 'wide']);
+  if (o.gardenerH) r.push(['sprout', `1 Gardener hire · ${o.gardenerH} h`, 'wide']);
+  for (const [id, n] of Object.entries(o.seeds || {})) r.push(['sprout', `${n} ${SPECIES[id.slice(5)]?.name || id} seeds`]);
+  if (o.trucks) r.push(['water', `${o.trucks} truckloads of Water`]);
+  if (o.irrigation) r.push(['water', `${o.irrigation} Irrigation row`]);
+  if (o.jewels) r.push(['jewel', `${o.jewels} Jewels`]);
+  if (o.coins) r.push(['coin', `${fmtC(o.coins)} coins`]);
+  if (o.tools?.length) r.push(['build', o.tools.map((t) => FEATURES[t]?.name || t).join(' + ') + (o.tools.some((t) => S.owned?.[t]) ? ` <small class="sp-sub-tag">(already yours: +${TOOL_SUB_JEWELS} Jewels each instead)</small>` : ''), 'wide']);
+  if (o.dailyX2) r.push(['gift', `Double Daily Rewards, for good <span class="dl-x2">×2</span>`, 'wide']);
+  if (o.wood) r.push(['wood', `${o.wood} Wood`]);
+  if (o.packs) r.push(['pack', `${o.packs} Card Packs`]);
+  if (o.saplings) r.push(['sapling', `${o.saplings} random tree saplings`]);
+  return r;
 }
+function offerCardHTML(o, compact = false) {
+  const owned = offerOwned(o);
+  return `<div class="starter-card offer-card${compact ? ' compact' : ''}${o.starter ? ' is-starter' : ''}" data-offer-card="${o.id}"${o.starter ? ' data-starter-card' : ''}><div class="sp-head"><span class="sp-gift"><i data-icon="${o.starter ? 'gift' : 'jewel'}"></i></span><div><b>${o.name}</b><small>${o.blurb}</small><em class="sp-val">≈ ${fmtC(offerValue(o))} coins of value</em></div></div>
+    <ul class="sp-items">${offerRows(o).map(([ic, t, w]) => `<li${w ? ' class="wide"' : ''}><i data-icon="${ic}"></i>${t}</li>`).join('')}</ul>
+    ${owned ? '<p class="sp-owned">Owned · thank you!</p>' : `<button class="btn btn-gold" data-offer-buy="${o.id}"${o.starter ? ' data-starter-buy' : ''}>Get it · ${o.price}</button>`}
+    <p class="sp-note" data-starter-note>Purchases arrive with the iPhone app. This web prototype never charges.</p></div>`;
+}
+const starterCardHTML = (compact = false) => offerCardHTML(STARTER_PACK, compact);
+// one popup, the moment the beginning goals are done (S.goalsClosed is set when the closing card is dismissed)
+function starterReady() { const st = M().starter; return !st.bought && !st.shows && starterUnlocked() && !!S.goalsClosed; }
+function maybeStarter() { if (!monetOn() || !S.introDone || panel || placing || buildMode || modalOpen() || closingEl || !starterReady()) return; showStarter(true); }
+// v0.67 migration: the old $1.99 offer's timed popups don't count — the new Starter Pack gets its one popup after the goals
+{ const st = M().starter; if (!st.v067) { st.v067 = true; st.shows = 0; delete st.until; delete st.lastShow; } }
+setInterval(maybeStarter, 3000);
 function showStarter(auto = false) {
-  const P = STARTER_PACK, st = M().starter; if (st.bought) return null;
-  if (auto) { st.shows = (st.shows || 0) + 1; st.lastShow = now(); if (!starterLive()) st.until = now() + P.windowMs; save(); }
+  const st = M().starter; if (st.bought) return null;
+  if (auto) { st.shows = (st.shows || 0) + 1; st.lastShow = now(); save(); }
   starterEl?.remove(); const e = starterEl = el('div', 'cozy-modal starter-modal'); e.id = 'starter';
-  e.innerHTML = `<div class="cozy-card"><button class="close-btn" data-starter-x aria-label="Close">×</button><h3>A little welcome gift</h3>${starterCardHTML()}<button class="btn sm sp-later" data-starter-x>Maybe later</button></div>`;
+  e.innerHTML = `<div class="cozy-card"><button class="close-btn" data-starter-x aria-label="Close">×</button><h3>You did it! A Starter Pack</h3><p class="muted sp-sub">All your beginning goals are done. Here’s an optional head start — it stays in the Jewel Shop whenever you want it.</p>${starterCardHTML()}<button class="btn sm sp-later" data-starter-x>Maybe later</button></div>`;
   $('#ui').appendChild(e); fillIcons(e);
-  const tick = setInterval(() => { if (!e.isConnected) return clearInterval(tick); const t = e.querySelector('[data-starter-timer] b'); if (t) t.textContent = fmtTime(starterLeft()); }, 1000);
-  e.addEventListener('click', (ev) => { if (ev.target === e || ev.target.closest('[data-starter-x]')) { e.remove(); starterEl = null; return; } if (ev.target.closest('[data-starter-buy]')) buyStarter(e); });
+  e.addEventListener('click', (ev) => { if (ev.target === e || ev.target.closest('[data-starter-x]')) { e.remove(); starterEl = null; return; } const b = ev.target.closest('[data-offer-buy]'); if (b) buyOffer(b.dataset.offerBuy, e); });
   return e;
 }
-async function buyStarter(root) {
-  const r = await Payments.purchaseOffer(STARTER_PACK);
-  if (r.ok) return grantStarter(r.receipt);
-  const n = root?.querySelector('[data-starter-note]'); if (n) { n.textContent = r.reason; n.classList.add('on'); }
-  S.stats.starterTaps = (S.stats.starterTaps || 0) + 1; save(); return false;
+async function buyOffer(id, root) {
+  const o = offerById(id); if (!o || offerOwned(o)) return false;
+  const r = await Payments.purchaseOffer(o);
+  if (r.ok) return grantOffer(id, r.receipt);
+  const n = root?.querySelector(`[data-offer-card="${id}"] [data-starter-note]`) || root?.querySelector('[data-starter-note]'); if (n) { n.textContent = r.reason; n.classList.add('on'); }
+  S.stats.offerTaps = (S.stats.offerTaps || 0) + 1; if (o.starter) S.stats.starterTaps = (S.stats.starterTaps || 0) + 1; save(); return false;
 }
-// Called only with a verified store receipt (the iPhone app). Hands out the pack contents once.
-function grantStarter(receipt) {
-  const P = STARTER_PACK, st = M().starter; if (st.bought) return false;
-  st.bought = true; st.receipt = receipt || null; S.jewels += P.jewels; S.freePacks = (S.freePacks || 0) + P.packs; S.coins += P.coins; S.wood += P.wood;
-  save(); hud(); starterEl?.remove(); starterEl = null; if (panel) renderPanel(); toast('<i data-icon="gift"></i> Starter Pack added · thank you!'); return true;
+const buyStarter = (root) => buyOffer(STARTER_PACK.id, root);
+// Called only with a verified store receipt (the iPhone app). Hands out the contents (a once-pack only once).
+function grantOffer(id, receipt) {
+  const o = offerById(id); if (!o || offerOwned(o)) return false;
+  const m = M(); m.owned ||= {}; m.receipts ||= {};
+  if (o.once) m.owned[o.id] = true; if (o.starter) { m.starter.bought = true; m.starter.receipt = receipt || null; }
+  (m.receipts[o.id] ||= []).push(receipt || null);
+  S.jewels += o.jewels || 0; S.coins += o.coins || 0; S.wood += o.wood || 0; S.freePacks = (S.freePacks || 0) + (o.packs || 0);
+  if (o.saplings) { const ob = S.bags.orchard || S.bags.home; ob.sapling = (ob.sapling || 0) + o.saplings; }
+  const subs = []; for (const t of o.tools || []) { if (S.owned[t]) { S.jewels += TOOL_SUB_JEWELS; subs.push(t); continue; } S.discovered[t] = S.unlocked[t] = S.owned[t] = true; if (!S.cards[t]) addCard(t); }
+  if (o.dailyX2) S.dailyX2 = true;   // permanent: every daily gift is doubled from now on
+  S.gardenerPasses = (S.gardenerPasses || 0) + (o.gardenerH ? 1 : 0); if (o.gardenerH) S.gardenerPassH = o.gardenerH;
+  S.freeTrucks = (S.freeTrucks || 0) + (o.trucks || 0);
+  for (const [id, n] of Object.entries(o.seeds || {})) S.bags.home[id] = (S.bags.home[id] || 0) + n;
+  if (o.irrigation) { S.discovered.irrigation = S.unlocked.irrigation = S.owned.irrigation = true; addCard('irrigation', o.irrigation); }
+  const plants = [];
+  const tierList = [...TIER_ORDER.flatMap((t) => Array(o.plantsPerTier || 0).fill(t)), ...(o.plantTier ? [o.plantTier] : [])];
+  for (const t of tierList) {
+    const pool = Object.values(SPECIES).filter((s) => s.tier === t && s.enabled !== false && ITEMS['seed_' + s.id]);
+    if (!pool.length) continue; const sp = pool[Math.floor(Math.random() * pool.length)];
+    applyPackCard(sp.id); S.bags.home['seed_' + sp.id] = (S.bags.home['seed_' + sp.id] || 0) + (o.seedsPerPlant || 0); plants.push(sp.id);
+  }
+  m.lastGrant = { id: o.id, plants, tiers: plants.map((p) => SPECIES[p].tier), subs };
+  save(); hud(); syncTools(); starterEl?.remove(); starterEl = null; if (panel) renderPanel();
+  toast(`<i data-icon="gift"></i> ${o.name} added · thank you!`); return true;
 }
+const grantStarter = (receipt) => grantOffer(STARTER_PACK.id, receipt);
 // ---- More from Schwarze Spiele ----
 let promoEl = null;
 const promoGame = () => OTHER_GAMES.find((g) => g.id === CROSS_PROMO.gameId) || OTHER_GAMES[0];
@@ -2593,7 +2676,7 @@ function showPromo(tag = '') {
   return e;
 }
 document.addEventListener('click', (ev) => { const w = ev.target.closest?.('[data-wish]'); if (w) { ev.stopPropagation(); wish(w.dataset.wish); return; }
-  const b = ev.target.closest?.('[data-shop-starter] [data-starter-buy]'); if (b) { ev.stopPropagation(); buyStarter(b.closest('[data-shop-starter]')); } }, true);
+  const b = ev.target.closest?.('[data-shop-starter] [data-offer-buy]'); if (b) { ev.stopPropagation(); buyOffer(b.dataset.offerBuy, b.closest('[data-shop-starter]')); } }, true);
 // v0.63: daily streak. Days are LOCAL calendar days (YYYY-MM-DD). One claim per day; claiming the day after keeps the streak,
 // a gap of 2+ days restarts at Day 1. Clock guard: never two claims on the same day, and nothing is claimable while the
 // device clock reads earlier than the last claim (setting the clock back can't farm gifts).
@@ -2610,7 +2693,12 @@ function dailyStatus() {
   if (diff === 1) return { can: true, next: D.streak + 1, today, reset: false };
   return { can: true, next: 1, today, reset: D.streak > 0 };
 }
-const dailyGift = (streak) => DAILY.days[dailyCycleDay(streak) - 1];
+// v0.67: the Collector's Bundle doubles every daily gift for good (S.dailyX2), shown with a small ×2 badge
+const dailyMult = () => (S.dailyX2 ? 2 : 1);
+const dailyX = (g) => dailyMult() === 1 ? g : Object.fromEntries(Object.entries(g).map(([k, v]) => [k, typeof v === 'number' ? v * dailyMult() : v]));
+const dailyGift = (streak) => dailyX(DAILY.days[dailyCycleDay(streak) - 1]);
+const dailyAvgValue = () => DAILY.days.reduce((a, g) => a + (g.coins || 0) + (g.wood || 0) * OFFER_VALUE.wood + (g.scrap || 0) * 10 + (g.pack || 0) * OFFER_VALUE.pack + (g.jewels || 0) * OFFER_VALUE.jewel, 0) / DAILY.days.length;
+const dailyBadge = () => (S.dailyX2 ? ' <span class="dl-x2" title="Double Daily Rewards">×2</span>' : '');
 const giftBits = (g) => [g.coins && `<span><i data-icon="coin"></i>${g.coins}</span>`, g.wood && `<span><i data-icon="wood"></i>${g.wood}</span>`, g.scrap && `<span><i data-icon="scrap"></i>${g.scrap}</span>`,
   g.pack && `<span class="g-pack">🎴 Pack</span>`, g.jewels && `<span><i data-icon="jewel"></i>${g.jewels}</span>`].filter(Boolean).join('');
 function claimDaily() {
@@ -2630,11 +2718,11 @@ function showDaily(auto = false) {
   if (auto) S.daily.seen = st.today;
   const el = dailyEl = document.createElement('div'); el.id = 'daily'; el.className = 'cozy-modal';
   el.innerHTML = `<div class="cozy-card daily-card"><button class="close-btn" data-dl="close" aria-label="Close">×</button>
-    <h3>Daily Garden Gift</h3><p class="muted">${st.can ? (st.reset ? 'You missed a day, so your streak starts again — welcome back!' : cur > 1 ? `Day ${cur} in a row — lovely!` : 'Come back each day for a bigger gift.') : st.clockBack ? 'Your device clock looks earlier than your last gift — check back later.' : `Claimed today · come back tomorrow for Day ${cur + 1}.`}</p>
+    <h3>Daily Garden Gift${dailyBadge()}</h3><p class="muted">${st.can ? (st.reset ? 'You missed a day, so your streak starts again — welcome back!' : cur > 1 ? `Day ${cur} in a row — lovely!` : 'Come back each day for a bigger gift.') : st.clockBack ? 'Your device clock looks earlier than your last gift — check back later.' : `Claimed today · come back tomorrow for Day ${cur + 1}.`}</p>
     <div class="dl-tiles">${DAILY.days.map((g, i) => { const d = i + 1, done = d < cd || (d === cd && !st.can), today = st.can && d === cd;
-      return `<div class="dl-tile${done ? ' done' : ''}${today ? ' today' : ''}${g.milestone ? ' ms' : ''}${i === nextMs ? ' next-ms' : ''}${g.grand ? ' grand' : ''}" data-day="${d}"><em>Day ${base + d}</em>${done ? '<b class="dl-check">✓</b>' : `<div class="dl-gift">${giftBits(g)}</div>`}</div>`; }).join('')}</div>
-    ${nextMs >= 0 ? `<p class="dl-next">Next milestone: <b>Day ${base + nextMs + 1}</b> · ${giftBits(DAILY.days[nextMs])}</p>` : ''}
-    <button class="btn btn-gold dl-claim" data-dl="claim" ${st.can ? '' : 'disabled'}>${st.can ? `Claim Day ${cur}` : 'Claimed ✓'}</button>
+      return `<div class="dl-tile${done ? ' done' : ''}${today ? ' today' : ''}${g.milestone ? ' ms' : ''}${i === nextMs ? ' next-ms' : ''}${g.grand ? ' grand' : ''}" data-day="${d}"><em>Day ${base + d}</em>${done ? '<b class="dl-check">✓</b>' : `<div class="dl-gift">${giftBits(dailyX(g))}</div>`}</div>`; }).join('')}</div>
+    ${nextMs >= 0 ? `<p class="dl-next">Next milestone: <b>Day ${base + nextMs + 1}</b> · ${giftBits(dailyX(DAILY.days[nextMs]))}</p>` : ''}
+    <button class="btn btn-gold dl-claim" data-dl="claim" ${st.can ? '' : 'disabled'}>${st.can ? `Claim Day ${cur}${S.dailyX2 ? ' · ×2' : ''}` : 'Claimed ✓'}</button>
     <p class="ap-note">Streak ${S.daily.streak || 0} · best ${S.daily.best || 0} · miss a day and it restarts</p></div>`;
   $('#ui').appendChild(el); fillIcons(el); save();
   el.addEventListener('click', (e) => {
@@ -2718,7 +2806,7 @@ function standHTML_() {
 // v0.61: each stand sells only its own place's goods (fruit + Fruit Stand jars at the Orchard Stand, pressed oils at both)
 const sellTag = (id) => (itemLoc(id) === 'orchard' ? 'Sells at the Orchard' : 'Sells at Home');
 const ostandCount = () => Object.values(S.ostand).reduce((a, b) => a + b, 0);
-function stock(id, n, loc = 'home') { return inBag(loc, () => stock_(id, n, loc = 'home')); }
+function stock(id, n, loc = 'home') { return inBag(loc, () => stock_(id, n, loc)); }
 function stock_(id, n, loc = 'home') {
   if (loc === 'orchard') return ostock(id, n);
   if (consLeft('stand')) { toast(`The Farm Stand is still being built · ${clock(consLeft('stand'))} left`); return; }
@@ -2729,7 +2817,7 @@ function stock_(id, n, loc = 'home') {
   if (wasEmpty && !custs.length) nextCust = Math.max(nextCust, now() + (S.stats.customers ? 6000 : 3500));
   syncStand(); save(); hud(); renderPanel(); checkGoals();
 }
-function unstock(id, loc = 'home') { return inBag(loc, () => unstock_(id, loc = 'home')); }
+function unstock(id, loc = 'home') { return inBag(loc, () => unstock_(id, loc)); }
 function unstock_(id, loc = 'home') { if (loc === 'orchard') return ounstock(id); const q = S.stand[id] || 0; if (!q) return; if (ITEMS[id]?.antique) { for (let n = 0; n < q; n++) giveRestored(ITEMS[id].antique); } else S.inv[id] += q; delete S.stand[id]; syncStand(); save(); hud(); renderPanel(); }
 
 // goods in the Bag that this stand can't sell: listed (greyed) with a gentle "Sells at …" tag
@@ -2846,7 +2934,7 @@ function marketHTML() {
     if (nb) { const q = truckQuote(), per = WATER_TRUCK.perBarrel, pl = (n) => `${n} barrel${n === 1 ? '' : 's'}`;
       const sub = !q.need ? `All ${pl(nb)} already full · the truck only bills barrels it fills (${per} coins each)`
         : `A water truck fills ${q.need === nb ? `all ${pl(nb)}` : `${q.need} of your ${pl(nb)}`} to full · ${per} coins per barrel filled${q.can < q.need ? (q.can ? ` · you can pay for ${pl(q.can)} now (emptiest first)` : ` · you need ${per} coins`) : ''}`;
-      rows.push(`<div class="row truck-row"><div class="ico">${TRUCK_SVG}</div><div class="meta"><b>Fill Rain Barrels</b><small>${sub}</small></div><div class="acts"><button class="btn btn-primary sm" data-act="fill-barrels" data-fill="${q.can}" ${q.can ? '' : 'disabled'}>${coin((q.can || q.need || 0) * per)}</button></div></div>`); } }
+      rows.push(`<div class="row truck-row"><div class="ico">${TRUCK_SVG}</div><div class="meta"><b>Fill Rain Barrels</b><small>${sub}</small></div><div class="acts"><button class="btn btn-primary sm" data-act="fill-barrels" data-fill="${S.freeTrucks > 0 ? q.need : q.can}" ${q.can || (S.freeTrucks > 0 && q.need) ? '' : 'disabled'}>${S.freeTrucks > 0 ? `Free · ${S.freeTrucks} left` : coin((q.can || q.need || 0) * per)}</button></div></div>`); } }
   // v0.5: every unlocked plant is for sale (tier-coloured label, grow time, flower price). Locked Basic plants keep their own row;
   // locked higher-tier plants are folded into one compact row per tier so the list stays short.
   if (bedsHere) for (const t of TIER_ORDER) { const sps = Object.keys(SPECIES).filter((sp) => SPECIES[sp].tier === t), T = PLANT_TIERS[t];
@@ -2866,7 +2954,7 @@ function marketHTML() {
   if (atHome && !S.owned.teastand) { const F = FEATURES.teastand;
     rows.push(S.owned.teastand ? ownedRow('teastand', S.teaBuilt, S.teaBuilt ? `Owned · brewing on ${lotName(S.teaPos?.lot || 'home')}` : `Owned · not built yet · ${woodTag(BUILDS.teastand.wood)} on any plot you own`)
       : S.unlocked.teastand ? placeRow('teastand', `${ftag('teastand')} · pick a spot on any Home plot you own — paid when you place it · blend dried herbs into teas`) : coinUnlockRow('teastand')); }
-  for (const c of Object.keys(CRAFT).filter((c) => standOkAt(c, at))) { const C = CRAFT[c];   // v0.6
+  for (const c of Object.keys(CRAFT).filter((c) => c !== 'opress' && standOkAt(c, at))) { const C = CRAFT[c];   // v0.6 (v0.66.1: the Orchard Oil Press is bought from the Orchard Build menu)
     if (c === 'fruitstand' && !S.owned.fruitstand) { if (SHOW_LOCKED) rows.push(`<div class="row locked"><div class="ico">${FEATURE_ART.fruitstand}</div><div class="meta"><b>Fruit Stand</b><small>Not for sale — comes free with the Orchard</small></div><span class="loc-tag">Orchard only</span></div>`); continue; }
     if (S.owned[c]) continue;   // v0.65: one-time
     rows.push(S.owned[c] ? ownedRow(c, S[C.built], S[C.built] ? `Owned · built on ${lotName(S[C.pos]?.lot || 'home')}` : `Owned · not built yet · ${BUILDS[c].wood ? woodTag(BUILDS[c].wood) : 'free'} on ${c === 'fruitstand' ? 'an Orchard plot' : 'any plot you own'}`)
@@ -2929,8 +3017,9 @@ function fillBarrels() {
   if (!S.marketBuilt) return false;
   const q = truckQuote(), per = WATER_TRUCK.perBarrel;
   if (!q.need) { toast('Every rain barrel is already full — the truck has nothing to fill'); return false; }
-  if (!q.can) { toast(`The water truck charges ${per} coins per barrel — you need at least ${per} coins`); return false; }
-  const lots = q.list.slice(0, q.can).map(([l]) => l), bill = lots.length * per, left = q.need - lots.length;
+  const free = S.freeTrucks > 0;   // v0.67: a truckload from the Gardener's Pack fills every barrel for free
+  if (!free && !q.can) { toast(`The water truck charges ${per} coins per barrel — you need at least ${per} coins`); return false; }
+  const lots = q.list.slice(0, free ? q.need : q.can).map(([l]) => l), bill = free ? 0 : lots.length * per, left = q.need - lots.length; if (free) S.freeTrucks--;
   for (const l of lots) { const b = S.barrels[l]; b.w = regenMax(b); b.at = now(); }
   S.coins -= bill; S.stats.truckFills = (S.stats.truckFills || 0) + 1; S.stats.truckBarrels = (S.stats.truckBarrels || 0) + lots.length;
   S.lastTruck = { at: now(), lots, bill, left };
@@ -3128,12 +3217,13 @@ function workerSpot(lot) {
 }
 function hireWorker(lot) {
   if (!workersOn() || !S.lots[lot] || S.workers[lot]) return false;
-  if (S.coins < WORKER.hire) { toast(`A Gardener costs ${WORKER.hire} coins`); return false; }
-  const p = workerSpot(lot); S.coins -= WORKER.hire;
-  S.workers[lot] = { x: p.x, z: p.z, hired: now(), end: now() + SHIFT_MS(), done: { harvests: 0, planted: 0, watered: 0, picked: 0, made: 0, stocked: 0 }, made: [] };
+  const pass = S.gardenerPasses > 0;   // v0.67: a Gardener's Pack hire — free, one 24 h shift
+  if (!pass && S.coins < WORKER.hire) { toast(`A Gardener costs ${WORKER.hire} coins`); return false; }
+  const p = workerSpot(lot); if (pass) S.gardenerPasses--; else S.coins -= WORKER.hire;
+  S.workers[lot] = { x: p.x, z: p.z, hired: now(), end: now() + (pass ? (S.gardenerPassH || 24) * 3600e3 : SHIFT_MS()), pass, done: { harvests: 0, planted: 0, watered: 0, picked: 0, made: 0, stocked: 0 }, made: [] };
   S.stats.workersHired = (S.stats.workersHired || 0) + 1;
   W.addWorker(lot, p.x, p.z, true); W.setWorker(lot, 'work'); save(); hud(); renderPanel();
-  toast(`🌿 A Gardener is tending ${lotName(lot)} · ${shiftH()}-hour shift`); workerPass(lot); return true;
+  toast(`🌿 A Gardener is tending ${lotName(lot)} · ${pass ? S.gardenerPassH || 24 : shiftH()}-hour shift`); workerPass(lot); return true;
 }
 function payWorker(lot) {
   const w = S.workers[lot]; if (!w || now() < w.end) return false;
@@ -3144,6 +3234,8 @@ function payWorker(lot) {
   toast(`🌿 Paid ${WORKER.wage} coins · a new ${shiftH()}-hour shift on ${lotName(lot)}`); workerPass(lot); return true;
 }
 const workerKeep = (lot, sp) => lotBedTiles(lot).length;   // seeds of each kind held back for replanting
+// v0.66.1: the seed a gardener plants into an empty plot: the most valuable flower whose seeds are in this location's Bag
+const workerSeed = () => Object.keys(SPECIES).filter((sp) => S.inv['seed_' + sp] > 0 && ITEMS['flower_' + sp]).sort((a, b) => sellOf('flower_' + b) - sellOf('flower_' + a) || a.localeCompare(b))[0] || null;
 function workerPass(lot) { return inBag(workerLoc(lot), () => workerPass_(lot)); }
 function workerPass_(lot) {
   const w = S.workers[lot]; if (!w || now() >= w.end) return 0;
@@ -3155,6 +3247,10 @@ function workerPass_(lot) {
       const r = harvestCore(i); if (!r) continue; n++; d.harvests = (d.harvests || 0) + 1; job('pick', tileXZ(i), { bed: bedOfTile(i), color: SPECIES[r.sp]?.color });
       if (S.inv['seed_' + r.sp] > 0) { plant(i, r.sp); d.planted = (d.planted || 0) + 1; job('plant', tileXZ(i), { bed: bedOfTile(i) }); } else syncTile(i);
     }
+    // 1b) v0.66.1: plant every EMPTY plot on this plot's beds from the Bag at this location (most valuable seed first;
+    // before, a gardener only replanted what it had just harvested, so empty beds stayed empty)
+    for (const i of lotBedTiles(lot)) { if (S.tiles[i]) continue; const sp = workerSeed(); if (!sp) break;
+      plant(i, sp); if (S.tiles[i]?.sp === sp) { n++; d.planted = (d.planted || 0) + 1; job('plant', tileXZ(i), { bed: bedOfTile(i), color: SPECIES[sp]?.color }); } else break; }
     // 2) water thirsty plants from this plot's barrel (a Blue Lotus barrel needs two passes: half, then full)
     for (const i of lotBedTiles(lot)) { let g = 40; let k = 0; while (g-- > 0 && thirsty(S.tiles[i]) && water(i, true)) { n++; k++; d.watered = (d.watered || 0) + 1; } if (k) job('water', tileXZ(i), { bed: bedOfTile(i) }); }   // v0.63: pours until the bed has its start / bud water (or the barrel is dry)
     // 3) ripe fruit trees on this plot
@@ -3300,7 +3396,7 @@ const GARDENER_SVG = `<svg viewBox="0 0 64 64" width="54" height="54"><ellipse c
 function workerRowLine(lot) { const s = workerStatus(lot); return s ? `<small class="worker-line ${s.working ? '' : 'pay'}">Gardener · ${s.txt}</small>` : `<small class="worker-line">No Gardener yet</small>`; }
 function workerRowAct(lot) {
   const s = workerStatus(lot);
-  if (!s) return `<div class="acts"><button class="btn btn-primary sm" data-act="hire-worker" data-lot="${lot}" ${S.coins >= WORKER.hire ? '' : 'disabled'}>Hire · ${coin(WORKER.hire)}</button></div>`;
+  if (!s) return `<div class="acts"><button class="btn btn-primary sm" data-act="hire-worker" data-lot="${lot}" ${S.coins >= WORKER.hire || S.gardenerPasses > 0 ? '' : 'disabled'}>${S.gardenerPasses > 0 ? `Hire · free ${S.gardenerPassH || 24} h pass` : `Hire · ${coin(WORKER.hire)}`}</button></div>`;
   return `<div class="acts">${s.working ? `<button class="btn sm" data-act="open-worker" data-lot="${lot}">View</button>` : `<button class="btn btn-gold sm" data-act="pay-worker" data-lot="${lot}" ${S.coins >= WORKER.wage ? '' : 'disabled'}>Pay · ${coin(WORKER.wage)}</button>`}</div>`;
 }
 function workerLine(i) {
@@ -3413,7 +3509,9 @@ const MAP_ART = {
   grocery: `<path d="M-28 2h56v24h-56z" fill="#F2E2C4" stroke="#7A5A3C" stroke-width="2"/><path d="M-32 2h64l-4-12h-56z" fill="#5E8C6A" stroke="#3D5A40" stroke-width="1.5"/><g fill="#F7F1E3"><path d="M-24 2h8l-2-12h-6zM-8 2h8l-1-12h-6zM8 2h8l0-12h-6zM24 2h8l-3-12h-6z" opacity=".9"/></g><rect x="-6" y="12" width="12" height="14" fill="#8E6040"/><rect x="-22" y="9" width="12" height="9" fill="#9FC7D9" stroke="#7A5A3C"/><rect x="10" y="9" width="12" height="9" fill="#9FC7D9" stroke="#7A5A3C"/><g fill="#E0584A"><circle cx="-36" cy="22" r="3"/><circle cx="-32" cy="24" r="3"/></g>`,
 };
 const LOCK_SVG = `<g class="lock"><circle r="11" fill="#FBF6EA" stroke="#7A5A3C" stroke-width="1.5"/><path d="M-4.5-1v-3a4.5 4.5 0 0 1 9 0v3" fill="none" stroke="#7A5A3C" stroke-width="2"/><rect x="-6" y="-1" width="12" height="9" rx="2" fill="#D9A93F" stroke="#7A5A3C" stroke-width="1.2"/></g>`;
-const mapShown = (p) => SHOW_LOCKED || !p.soon;   // v0.61: coming-soon places stay hidden
+// v0.61: coming-soon places stay hidden · v0.66.1: once the Orchard is yours, the NEXT place (Vegetable Farm) shows as a fogged 'Coming soon' spot
+const NEXT_SOON = 'vegfarm';
+const mapShown = (p) => SHOW_LOCKED || !p.soon || (p.id === NEXT_SOON && !!S.lots.orchard);
 function placeState(p) {
   if (p.soon) return 'soon';
   if (p.id === 'home') return 'open';
@@ -3508,8 +3606,8 @@ function mapSVG() {
   const ribbon = (p, st) => { const w = Math.max(70, p.name.length * 8.4 + 26);
     return `<g class="m-ribbon" transform="translate(0 ${p.id === 'home' ? 50 : 52})"><path d="M${-w / 2 - 9} -3l7 -7v20l-7 -6z" class="rb-tail"/><path d="M${w / 2 + 9} -3l-7 -7v20l7 -6z" class="rb-tail"/>
       <rect x="${-w / 2}" y="-11" width="${w}" height="22" rx="4" class="rb"/><text y="5" text-anchor="middle" class="m-label">${p.name}</text></g>
-      ${st === 'forsale' || st === 'locked' ? `<g class="m-price" transform="translate(0 ${p.id === 'home' ? 74 : 76})"><rect x="-62" y="-10" width="124" height="20" rx="10"/><text y="4" text-anchor="middle">${st === 'locked' ? 'Buy every Home plot' : `${ORCHARD_PRICE.coins.toLocaleString('en-US')} coins · ${ORCHARD_PRICE.wood} Wood`}</text></g>` : ''}`; };
-  const place = (p) => { const st = placeState(p), locked = st === 'locked' || st === 'forsale';
+      ${st === 'forsale' || st === 'locked' || st === 'soon' ? `<g class="m-price${st === 'soon' ? ' m-soon' : ''}" transform="translate(0 ${p.id === 'home' ? 74 : 76})"><rect x="-62" y="-10" width="124" height="20" rx="10"/><text y="4" text-anchor="middle">${st === 'soon' ? 'Coming soon' : st === 'locked' ? 'Buy every Home plot' : `${ORCHARD_PRICE.coins.toLocaleString('en-US')} coins · ${ORCHARD_PRICE.wood} Wood`}</text></g>` : ''}`; };
+  const place = (p) => { const st = placeState(p), locked = st === 'locked' || st === 'forsale' || st === 'soon';
     return `<g class="map-place st-${st}${p.id === here ? ' here' : ''}" data-place="${p.id}" transform="translate(${p.x} ${p.y})" role="button" aria-label="${p.name}${locked ? ' · locked' : ''}">
       <ellipse class="hit" cx="0" cy="10" rx="74" ry="60" fill="transparent"/>
       ${(MAP_SCENE[p.id] || (() => `<g filter="url(#paint)">${MAP_ART[p.id]}</g>`))()}
@@ -3526,7 +3624,7 @@ function mapSVG() {
       <radialGradient id="vignette" cx=".5" cy=".52" r=".72"><stop offset=".62" stop-color="#E8D6B0" stop-opacity="0"/><stop offset="1" stop-color="#C9A97A" stop-opacity=".55"/></radialGradient>
       <linearGradient id="northFog" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#FFFDF8" stop-opacity=".98"/><stop offset=".72" stop-color="#FFFDF8" stop-opacity=".9"/><stop offset="1" stop-color="#FFFDF8" stop-opacity="0"/></linearGradient>
     </defs>
-    <rect width="390" height="640" fill="${pu ? 'url(#paper)' : '#FFF9F0'}"/>
+    <rect x="-400" y="-400" width="1190" height="1440" fill="${pu ? 'url(#paper)' : '#FFF9F0'}"/>${wash(195, 700, 260, 90, 23, '#B7D4B5', 0.3)}${wash(195, -40, 260, 80, 29, '#C8E0E8', 0.25)}
     ${wash(200, 470, 230, 190, 3, '#B7D4B5', 0.38)}${wash(90, 560, 90, 60, 5, '#B7D4B5', 0.3)}${wash(320, 380, 90, 80, 8, '#B7D4B5', 0.32)}
     ${wash(70, 420, 50, 34, 13, '#F5D07A', 0.16)}${wash(330, 560, 50, 36, 17, '#F7C5C5', 0.2)}${wash(150, 330, 70, 40, 19, '#B7D4B5', 0.26)}
     ${stream}${roads}${deco}
@@ -3536,7 +3634,7 @@ function mapSVG() {
       <text class="m-unexplored" x="195" y="175" text-anchor="middle">Beyond the clouds…</text><text class="m-unexplored sm" x="195" y="194" text-anchor="middle">more of the valley to discover</text></g>
     <g transform="translate(46 596)" class="compass"><circle r="17" fill="#FFF9F0" stroke="#7A5A3C" stroke-width="1.2"/><path d="M0-14 4 0 0 14-4 0z" fill="#E99A9A" stroke="#7A5A3C" stroke-width=".6"/><path d="M-14 0 0-3 14 0 0 3z" fill="#B7D4B5" stroke="#7A5A3C" stroke-width=".6"/><text y="-20" text-anchor="middle">N</text></g>
     <g class="m-title" transform="translate(195 30)"><path d="M-70-14h140l-8 14 8 14h-140l8-14z" fill="#FFF9F0" stroke="#7A5A3C" stroke-width="1.2"/><text y="5" text-anchor="middle">Petalspire Vale</text></g>
-    <rect width="390" height="640" fill="url(#vignette)" pointer-events="none"/>
+    <rect x="-400" y="-400" width="1190" height="1440" fill="url(#vignette)" pointer-events="none"/>
   </svg>`;
 }
 function mapCard(id) {
@@ -3553,7 +3651,7 @@ function mapCard(id) {
 let mapSel = null;
 function renderMap() {
   const m = $('#map'); if (m.classList.contains('hidden')) return;
-  $('#map-body').innerHTML = mapSVG(); $('#map-card').innerHTML = mapSel ? mapCard(mapSel) : `<p class="muted map-hint">Tap a place to travel there. Everything keeps growing while you are away.</p>`;
+  $('#map-body').innerHTML = mapSVG(); $('#map-card').innerHTML = mapSel ? mapCard(mapSel) : '';   // v0.66.1: no hint panel — the Map is the whole screen; a card shows only for a tapped place
   fillIcons($('#map'));
 }
 // v0.61: the Map stays locked until every Home plot is owned
@@ -3597,9 +3695,11 @@ function tradeJewel(what) {
 function jewelsHTML() {
   const cards = JEWEL_BUNDLES.map((b) => `<button class="jewel-card${b.best ? ' best' : ''}" data-jewels="${b.id}">${b.best ? '<span class="best-tag">Best value</span>' : ''}
     <span class="jc-art">${'<i data-icon="jewel"></i>'.repeat(b.n >= 50 ? 3 : b.n >= 10 ? 2 : 1)}</span><b>${b.n} Jewel${b.n > 1 ? 's' : ''}</b><em>${b.price}</em></button>`).join('');
-  return `${starterLive() ? `<div class="shop-starter" data-shop-starter>${starterCardHTML(true)}</div>` : ''}<div class="jewel-hero"><i data-icon="jewel"></i><div><b>${S.jewels}</b><small>Jewels</small></div></div>
+  const offers = offersSorted().filter((o) => !o.starter || starterUnlocked() || M().starter.bought);   // v0.67: highest value first; the Starter Pack once the beginning goals are done
+  return `<div class="jewel-hero"><i data-icon="jewel"></i><div><b>${S.jewels}</b><small>Jewels</small></div></div>
     <p class="muted" style="margin:6px 4px 12px">Jewels open Card Packs (${PACK_JEWELS} each), finish a restoration instantly (${RESTORE_HURRY_JEWELS}), grow a planted tree by a stage (${TREE.hurryJewels}) or complete the market rebuild (${BUILDS.market.hurryJewels}).</p>
     <div class="jewel-grid">${cards}</div>
+    <div class="sec-title">Packs</div><div class="shop-offers" data-shop-starter>${offers.map((o) => offerCardHTML(o, true)).join('')}</div>
     <div class="sec-title">Spend Jewels</div>
     <div class="list jewel-trades">
       <div class="row"><div class="ico"><img src="assets/pack.jpg" alt="" style="width:40px;height:40px;object-fit:cover;border-radius:8px"/></div><div class="meta"><b>${PACKS.standard.name}</b><small>${PACKS.standard.cards} cards · ${PACK_JEWELS} Jewel each, in Market › Card Packs</small></div><button class="btn btn-gold sm" data-act="go-packs">Packs</button></div>
@@ -3688,6 +3788,7 @@ $('#panel-body').addEventListener('click', (e) => {
   if (a === 'build-tincture') return buildTincture();
   if (a === 'build-teastand') return buildTea();
   if (a === 'build-press') return buildCraft('press');
+  if (a === 'build-opress') return buildCraft('opress');
   if (a === 'build-fruitstand') return buildCraft('fruitstand');
   if (a === 'brew-tea') return brewTea();
   if (a === 'tea-clear') { teaPick = []; return renderPanel(); }
@@ -4199,7 +4300,7 @@ function handleTap(x, y) {
   else if (hit.kind === 'tincture') openPanel('tincture');
   else if (hit.kind === 'still') openPanel('still');
   else if (hit.kind === 'teastand') openPanel('teastand');
-  else if (hit.kind === 'press' || hit.kind === 'fruitstand') openPanel(hit.kind);
+  else if (hit.kind === 'press' || hit.kind === 'opress' || hit.kind === 'fruitstand') openPanel(hit.kind);
   else if (hit.kind === 'orchardtree') { const t = S.orchard[hit.k]; if (t && orchRipe(t)) pickTree(hit.k); else openPanel('orchardtree', hit.k); }
   else if (hit.kind === 'windmill') { if (!building.windmill) toast(`Windmill · every connected rain barrel refills every ${regenS()} s (instead of ${S.bonus.can ? WATER_REGEN_S / 2 : WATER_REGEN_S} s)`); }
   else if (hit.kind === 'billboard') { if (!building.billboard) openPanel('billboard'); }
@@ -4251,7 +4352,7 @@ function tick() {
     if (S.marketProj) { if (marketK() >= 1) finishMarket(); else W.setMarketState('building', marketK()); }
     syncCons(); syncJewelDock(); syncDeliv();
     if (regenBarrels() && selected != null) renderSheet();
-    autoIrrigate(); syncBarrels(); syncTinc(); syncStill(); syncTea(); syncCraft('press'); syncCraft('fruitstand'); syncOrchard();
+    autoIrrigate(); syncBarrels(); syncTinc(); syncStill(); syncTea(); syncCraft('press'); syncCraft('opress'); syncCraft('fruitstand'); syncOrchard();
     if (focus?.kind === 'barrel') { const n = $('#barrel-txt'); if (n && S.barrels[focus.lot]) n.textContent = barrelText(focus.lot); }
     else if (selected != null && S.tiles[selected] && thirsty(S.tiles[selected]) && (+$('#tile-sheet').dataset.water !== totalWater() || !totalWater()) && +$('#tile-sheet').dataset.tw !== Math.floor(now() / 1000)) { $('#tile-sheet').dataset.tw = Math.floor(now() / 1000); renderSheet(); }
     if (panel === 'still') { let redo = false; S.stills.forEach((t, k) => { const n = $(`[data-sleft="${k}"]`); if (t && n) { const left = t.start + t.ms - now(); if (left <= 0) redo = true; else n.textContent = fmtTime(left); } }); if (redo) renderPanel(); }
@@ -4302,7 +4403,7 @@ window.__ps = {
   setClock: (t) => { clockAt = t; },
   BUILD, adMult, adPicks, standHTML, itemVal, byValue, sortRows, rewardHTML, get fromBuild() { return fromBuild; }, get bags() { return S.bags; }, get migBags() { return migBags; }, inBag, bagOf, sendGoods, tileLoc, standLoc, splitOrchardGoods, buildHTML, marketHTML, satchelHTML, billboardHTML, bbStatusText, bbReadyIn, BILLBOARD, CHARMS, CHARM_IDS, charmV, charmLv, charmText, craftK, shiftH, standPrice, ostandPrice, custGap, harvestCore, setCharmRoll(v) { charmRoll = v; }, freeGFSpot, bulkSell, bulkAll, bulkPrice, bulkItems, bulkHTML, rollWants, STAND_BUY, BULK, GF_IDS, gfOn, gfPlaced, placeGF, storeGF, onMapOnly, charmAt, oGap, TRUCK, orderDelivery, deliverTrip, syncDeliv, inTransit, get deliv() { return S.deliv; }, get vanOut() { return vanOut.size; }, migGF065, get mig065() { return mig065; }, regenNow: () => regenS(), SWAP_TIERS, swapPool, get bagTab() { return bagTab; }, setBagTab(t) { bagTab = t; }, shelfMig063, rollIds, rollPackLoot, catTierOdds, drawPlant, drawOther, isPlantCard, PACK_LOOT, OWNED_K, setForcedLoot(L) { forcedLoot = L; }, consLeft, finishCons, hurryCons, startCons, plantTile: plant, syncTile, bloomTargets, instantBloom, askBloom, customerRush, askRush, rushLeft, rushReady, syncJewelDock, get rush() { return S.rush; }, get nextCustAt() { return nextCust; }, get nextOCustAt() { return nextOCust; }, swapCard, swapIn, swapPool, swapTierOdds, SWAP, setSwapForced(id) { swapForced = id; }, get revealCards() { return revealCards; }, upgLeft, finishUpg, hurryUpg, deselect, get upg() { return S.upg; }, toolLeft, get cons() { return S.cons; }, dailyStatus, claimDaily, showDaily, maybeDaily, dayKey, watchAd, playRewardAd, DAILY, upgradeBuilding, get standLv() { return S.standLv; }, cardFix063, normalizeCards,
   TIPS, JEWEL_DROP, obsState, PACKS,
-  hud, syncBarrels, lotRoofs, standsLine, buildBarrelAt: (lot, x, z) => buildBarrel(lot, x, z), openMap, closeMap, mapLocked, syncMapBtn, maybeBoost, showBoost, applyBoost, hideBoost, showStarter, grantStarter, buyStarter, starterLive, starterReady, maybeStarter, promoMilestone, showPromo, wish, settingsHTML, jewelsHTML, unlockMapIfReady, travel, buyOrchard, claimFollow, SOCIALS, setLoc, loc: () => curLoc(), orchardLocked, mapPlaces: () => MAP_PLACES.map((p) => ({ id: p.id, name: p.name, soon: !!p.soon, state: placeState(p) })), ORCHARD_PRICE, casterIds: () => casters().map((c) => c.id + (c.h != null ? ":box" : ":tree")), checkGoals, regenBarrels, feedLot, reachLots,  get barrelReachTargets() { return W.bedTargets.children.map((g) => ({ b: g.userData.b, ok: g.userData.ok })); }, barrelRoof, lotRoofs, barrelStands, barrelPerTick, get gutterLots() { return [...W.gutters.keys()]; }, gutterPipes(lot) { return W.gutters.get(lot)?.userData.pipes || 0; },
+  hud, dailyGift: (n) => dailyGift(n), syncBarrels, lotRoofs, standsLine, buildBarrelAt: (lot, x, z) => buildBarrel(lot, x, z), openMap, closeMap, mapLocked, syncMapBtn, maybeBoost, showBoost, applyBoost, hideBoost, showStarter, grantStarter, buyStarter, starterLive, grantOffer, buyOffer, offerValue, offersSorted, maybeStarter, starterReady, maybeStarter, promoMilestone, showPromo, wish, settingsHTML, jewelsHTML, unlockMapIfReady, travel, buyOrchard, claimFollow, SOCIALS, setLoc, loc: () => curLoc(), orchardLocked, mapPlaces: () => MAP_PLACES.map((p) => ({ id: p.id, name: p.name, soon: !!p.soon, state: placeState(p) })), ORCHARD_PRICE, casterIds: () => casters().map((c) => c.id + (c.h != null ? ":box" : ":tree")), checkGoals, regenBarrels, feedLot, reachLots,  get barrelReachTargets() { return W.bedTargets.children.map((g) => ({ b: g.userData.b, ok: g.userData.ok })); }, barrelRoof, lotRoofs, barrelStands, barrelPerTick, get gutterLots() { return [...W.gutters.keys()]; }, gutterPipes(lot) { return W.gutters.get(lot)?.userData.pipes || 0; },
   get tincGrandfathered() { return tincGrandfathered; }, tincProblem, tincSpots, buildTincture, placeTincture, buildStill, placeStill, distill, collectOil, STILL, TEA, teaInfo, teaId, teaSps, registerTea, buildTea, placeTea, brewTea, collectTea, teaAdd, teaRemove, get teaPick() { return [...teaPick]; }, set teaPick(v) { teaPick = [...v]; }, teaHTML, syncTea, DRY_TIER_S,
   CRAFT, PRESS, FRUITSTAND, TREES, TREE_IDS, SEED_BAGS, bagId, bagSeeds, buildCraft, placeCraft, craftMake, craftCollect, craftHTML, syncCraft, orchardSpots, orchardProblem, plantOrchard, pickTree, syncOrchard, orchStage, orchRipe, orchardTreeHTML, startTreePlace, orchardLocked, packW, cardOdds, tierOdds, featureOdds, drawNonBasic, collIds, get sunflowerRefund() { return sunflowerRefund; }, ORCHARD_TREE_SPOTS,
   RESALE, sellPlaced, stockAntique, sellRestored, installShelf, uninstallShelf, shelfOn, syncShelf, SHELF_BONUS, STAND_CAP, focusThing, get atmosphere() { return atmosphere(); }, get standCap() { return standCap(); },

@@ -252,7 +252,7 @@ export function createWorld(canvas) {
   lantern(-4.45, 4.55); lantern(4.35, 4.55);
 
   // ---------- Lot borders, tint and For Sale signs ----------
-  const lotFx = {};
+  const lotFx = {}; let orchFenceG = null; const orchOwned = new Set(['orchard']);   // v0.66.1: bought Orchard land, for the fence
   const stakeG = new THREE.CylinderGeometry(0.035, 0.045, 0.55, 5); stakeG.translate(0, 0.27, 0);
   const ropeG = new THREE.CylinderGeometry(0.014, 0.014, 1, 4); ropeG.rotateZ(Math.PI / 2);
   function signTexture() {
@@ -322,14 +322,10 @@ export function createWorld(canvas) {
       posts.castShadow = rails.castShadow = true; orchardScene.add(posts, rails); }
     const rowM = mat('#BCD596', { roughness: 1 });
     for (const z of [-3.2, -5.6, -8.0]) { const r = new THREE.Mesh(new THREE.PlaneGeometry(12.6, 1.5), rowM); r.rotation.x = -Math.PI / 2; r.position.set(ORCH_X, 0.01, z); r.receiveShadow = true; orchardScene.add(r); }
-    // split-rail fence around the field (open at the lane)
-    const l = LOTS.orchard, postG = new THREE.CylinderGeometry(0.06, 0.07, 0.9, 6), railG = new THREE.BoxGeometry(1, 0.07, 0.06), posts = [], rails = [];
-    const edge = (ax, az, bx, bz) => { const n = Math.max(1, Math.round(Math.hypot(bx - ax, bz - az) / 2)); for (let k = 0; k <= n; k++) { const x = ax + (bx - ax) * k / n, z = az + (bz - az) * k / n; posts.push([x, z]); if (k < n) rails.push([x + (bx - ax) / n / 2, z + (bz - az) / n / 2, Math.hypot(bx - ax, bz - az) / n, Math.atan2(-(bz - az), bx - ax)]); } };
-    edge(l.x0, l.z0, l.x1, l.z0); edge(l.x0, l.z0, l.x0, l.z1); edge(l.x1, l.z0, l.x1, l.z1); edge(l.x0, l.z1, ORCH_X - 1.4, l.z1); edge(ORCH_X + 1.4, l.z1, l.x1, l.z1);
-    const pm = new THREE.InstancedMesh(postG, woodD, posts.length), rm = new THREE.InstancedMesh(railG, woodL, rails.length * 2), m4 = new THREE.Matrix4(), q = new THREE.Quaternion();
-    posts.forEach(([x, z], k) => { m4.makeTranslation(x, 0.45, z); pm.setMatrixAt(k, m4); });
-    rails.forEach(([x, z, len, a], k) => { q.setFromAxisAngle(new THREE.Vector3(0, 1, 0), a); for (const [j, y] of [[0, 0.4], [1, 0.72]]) { m4.compose(new THREE.Vector3(x, y, z), q, new THREE.Vector3(len, 1, 1)); rm.setMatrixAt(k * 2 + j, m4); } });
-    pm.castShadow = rm.castShadow = true; orchardScene.add(pm, rm);
+    // v0.66.1: split-rail fence around the PURCHASED Orchard land only (the field + every bought Orchard plot), with a gate at
+    // the lane; it is rebuilt whenever an Orchard plot is bought (setLotOwned), so unbought land always stays outside it.
+    orchFenceG = new THREE.Group(); orchFenceG.userData.kind = 'orchfence'; orchardScene.add(orchFenceG); buildOrchFence();
+    const m4 = new THREE.Matrix4();   // (still used by the meadow below)
     // wildflowers dotted through the grass (sunny meadow)
     { const fr = mulberry(77), fg = new THREE.IcosahedronGeometry(0.07, 0), cols = ['#FFFFFF', '#F5D35A', '#F7C5C5', '#B79AD6'];
       for (const c of cols) { const n = 90, im = new THREE.InstancedMesh(fg, mat(c), n); for (let k = 0; k < n; k++) { let x, z; do { x = ORCH_X + (fr() - 0.5) * 30; z = ORCH_Z + (fr() - 0.5) * 26; } while ((z > 4.3 && z < 8.9) || ORCHARD_TREE_SPOTS.some((p) => Math.hypot(p.x - x, p.z - z) < 1.1)); m4.makeTranslation(x, 0.06, z); im.setMatrixAt(k, m4); } orchardScene.add(im); } }
@@ -364,7 +360,38 @@ export function createWorld(canvas) {
   function setBulk(loc, on) { (loc === 'orchard' ? bulkOrch : bulkHome).visible = !!on; }
   function setOStandStock(n) { const g = orchardShed.getObjectByName('stock'); if (g) g.visible = n > 0; }
   const orchSign = label('The Orchard', { h: 0.55, color: '#3D5A40', border: '#D9A93F' }); orchSign.position.set(ORCH_X - 2.6, 1.7, 4.1); orchardScene.add(orchSign);
-  function setLotOwned(id, owned) { const f = lotFx[id]; if (f) f.fx.visible = !owned; }
+  function buildOrchFence() {
+    if (!orchFenceG) return;
+    for (const c of [...orchFenceG.children]) { orchFenceG.remove(c); c.geometry?.dispose?.(); }
+    const ids = ['orchard', ...ORCH_FOR_SALE].filter((id) => orchOwned.has(id)), L = (id) => LOTS[id], E = 0.01;
+    const owned = (x, z) => ids.some((id) => { const l = L(id); return x > l.x0 + E && x < l.x1 - E && z > l.z0 + E && z < l.z1 - E; });
+    const posts = [], rails = [], segs = [];
+    // every side of an owned plot whose neighbour across that side is NOT owned is part of the outline (split at 1 m so partial sides work)
+    for (const id of ids) { const l = L(id);
+      for (const [ax, az, bx, bz, nx, nz] of [[l.x0, l.z0, l.x1, l.z0, 0, -1], [l.x0, l.z1, l.x1, l.z1, 0, 1], [l.x0, l.z0, l.x0, l.z1, -1, 0], [l.x1, l.z0, l.x1, l.z1, 1, 0]]) {
+        const len = Math.hypot(bx - ax, bz - az), n = Math.round(len); let run = null;
+        for (let k = 0; k <= n; k++) { const t = (k + 0.5) / n, x = ax + (bx - ax) * t, z = az + (bz - az) * t, out = k < n && !owned(x + nx * 0.5, z + nz * 0.5);
+          if (out && !run) run = [ax + (bx - ax) * k / n, az + (bz - az) * k / n];
+          if (!out && run) { segs.push([run[0], run[1], ax + (bx - ax) * k / n, az + (bz - az) * k / n]); run = null; } } } }
+    // the gate: a 2.8 m opening on the front edge at the Orchard lane
+    const GZ = LOTS.orchard.z1, G0 = ORCH_X - 1.4, G1 = ORCH_X + 1.4, cut = [];
+    for (const [ax, az, bx, bz] of segs) { if (Math.abs(az - GZ) < E && Math.abs(bz - GZ) < E && Math.min(ax, bx) < G0 && Math.max(ax, bx) > G1) { cut.push([Math.min(ax, bx), az, G0, az], [G1, az, Math.max(ax, bx), az]); } else cut.push([ax, az, bx, bz]); }
+    for (const [ax, az, bx, bz] of cut) { const n = Math.max(1, Math.round(Math.hypot(bx - ax, bz - az) / 2));
+      for (let k = 0; k <= n; k++) { const x = ax + (bx - ax) * k / n, z = az + (bz - az) * k / n; posts.push([x, z]); if (k < n) rails.push([x + (bx - ax) / n / 2, z + (bz - az) / n / 2, Math.hypot(bx - ax, bz - az) / n, -Math.atan2(bz - az, bx - ax)]); } }
+    const postG = new THREE.CylinderGeometry(0.06, 0.07, 0.9, 6), railG = new THREE.BoxGeometry(1, 0.07, 0.06);
+    const pm = new THREE.InstancedMesh(postG, woodD, Math.max(1, posts.length)), rm = new THREE.InstancedMesh(railG, woodL, Math.max(1, rails.length * 2)), m4 = new THREE.Matrix4(), q = new THREE.Quaternion();
+    posts.forEach(([x, z], k) => { m4.makeTranslation(x, 0.45, z); pm.setMatrixAt(k, m4); }); pm.count = posts.length;
+    rails.forEach(([x, z, len, a], k) => { q.setFromAxisAngle(new THREE.Vector3(0, 1, 0), a); for (const [j, y] of [[0, 0.4], [1, 0.72]]) { m4.compose(new THREE.Vector3(x, y, z), q, new THREE.Vector3(len, 1, 1)); rm.setMatrixAt(k * 2 + j, m4); } }); rm.count = rails.length * 2;
+    pm.castShadow = rm.castShadow = true; orchFenceG.add(pm, rm);
+    // gate posts, a little arch and two gate leaves swung open
+    for (const x of [G0, G1]) { const gp = shadowy(new THREE.Mesh(new THREE.BoxGeometry(0.16, 1.5, 0.16), woodD)); gp.position.set(x, 0.75, GZ); orchFenceG.add(gp); }
+    const arch = shadowy(new THREE.Mesh(new THREE.BoxGeometry(G1 - G0 + 0.4, 0.14, 0.14), woodD)); arch.position.set(ORCH_X, 1.48, GZ); orchFenceG.add(arch);
+    for (const [x, sx] of [[G0, 1], [G1, -1]]) { const leaf = new THREE.Group(); leaf.position.set(x, 0, GZ); leaf.rotation.y = sx * -1.1; orchFenceG.add(leaf);
+      for (const y of [0.3, 0.62, 0.94]) { const r = shadowy(new THREE.Mesh(new THREE.BoxGeometry(1.25, 0.08, 0.05), woodL)); r.position.set(sx * 0.66, y, 0); leaf.add(r); }
+      const br = shadowy(new THREE.Mesh(new THREE.BoxGeometry(1.4, 0.07, 0.05), woodL)); br.position.set(sx * 0.66, 0.62, 0); br.rotation.z = sx * 0.55; leaf.add(br); }
+  }
+  function setLotOwned(id, owned) { const f = lotFx[id]; if (f) f.fx.visible = !owned;
+    if (ORCH_FOR_SALE.includes(id) && orchOwned.has(id) !== !!owned) { if (owned) orchOwned.add(id); else orchOwned.delete(id); buildOrchFence(); } }
 
   // ---------- Raised beds ----------
   const beds = []; const tiles = [];
@@ -850,9 +877,11 @@ export function createWorld(canvas) {
     for (const t of teaSlots) t.steam.forEach((sp, i) => { if (!t.active || !teastand.visible) { sp.visible = false; return; } const ph = (tt * 0.6 + i / 3) % 1; sp.visible = true;
       sp.position.set(0.17 + ph * 0.12 + Math.sin(tt * 2 + i) * 0.04, 0.3 + ph * 0.8, ph * 0.5); sp.scale.setScalar(0.16 + ph * 0.45); sp.material.opacity = 0.85 * Math.sin(Math.PI * Math.min(1, ph * 1.15)); }); });
   // ---------- v0.6: Pressed Oil Stand (screw press, barrels, bottles) and Fruit Stand (awning, jars, crates, a jam pot) ----------
-  const craftSlots = { press: [], fruitstand: [] };
+  const craftSlots = { press: [], opress: [], fruitstand: [] };
   const steamMat2 = () => new THREE.SpriteMaterial({ map: glowTexture(), color: '#FFFFFF', transparent: true, opacity: 0, depthWrite: false });
-  const press = new THREE.Group(); press.position.set(SPOTS.press[0], 0, SPOTS.press[1]); press.rotation.y = -0.2; press.scale.setScalar(0.8); scene.add(press);
+  // v0.66.1: one builder for both oil presses (Home + the Orchard's own)
+  function makePress(kind, spot, name) {
+  const press = new THREE.Group(); press.position.set(spot[0], 0, spot[1]); press.rotation.y = -0.2; press.scale.setScalar(0.8); scene.add(press);
   {
     const iron = mat('#6E777A', { roughness: 0.45, metalness: 0.5 }), oak = mat('#9A6B44', { roughness: 0.85 });
     const base = shadowy(new THREE.Mesh(new THREE.BoxGeometry(2.3, 0.3, 1.1), woodD)); base.position.y = 0.15; press.add(base);
@@ -876,12 +905,14 @@ export function createWorld(canvas) {
       const b = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.09, 0.3, 10), mat('#F2C53D', { roughness: 0.25, emissive: '#8A6418', emissiveIntensity: 0.3 })); b.position.y = 0.15; b.visible = false; g.add(b);
       const neck = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.04, 0.1, 8), mat('#8A6545')); neck.position.y = 0.34; b.add(neck); neck.position.y = 0.19;
       const gl = glowSprite('#FFD27A', 0.7, 0.45); gl.position.y = 0.25; gl.visible = false; g.add(gl);
-      craftSlots.press.push({ g, item: b, gl, active: false });
+      craftSlots[kind].push({ g, item: b, gl, active: false });
     }
-    const label = label_('Pressed Oil Stand', { h: 0.5 }); label.position.set(0, 3.1, 0.2); press.add(label); press.userData.label = label;
+    const label = label_(name, { h: 0.5 }); label.position.set(0, 3.1, 0.2); press.add(label); press.userData.label = label;
     const hit = new THREE.Mesh(new THREE.BoxGeometry(2.5, 3.0, 1.4), new THREE.MeshBasicMaterial({ visible: false })); hit.position.y = 1.4; press.add(hit);
   }
-  press.userData.kind = 'press'; press.visible = false;
+  press.userData.kind = kind; press.visible = false; return press;
+  }
+  const press = makePress('press', SPOTS.press, 'Pressed Oil Stand'), opress = makePress('opress', SPOTS.opress || [0, -95], 'Orchard Oil Press');
   const fruitstand = new THREE.Group(); fruitstand.position.set(SPOTS.fruitstand[0], 0, SPOTS.fruitstand[1]); fruitstand.rotation.y = -0.2; fruitstand.scale.setScalar(0.8); scene.add(fruitstand);
   {
     const counter = shadowy(new THREE.Mesh(new THREE.BoxGeometry(2.1, 0.9, 0.8), mat('#C99A6B', { roughness: 0.85 }))); counter.position.y = 0.45; fruitstand.add(counter);
@@ -915,7 +946,7 @@ export function createWorld(canvas) {
   // slots: [{ done, color } | null]
   function setCraft(kind, slots) { slots.forEach((s, k) => { const t = craftSlots[kind][k]; if (!t) return; t.active = !!s && !s.done; t.item.visible = !!s && s.done; t.gl.visible = !!s && s.done && !!s.glow; if (s?.color) { t.item.material = t.item.material.clone(); t.item.material.color.set(s.color); } }); }
   frameHooks.push(() => { const tt = performance.now() / 1000;
-    const pressing = craftSlots.press.some((t) => t.active); if (press.visible) { if (pressing) press.userData.wheel.rotation.y = tt * 1.4; press.userData.drip.visible = pressing; if (pressing) press.userData.drip.scale.y = 0.6 + 0.4 * Math.abs(Math.sin(tt * 3)); }
+    for (const [pr, kk] of [[press, 'press'], [opress, 'opress']]) { const pressing = craftSlots[kk].some((t) => t.active); if (pr.visible) { if (pressing) pr.userData.wheel.rotation.y = tt * 1.4; pr.userData.drip.visible = pressing; if (pressing) pr.userData.drip.scale.y = 0.6 + 0.4 * Math.abs(Math.sin(tt * 3)); } }
     const cooking = craftSlots.fruitstand.some((t) => t.active);
     craftSlots.fruitstand.forEach((t, k) => t.steam.forEach((sp, i) => { if (!cooking || !fruitstand.visible || k) { sp.visible = false; return; } const ph = (tt * 0.6 + i / 3) % 1; sp.visible = true;
       sp.position.set(Math.sin(tt * 2 + i) * 0.06, 1.35 + ph * 0.8, 0.05 + ph * 0.3); sp.scale.setScalar(0.16 + ph * 0.45); sp.material.opacity = 0.85 * Math.sin(Math.PI * Math.min(1, ph * 1.15)); })); });
@@ -1599,7 +1630,7 @@ export function createWorld(canvas) {
     if (mode === 'build') { const h = raycaster.intersectObjects(ghostMeshes, false)[0]; return h ? h.object.userData : null; }
     if (mode === 'ground') { const p = raycaster.ray.intersectPlane(groundPlane, new THREE.Vector3()); return p ? { kind: 'ground', point: p } : null; }
     const targets = [...tiles.map((t) => t.mesh), ...tiles.map((t) => t.holder), woods, lootG, decorG, featG, bpGroup];
-    if (stand.visible) targets.push(stand); if (rack.visible) targets.push(rack); if (tincture.visible) targets.push(tincture); if (still.visible) targets.push(still); if (teastand.visible) targets.push(teastand); if (press.visible) targets.push(press); if (fruitstand.visible) targets.push(fruitstand); targets.push(orchardG); if (orchardShed.visible) targets.push(orchardShed);   /* v0.65 fix: the Orchard Stand (and its scaffold while it's being built) was never tappable */ if (parking.visible) targets.push(parking); if (windmill.visible) targets.push(windmill); if (billboard.visible) targets.push(billboard); targets.push(market); for (const g of barrels.values()) if (g.visible) targets.push(g); for (const g of hives.values()) if (g.visible) targets.push(g); for (const g of workers.values()) if (g.visible) targets.push(g);
+    if (stand.visible) targets.push(stand); if (rack.visible) targets.push(rack); if (tincture.visible) targets.push(tincture); if (still.visible) targets.push(still); if (teastand.visible) targets.push(teastand); if (press.visible) targets.push(press); if (opress.visible) targets.push(opress); if (fruitstand.visible) targets.push(fruitstand); targets.push(orchardG); if (orchardShed.visible) targets.push(orchardShed);   /* v0.65 fix: the Orchard Stand (and its scaffold while it's being built) was never tappable */ if (parking.visible) targets.push(parking); if (windmill.visible) targets.push(windmill); if (billboard.visible) targets.push(billboard); targets.push(market); for (const g of barrels.values()) if (g.visible) targets.push(g); for (const g of hives.values()) if (g.visible) targets.push(g); for (const g of workers.values()) if (g.visible) targets.push(g);
     for (const id of Object.keys(lotFx)) if (lotFx[id].fx.visible) targets.push(lotFx[id].sign, lotFx[id].tag);
     const hits = raycaster.intersectObjects(targets, true);
     for (const h of hits) { if (h.object.userData?.tag && visibleChain(h.object)) return { kind: 'lot', id: h.object.userData.id }; }
@@ -1733,7 +1764,7 @@ export function createWorld(canvas) {
 
   return {
     setPaused, PR_CAP, IOS,
-    renderer, scene, camera, ctl, DEF, tiles, beds, obs, stand, rack, market, barrel, still, setStill, teastand, setTea, press, fruitstand, setCraft, addOrchardTree, setOrchardTree, removeOrchardTree, orchardTrees, makeFruitTree, parking, setParking, windmill, billboard, setBillboard, spotGhosts, setSpotGhosts, bedTargets, setBedTargets, barrels, addBarrel, removeBarrel, gutters, setGutter, setBarrelInfo, setBarrelLv, hives, addHive, removeHive, setBeeBeds, tincture, setTincture, cars, frameHooks,
+    renderer, scene, camera, ctl, DEF, tiles, beds, obs, stand, rack, market, barrel, still, setStill, teastand, setTea, press, opress, orchFenceInfo: () => ({ posts: orchFenceG?.children[0]?.count || 0, owned: [...orchOwned] }), fruitstand, setCraft, addOrchardTree, setOrchardTree, removeOrchardTree, orchardTrees, makeFruitTree, parking, setParking, windmill, billboard, setBillboard, spotGhosts, setSpotGhosts, bedTargets, setBedTargets, barrels, addBarrel, removeBarrel, gutters, setGutter, setBarrelInfo, setBarrelLv, hives, addHive, removeHive, setBeeBeds, tincture, setTincture, cars, frameHooks,
     updateCamera, resize, glide, intro, pick, project, tileWorld, sickleSweep, plowFurrows, fxCount: () => fxs.length,
     setObstacle, chop, clearObstacle, addBed, setGhosts, setLotOwned, setLocation, orchardScene, orchardShed, setOStandStock, setStandShelf, standShelf, setStandStock, setMarketOpen, setRack, appear, spawnCar, spawnTruck, poof,
     tilePlant: (i) => tiles[i]?.plant || null, addWorker, removeWorker, setWorker, workerAt, workerGo, workerIdle, workerPose, placeWorker, setPlant, attachPlant, setIcon, setShade, bgTrees, setIrrigation, irrigPulse, irrig, select, splash, render, textSprite, relabel, groundAt,

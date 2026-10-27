@@ -3,7 +3,7 @@ export const TILE = 1.08;          // tile spacing in a bed
 export const BED_N = 3;            // beds are 3x3 plots
 export const SITE_HALF = 2.0;      // half-size of a bed footprint used for clearing checks
 export const ROAD = { z0: 5.0, z1: 7.8, near: 5.72, far: 7.08 };
-export const SPOTS = { market: [-3.35, 3.75], stand: [0.75, 3.95], rack: [3.6, 3.8], barrel: [-1.15, 4.25], tincture: [3.25, 2.4], still: [0, -60], teastand: [0, -80], press: [0, -90], fruitstand: [0, -100], windmill: [0, -70], billboard: [-6.6, 9.3], orchardshed: [305.2, 2.2] };
+export const SPOTS = { market: [-3.35, 3.75], stand: [0.75, 3.95], rack: [3.6, 3.8], barrel: [-1.15, 4.25], tincture: [3.25, 2.4], still: [0, -60], teastand: [0, -80], press: [0, -90], opress: [0, -95], fruitstand: [0, -100], windmill: [0, -70], billboard: [-6.6, 9.3], orchardshed: [305.2, 2.2] };
 // v0.52: up to 6 bays along the near lane, unlocked in this order as the Parking Lot levels up (2 / 3 / 4 / 6).
 // Cars drive in +x, so the occupied bays are always used front (largest x) to back — see bayXs() in main.js.
 export const PARK_X = [0.75, -1.75, -4.25, 3.25, -6.75, 5.75];   // v0.41 Parking Lot bays along the near lane (bay 0 = in front of the Farm Stand)   // still: off-map until the player places it (v0.41)

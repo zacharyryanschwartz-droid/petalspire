@@ -1,4 +1,4 @@
-# Petalspire v0.66
+# Petalspire v0.67
 
 A cozy 3D flower-garden prototype for iPhone Safari (portrait, one thumb). Also plays on desktop with a mouse.
 This is a **prototype**: version numbers stay below 1.0 until the first official release.
@@ -20,6 +20,39 @@ This is a **prototype**: version numbers stay below 1.0 until the first official
 7. **Land for sale.** Five wooded plots, each with a floating For Sale sign: 150 → 300 → 600 → 1000 → 1500 coins.
 
 Drag with one finger to pan, pinch to zoom, and twist with two fingers to turn. On desktop, right-drag or shift-drag turns the view.
+
+## New in v0.67 — real-money packs, and the v0.66.1 fixes
+
+**Packs (placeholder purchases).** The Jewel Shop lists two packs, highest value first. Prices are placeholders for the iPhone App Store. The web build never charges and never grants: tapping *Get it* shows "… arrives with the iPhone app. Nothing was charged."
+
+Value is a coin equivalent:
+- 1 Jewel = 1,000 coins (the Jewel trade);
+- 1 Wood = 4 coins;
+- a tool at its Market price (or 2 Jewels if you already own it);
+- a plant = its tier's average seed price × (seeds + 2 for the card);
+- Double Daily Rewards = 30 average daily gifts.
+
+| Pack | Price | Contents | Value (coins) |
+|---|---|---|---|
+| Collector's Bundle | $19.99 | Everything in the Starter Pack **plus** 1 extra random Other World plant, 100 more Jewels, 5,000 more coins, 300 more Wood and **Double Daily Rewards for good**. In total: 1 random plant of each of the 7 tiers + 1 extra Other World plant (card + 3 seeds each), 120 Jewels, 6,000 coins, 400 Wood, Hand Plow + Harvest Sickle | 145,898 |
+| Starter Pack (one time only) | $4.99 | 1 random plant of each of the 7 tiers (card + 3 seeds), 20 Jewels, 1,000 coins, Hand Plow + Harvest Sickle, 100 Wood | 25,228 |
+
+- If you already own the Plow or the Sickle, each one you own is swapped for 2 Jewels.
+- **Double Daily Rewards**: every Daily Garden Gift is doubled from then on. A small **×2** badge shows on the gift.
+
+- The **Starter Pack** replaces the old $1.99 one. It pops up **once, right after the beginning goals are completed** (when the "The garden is yours now" card is closed). Saves that finished the goals earlier see it once on load. It stays in the Jewel Shop afterwards until bought. The old 15-minute / 8-harvest trigger is gone.
+- The Hand Plow plants a whole bed at once; the Harvest Sickle harvests a whole bed at once.
+- `Payments.purchaseOffer` is still the one IAP hook; a native build calls `grantOffer(id, receipt)` with a verified receipt.
+
+## v0.66.1 fixes (shipped in v0.67)
+
+- Fixed: items from the Orchard Bag could not be put on the Orchard Stand (and could not be taken back). Since v0.65 the per-location `stock()`/`unstock()` wrappers always passed `home` to the stand logic, so Orchard taps hit the Home-stand check and only showed "Sells at the Orchard".
+- **Bag** lists only garden features bought at the Market and not yet placed. Tools are used from the tool dock and irrigation from the barrels. A load-time migration caps stale copies left by older saves.
+- **Build menu**: one-time builds disappear for good once built (`S.buildDone`, back-filled from older saves on load). Rain barrels stay.
+- **Map** is truly full screen, edge to edge, with no panel or margins. It respects the iPhone safe areas and has a ‹ Back button. Once the Orchard is yours, the next place, the **Vegetable Farm**, shows as a fogged, locked "Coming soon" spot.
+- **Gardeners** plant empty bed tiles with the most valuable seed in that location's Bag, as well as watering, picking and replanting, at Home and at the Orchard.
+- **Orchard Oil Press**: the Orchard has its own Oil Press in its Build menu. You need the Pressed Oil Stand unlocked first. It is placed on Orchard land, built in 2 h, and can be finished now for 1 Jewel. It presses from the Orchard Bag. The Home press stays at Home.
+- **Orchard fence** outlines only the land you own, with a gate at the lane. It grows automatically when you buy an Orchard plot; unbought plots stay outside.
 
 ## New in v0.66 — optional boosts, a Starter Pack (placeholder), More from Schwarze Spiele, and a studio splash
 
