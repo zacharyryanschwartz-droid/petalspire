@@ -1124,9 +1124,10 @@ export function createWorld(canvas) {
       b.glow.visible = !!s.done;
     });
   }
+  const appearing = new Set();   // v0.64.1: every object mid pop-in (was a fixed list that left out the Orchard Stand, so it stayed at 1% scale)
   function appear(obj, animate) {
     obj.visible = true;
-    if (animate) { obj.userData.appear = performance.now(); obj.userData.baseScale = obj.userData.baseScale || obj.scale.x; obj.scale.setScalar(0.01); poof(obj.position.clone().setY(0.8), '#E9D9B8', 22, 2.0); poof(obj.position.clone().setY(1.2), '#F7C5C5', 12, 1.5); }
+    if (animate) { appearing.add(obj); obj.userData.appear = performance.now(); obj.userData.baseScale = obj.userData.baseScale || obj.scale.x; obj.scale.setScalar(0.01); poof(obj.position.clone().setY(0.8), '#E9D9B8', 22, 2.0); poof(obj.position.clone().setY(1.2), '#F7C5C5', 12, 1.5); }
   }
 
   // ---------- v0.3: build animation (scaffold rises, sawdust, structure pops in) ----------
@@ -1560,7 +1561,7 @@ export function createWorld(canvas) {
       if (tl.icon.visible) tl.icon.position.y = 1.35 + (tl.key.endsWith(':3') ? 0.2 : -0.5) + Math.sin(t * 2.5 + p.userData.phase) * 0.06;
     }
     for (const b of beds) if (b.group.userData.born) { const k = Math.min(1, (now - b.group.userData.born) / 700); b.group.scale.set(1, Math.max(0.01, elastic(k)), 1); if (k >= 1) b.group.userData.born = 0; }
-    for (const o of [stand, rack, market, tincture, still, teastand, press, fruitstand, parking, billboard, windmill, ...barrels.values(), ...hives.values()]) if (o.userData.appear && !builds.some((b) => b.obj === o && !b.shown)) { const k = Math.min(1, (now - o.userData.appear) / 750); o.scale.setScalar(Math.max(0.01, elastic(k)) * o.userData.baseScale); if (k >= 1) o.userData.appear = 0; }
+    for (const o of appearing) { if (!o.userData.appear) { appearing.delete(o); continue; } if (builds.some((b) => b.obj === o && !b.shown)) continue; const k = Math.min(1, (now - o.userData.appear) / 750); o.scale.setScalar(Math.max(0.01, elastic(k)) * o.userData.baseScale); if (k >= 1) { o.userData.appear = 0; appearing.delete(o); } }
     for (const o of obs.values()) if (o.stump?.userData.born) { const k = Math.min(1, (now - o.stump.userData.born) / 400); o.stump.scale.setScalar(Math.max(0.01, elastic(k)) * o.def.s * 0.95); if (k >= 1) o.stump.userData.born = 0; }
     sel.material.opacity = 0.65 + 0.3 * Math.sin(t * 4);
     const pulse = 0.5 + 0.5 * Math.sin(t * 4); ghostOk.opacity = 0.22 + 0.2 * pulse; barOk.opacity = 0.7 + 0.3 * pulse;
