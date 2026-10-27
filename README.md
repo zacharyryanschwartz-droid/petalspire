@@ -27,6 +27,9 @@ Drag with one finger to pan, pinch to zoom, and twist with two fingers to turn. 
 - **Irrigation is a plain price to buy** (45 coins): one raised bed per purchase. You buy it, then tap the bed to place it; each purchase is also a card copy, so it levels the card up. The "Hook up" buttons and the "free with your card" row are gone (Market, Bag row, rain-barrel panel).
 - **Irrigation can only be bought when something needs it.** At Home it is disabled with "No beds need irrigation" when every bed is irrigated (or there are no beds). At the Orchard, tree-row Irrigation is disabled with "No tree rows need irrigation" in both the Market and the Build menu.
 - Saves from v0.7 load unchanged: irrigated beds, Irrigation copies, Parking level and built lots are kept.
+- **Camera: pan past your land.** You can now drag about half a screen beyond the outermost plot (and past the road). Movement gets softer near the edge and stops at a gentle limit.
+- **Camera: buying never moves or zooms the view.** Market items, Build cards, card copies and plots leave the camera where it is. It moves only when something you are placing has no free spot on screen; it glides there, keeps your zoom, and doesn't snap back.
+- **Pack art fills its frame.** The Starter Pack and Collector's Bundle bouquets are re-cropped so the bouquet sits in the centre with even margins. They now fill the offer popup and the Jewel Shop cards edge to edge (`object-fit: cover`) on phones and desktops.
 
 ## New in v0.7: music, sound effects, sound settings, and 1-hour Gardeners
 

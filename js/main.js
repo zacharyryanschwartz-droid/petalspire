@@ -1286,7 +1286,10 @@ function openStarterPack() {
 // ---------------- Structures you build ----------------
 const useOpt = { stand: true, market: true, tincture: true };
 const marketCoins = () => BUILDS.market.coins - (useOpt.market && S.scrap >= BUILDS.market.opt.scrap ? BUILDS.market.opt.save : 0);
-function glideTo(k) { W.ctl.moved = true; glideW({ target: V3(SPOTS[k][0] > 150 ? SPOTS[k][0] : SPOTS[k][0] * 0.85, 0.3, SPOTS[k][1] - 0.8), zoom: Math.min(W.ctl.zoom, 1.0) }, 0.8); }
+// v0.7.1: purchases and builds no longer move the camera. It only glides (zoom unchanged) when the thing just placed is off-screen.
+function offScreen(v, pad = 40) { const p = W.project(v); return p.behind || p.x < pad || p.x > innerWidth - pad || p.y < 90 || p.y > innerHeight - 160; }
+function glideIfOff(v, dur = 0.8) { const loc = v.x > 150 ? 'orchard' : 'home'; if (loc !== curLoc() || !offScreen(v)) return false; W.ctl.moved = true; W.glide({ target: V3(v.x, 0.3, v.z) }, dur); return true; }
+function glideTo(k) { glideIfOff(V3(SPOTS[k][0], 0.3, SPOTS[k][1])); }
 // ---------------- v0.63: stand construction ----------------
 // S.cons[kind] = { start, ms } while a stand is being built. Wall-clock time (saved), so it keeps going while the game is closed.
 // Automated test browsers build instantly unless a test opts in (localStorage 'petalspire.consTest'), so older tests still run.
@@ -1839,7 +1842,7 @@ function startStandPlace(what, title, c) {
   placing = { what, spots }; W.setSpotGhosts(spots);
   $('#buildbar-text').innerHTML = ok.length ? `<b>${title}</b> · tap a <b>green spot</b> on ${what === 'fruitstand' ? 'an Orchard plot' : what === 'press' ? 'any Home plot you own' : what === 'opress' ? 'the Orchard or an Orchard plot you own' : ANY_PLOT.has(what) ? 'any Home plot you own' : lots.map(lotName).join(' or ')}${buyIntent ? '' : ' · ' + woodTag(c)}` : `<b>${title}</b> · no clear spot yet — clear trees on ${lots.map(lotName).join(' or ')} first`;
   fillIcons($('#buildbar')); $('#buildbar').classList.remove('hidden');
-  const L = LOTS[(ANY_PLOT.has(what) ? ((ok.find((p) => lotLoc(p.lot) === curLoc()) || ok[0])?.lot || lots[0] || 'home') : (lots.includes(curLoc()) ? curLoc() : lots[0]))]; W.ctl.moved = true; glideW({ target: V3((L.x0 + L.x1) / 2, 0.3, (L.z0 + L.z1) / 2), zoom: Math.max(W.ctl.zoom, 1.0) }, 0.8);
+  const L = LOTS[(ANY_PLOT.has(what) ? ((ok.find((p) => lotLoc(p.lot) === curLoc()) || ok[0])?.lot || lots[0] || 'home') : (lots.includes(curLoc()) ? curLoc() : lots[0]))]; if (!ok.some((p) => lotLoc(p.lot) === curLoc() && !offScreen(V3(p.x, 0.3, p.z)))) { if (lotLoc(Object.keys(LOTS).find((id) => LOTS[id] === L)) !== curLoc()) { W.ctl.moved = true; glideW({ target: V3((L.x0 + L.x1) / 2, 0.3, (L.z0 + L.z1) / 2) }, 0.8); } else glideIfOff(V3((L.x0 + L.x1) / 2, 0.3, (L.z0 + L.z1) / 2)); }   // v0.7.1: only when no free spot is on screen; zoom unchanged
   return true;
 }
 function placeTincture(x, z) {
@@ -1995,7 +1998,7 @@ function startTreePlace(sp) {
   placing = { what: 'orchardtree', sp, spots }; W.setSpotGhosts(spots);
   $('#buildbar-text').innerHTML = ok.length ? `<b>${TREES[sp].name} sapling</b> · tap a <b>green spot</b> in the Orchard` : `<b>${TREES[sp].name} sapling</b> · no free spot — clear the old trees in the Orchard`;
   fillIcons($('#buildbar')); $('#buildbar').classList.remove('hidden');
-  W.ctl.moved = true; glideW({ target: V3(ORCH_X, 0.3, -4.2), zoom: Math.max(W.ctl.zoom, 1.0) }, 0.8);
+  if (curLoc() !== 'orchard') { W.ctl.moved = true; glideW({ target: V3(ORCH_X, 0.3, -4.2) }, 0.8); } else if (!ok.some((q) => !offScreen(V3(q.x, 0.3, q.z)))) glideIfOff(V3(ORCH_X, 0.3, -4.2));   // v0.7.1
   return true;
 }
 function plantOrchard(k, sp, at = now()) {
@@ -2748,7 +2751,7 @@ function offerRows(o) {
 }
 // v0.67.1 → v0.68: each pack is a hero bouquet made of the items themselves (plant cards fanned like petals, the Plow
 // and Sickle tucked in, Jewels, coins and Wood spilling at the base); the Collector's is bigger, with a glowing Other World bloom.
-const OFFER_ART = { starter_pack: 'assets/offer-starter.jpg', collector_bundle: 'assets/offer-collector.jpg' };
+const OFFER_ART = { starter_pack: 'assets/offer-starter.jpg?v=0.7.1', collector_bundle: 'assets/offer-collector.jpg?v=0.7.1' };   // v0.7.1: re-cropped art (cache-busted)
 function offerChips(o) {
   const c = [], nT = TIER_ORDER.length;
   if (o.plantsPerTier) c.push(['<i data-icon="sprout"></i>', `${o.plantsPerTier * nT}`, 'plants · 1 per tier', 'plants']);
@@ -3037,7 +3040,7 @@ function buildOStand() {
   if (!S.lots.orchard || S.oshedBuilt || building.oshed) return false;
   if (!canPay(ORCH_STAND)) { toast(`The Orchard Stand needs ${missingText(ORCH_STAND)}`); return false; }
   S.coins -= ORCH_STAND.coins; S.wood -= ORCH_STAND.wood; S.oshedBuilt = true; building.oshed = true; startCons('oshed'); save(); closePanel(); syncOShed(); hud();
-  glideW({ target: V3(SPOTS.orchardshed[0] - 0.6, 0.3, SPOTS.orchardshed[1] - 0.6), zoom: Math.min(W.ctl.zoom, 1.0) }, 0.8);
+  glideIfOff(V3(SPOTS.orchardshed[0], 0.3, SPOTS.orchardshed[1]));
   setTimeout(() => W.buildAnim(W.orchardShed, [2.4, 2.6, 1.9], () => {
     building.oshed = false; popAt(V3(SPOTS.orchardshed[0], 2.4, SPOTS.orchardshed[1]), consMsg('oshed', 'Orchard Stand built!')); syncOShed(); syncBarrels?.(); hud(); checkGoals();
     toast('Stock fruit and jars on it — visitors on the Orchard road will stop to buy'); }), 500);
@@ -3250,7 +3253,6 @@ function fillBarrels() {
   const pl = (n) => `${n} barrel${n === 1 ? '' : 's'}`;
   toast(`🚚 Water truck on its way to fill ${pl(lots.length)}`);
   if (truck && truck.state !== 'out') truck.leave();
-  W.ctl.moved = true; glideW({ target: V3(-5.5, 0.3, 3.6), zoom: Math.max(W.ctl.zoom, 1.05) }, 1.0);
   const c = truck = W.spawnTruck({ stopX: -10.6, onPark: (car) => {
     W.poof(car.group.position.clone().setY(1.3), '#8EC5E0', 22, 2.2);
     lots.forEach((l, k) => setTimeout(() => { const b = S.barrels[l]; if (!b) return; W.poof(V3(b.x, 1.0, b.z), '#8EC5E0', 18, 2); popAt(V3(b.x, 1.6, b.z), `<i data-icon="water"></i>Filled ${regenMax(b)}/${regenMax(b)}`); }, 300 + k * 320));
@@ -3680,7 +3682,7 @@ function buyOrchLot(id) {
   if (!canPay(p)) { toast(`You need ${missingText(p)}`); return false; }
   S.coins -= p.coins; S.wood -= p.wood; S.lots[id] = true; save(); closePanel(); W.setLotOwned(id, true); syncTreeRows();
   const [cx, cz] = lotCenter(id); W.poof(new THREE.Vector3(cx, 0.6, cz), '#F5D07A', 26, 3);
-  W.ctl.moved = true; glideW({ target: new THREE.Vector3(cx, 0.3, cz + 1.2), zoom: 1.1 }, 1.4);
+  /* v0.7.1: buying a plot no longer moves the camera */
   toast(`${LOTS[id].name} is yours! · ${ORCHARD_TREE_SPOTS.filter((q) => q.lot === id).length} more tree spots`); hud(); checkGoals(); return true;
 }
 function buyLot(id) {
@@ -3690,7 +3692,7 @@ function buyLot(id) {
   S.coins -= price; S.lots[id] = true; S.lotsBought++; save();
   closePanel(); W.setLotOwned(id, true); syncTreeRows();
   const [cx, cz] = lotCenter(id); W.poof(new THREE.Vector3(cx, 0.6, cz), '#F5D07A', 26, 3);
-  W.ctl.moved = true; glideW({ target: new THREE.Vector3(cx * 0.6, 0.3, cz * 0.6 + 0.6), zoom: 1.15 }, 1.4);
+  /* v0.7.1: buying a plot no longer moves the camera */
   toast(`${LOTS[id].name} is yours!`); tip('plotbought'); hud(); checkGoals(); unlockMapIfReady(); return true;
 }
 
@@ -4503,6 +4505,18 @@ const canvas = $('#scene');
 const ptrs = new Map(); let gesture = null;
 const PANS = { home: { x0: -13, x1: 13, z0: -28, z1: 5 }, orchard: { x0: ORCH_X - 9, x1: ORCH_X + 9, z0: -15, z1: 6 } };   // v0.6: per Map location
 let PAN = PANS.home;
+// v0.7.1: generous pan limits — the land of this location (every plot, owned or for sale, plus the road) and, past it, about half
+// a screen of margin so an edge item can be brought to the middle. Past the land edge the drag is damped (a soft limit), and it
+// stops at the margin so nobody gets lost in the void.
+const PAN_DAMP = 0.5;
+function panBounds() {
+  const loc = curLoc(), ls = Object.entries(LOTS).filter(([id]) => lotLoc(id) === loc).map(([, L]) => L);
+  const land = ls.length ? { x0: Math.min(...ls.map((L) => L.x0)), x1: Math.max(...ls.map((L) => L.x1)), z0: Math.min(...ls.map((L) => L.z0)), z1: Math.max(ROAD.z1, ...ls.map((L) => L.z1)) } : PAN;
+  const w = innerWidth, h = innerHeight, c = W.groundAt(w / 2, h / 2), e = W.groundAt(w, h / 2), tp = W.groundAt(w / 2, h * 0.15);
+  const mx = Math.max(6, c && e ? Math.hypot(e.x - c.x, e.z - c.z) : 6), mz = Math.max(6, c && tp ? Math.hypot(tp.x - c.x, tp.z - c.z) : 6);
+  return { land, x0: land.x0 - mx, x1: land.x1 + mx, z0: land.z0 - mz, z1: land.z1 + mz };
+}
+const panStep = (v, d, lo, hi, l0, l1) => { let n = v + d; if ((n < l0 && d < 0) || (n > l1 && d > 0)) n = v + d * PAN_DAMP; return THREE.MathUtils.clamp(n, Math.min(lo, v), Math.max(hi, v)); };
 canvas.addEventListener('contextmenu', (e) => e.preventDefault());
 canvas.addEventListener('pointerdown', (e) => {
   canvas.setPointerCapture?.(e.pointerId);
@@ -4515,7 +4529,7 @@ function pinchDist() { const [a, b] = [...ptrs.values()]; return Math.hypot(a.x 
 function pinchAng() { const [a, b] = [...ptrs.values()]; return Math.atan2(b.y - a.y, b.x - a.x); }
 function panBy(px, py, x, y) {
   const a = W.groundAt(px, py), b = W.groundAt(x, y); if (!a || !b) return;
-  const t = W.ctl.target; t.x = THREE.MathUtils.clamp(t.x - (b.x - a.x), PAN.x0, PAN.x1); t.z = THREE.MathUtils.clamp(t.z - (b.z - a.z), PAN.z0, PAN.z1);
+  const t = W.ctl.target, B = panBounds(); t.x = panStep(t.x, -(b.x - a.x), B.x0, B.x1, B.land.x0, B.land.x1); t.z = panStep(t.z, -(b.z - a.z), B.z0, B.z1, B.land.z0, B.land.z1);
   W.ctl.moved = true; W.updateCamera();
 }
 canvas.addEventListener('pointermove', (e) => {
