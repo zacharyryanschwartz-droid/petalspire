@@ -21,6 +21,57 @@ This is a **prototype**: version numbers stay below 1.0 until the first official
 
 Drag with one finger to pan, pinch to zoom, and twist with two fingers to turn. On desktop, right-drag or shift-drag turns the view.
 
+## New in v0.64 — the Sickle and Plow never rest, slower builds, and new Jewel uses
+
+v0.64 (build `0.64`, label "v0.64 prototype") is v0.63 plus this patch. Saves load with nothing lost.
+
+- **No rest:** the Harvest Sickle and Hand Plow can be used again **right away**. There's no countdown on their buttons, no greyed "resting" look and no **Skip · 1 💎** button any more.
+- **No tool levels:** levels only shortened the rest, so Sickle and Plow cards no longer level up. Bag › Cards shows them as "×N collected · Ready again right away · no rest" with **"Copies just stack · this tool doesn't level up"**, with no level bar and no Upgrade button. There's no new bonus in its place.
+- **Saves:** a Sickle or Plow level stored in an older save is left as it is (it does nothing now). The old "last used" time is ignored.
+- **Duplicates:** a duplicate Sickle or Plow copy just stacks. If a tool card was already at max level (Lv4) in an older save, a duplicate still pays the usual max-level **+8 coins**, as before.
+- Also fixed: the Windmill card row said "(base 60)". It now shows the v0.63 base refill of 30 s.
+- Screenshots: `107-tools-no-rest`, `113-sickle-plow-copies-stack`.
+
+### Slower builds (v0.64)
+Builds now take real time. Timers use the real clock, are saved, and keep running while the game is closed. **Finish now always costs exactly 1 Jewel**, however much time is left (the v0.63 per-5-minutes curve is gone). The button reads **"Finish now · 1 💎"** with "Always 1 Jewel, however long is left".
+
+| Stand | Build time | Finish now |
+|---|---|---|
+| Farm Stand | 5 s | 1 Jewel |
+| Drying Rack | 1 min | 1 Jewel |
+| Fruit Stand | 5 min | 1 Jewel |
+| Tincture Stand | 15 min | 1 Jewel |
+| Essential Oil Stand | 30 min | 1 Jewel |
+| Tea Stand | 1 h | 1 Jewel |
+| Pressed Oil Stand | 2 h | 1 Jewel |
+| Orchard Stand | 4 h | 1 Jewel |
+
+**Coin upgrades take build time too.** The coins are paid when you start; the building **keeps working at its old level** until the upgrade is done ("Still works at LvN until it's done"), and **Finish now** is 1 Jewel here as well.
+
+| Upgrade | Lv2 | Lv3 | Lv4 | Lv5 |
+|---|---|---|---|---|
+| Farm Stand | 5 min | 20 min | 1 h | — |
+| Drying Rack | 5 min | 20 min | 1 h | — |
+| Rain Barrel (each) | 5 min | 20 min | 1 h | 2 h |
+
+Screenshots: `114-stand-upgrading-finish-now`, `115-barrel-upgrading`.
+
+### Jewel uses: Instant Bloom, Customer Rush, Swap
+A small dock on the right (above the tab bar) holds the first two. Each asks first and shows its price.
+
+- **🌸 Instant Bloom** (shows only while something is growing here): every plant at your **current location** goes straight to **harvest-ready**, skipping its start water, bud water and Blue Lotus barrel water. At the Orchard it ripens every unripe tree. **Price: 1 Jewel per 6 plants, rounded up, minimum 1, maximum 5** (1–6 plants: 1 · 7–12: 2 · 13–18: 3 · 19–24: 4 · 25 or more: 5). Screenshots: `118-instant-bloom-confirm`, `119-instant-bloom-ready`.
+- **📣 Customer Rush** (shows only when this location's stand is built, finished and stocked): **1 Jewel for 2 min 30 s**. Customers arrive **5× as often** (the gap between arrivals is ×0.2, so about every 3–6 s instead of 15–30 s), and the first one turns up within about a second. Parking and the Orchard's one visitor still cap how many come at once. While it runs, the button glows and shows the time left. It survives a reload. Screenshot: `120-customer-rush`.
+- **Swap · 1 💎** on the pack reveal: after a card flips, every card **below Rare** (Basic, Epic or Legendary) shows a Swap button. Tap it, confirm, and it's replaced by a random **Rare-or-better** card of the same kind (plant for a plant, other for another card), drawn at the normal relative pack odds, with cards you already own at ×0.4 as usual. The old card is given back: its copy, any duplicate coins, a supply card's +2 units and a new Irrigation card's ownership are all reversed. The new card flips in with its own spin, sparkles and a "Swapped" tag (Super Rare and better also get the full reveal). Each card can be swapped once. The loot bonus doesn't change. With 0 Jewels the button is greyed out with "Need 1 Jewel". Screenshots: `116-pack-swap`, `117-pack-swap-no-jewels`.
+
+    | Swap result (before the ×0.4 for owned cards) | Rare | Super Rare | Ultra Rare | Other World |
+    |---|---|---|---|---|
+    | Plant card | 50% | 30% | 13.3% | 6.7% |
+    | Other card | 100% (the Sundial, the only Rare-or-better non-plant card) | — | — | — |
+
+    Per plant: Damask Rose, Tulsi, Elderflower 16.7% each (Rare) · Saffron Crocus, Blue Lotus, Jasmine 10% each (Super Rare) · Ghost Orchid, Jade Vine, Middlemist 4.4% each (Ultra Rare) · Moonflower, Crystal Rose, Sunpetal 2.2% each (Other World).
+
+- The **Premium Pack** idea was dropped in favour of Swap.
+
 ## New in v0.63 — iPhone crash fix, pack bonuses, daily gifts, Watch Ad, building upgrades, build timers, a water economy, stacking Irrigation and bigger rain barrels
 
 v0.63 (build `0.63`, label "v0.63 prototype") is v0.62 plus the changes below. Saves migrate on load with nothing lost.
@@ -59,11 +110,11 @@ One claim per local calendar day. Claiming the next day continues the streak; mi
 ### Watch Ad
 "▶ Watch" at the Farm Stand and at the top of the Market: pick **+50 coins, +20 wood or +5 Scrap Metal**, then watch the (placeholder) ad to the end to get it. No cooldown and no daily limit. Works with No More Ads too (rewarded ads are opt-in). `js/ads.js` has `registerProvider()` for a real ad network.
 
-### Sickle and Plow rest
-Rest is 30 s at Lv1, 15% shorter per card level (25.5 s at Lv2, 21 s at Lv3, 16.5 s at Lv4). While resting, a **Skip · 1 💎** button ends the rest.
+### Sickle and Plow rest (removed in v0.64)
+~~Rest is 30 s at Lv1, 15% shorter per card level (25.5 s at Lv2, 21 s at Lv3, 16.5 s at Lv4). While resting, a **Skip · 1 💎** button ends the rest.~~ v0.64: no rest, no Skip, no tool levels (see above).
 
-### Stand build times
-After you place a stand it shows a construction scaffold and a timer and only opens for business when done (no sales, stocking or worker restocking until then). Timers use the real clock, are saved, and keep running while the game is closed. Stands built before v0.63 stay built. **Finish now** costs 1 Jewel per started 5 minutes left (minimum 1). Coin upgrades stay instant.
+### Stand build times (superseded in v0.64, see "Slower builds" above)
+After you place a stand it shows a construction scaffold and a timer and only opens for business when done (no sales, stocking or worker restocking until then). Timers use the real clock, are saved, and keep running while the game is closed. Stands built before v0.63 stay built. ~~**Finish now** costs 1 Jewel per started 5 minutes left (minimum 1). Coin upgrades stay instant.~~ v0.64: Finish now is always 1 Jewel, and coin upgrades take build time.
 
 | Stand | Build time | Finish now at start |
 |---|---|---|
@@ -453,7 +504,7 @@ Garden-feature cards keep their v0.41 odds exactly (41.5% of all cards together)
 - **Beehives are placed, and boost only their own plot.** The Honeybee Skep (Epic feature card, **60 coins** at the Market) is now a placeable skep: after buying, tap cleared ground on an owned plot (not a bed). Its bees give **+1 flower per harvest** (the old effect) but only to beds on that plot. Boosted beds get a soft honey tint and a 🐝 marker, and plant info shows "🐝 Bees: +40% flowers" (Lavender/Calendula +40%, Chamomile +67% of an average harvest). **One hive per plot**, no stacking; the Market keeps selling hives while an owned plot still lacks one. Seeds are unaffected.
 - **Card stacks & upgrades.** Every copy of a card now stacks on one card with a ×n badge (Bag → Cards; pack reveals say "Stacked ×n"). At **3 / 6 / 10 copies** a plant or tool card glows and shows **Upgrade**; tap it to level up (Lv2 / Lv3 / Lv4 max). Copies are **kept as progress**, never spent.
   - Plants, per level: +10% sell price (flowers and that plant's dried goods / tinctures), −5% grow time, +1 Beauty/Yield pip on the card; Lv4 also adds +1 flower per harvest. **Seeds per harvest never change** (they follow the tier).
-  - Sickle and Plow: −15% rest per level.
+  - Sickle and Plow: −15% rest per level *(v0.64: removed; the tools have no rest and their copies just stack)*.
   - Each extra Irrigation card is one more irrigated bed. Other feature cards just stack. A copy of an already-maxed card pays the old duplicate coins.
   - Thresholds and boosts live in `CARD_LEVELS` in `js/data.js`. The level shows on the card and in plant info.
 - **One rain barrel per plot. Water only comes from rain barrels.**

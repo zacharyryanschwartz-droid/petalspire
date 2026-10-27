@@ -160,13 +160,13 @@ export const FEATURES = {
   },
   sickle: {
     id: 'sickle', name: 'Harvest Sickle', rarity: 'epic', type: 'Tool · Harvest',
-    price: 80, stats: { Growth: 1, Beauty: 2, Yield: 4, Atmosphere: 2 }, cooldownS: 30,
-    blurb: 'Harvest a whole raised bed at once. Tap the Sickle, then a raised bed: every ripe plant in that bed is harvested in one sweep (normal yields and seeds). Rests 30 s between sweeps (15% shorter per card level; skip the rest for 1 Jewel).',
+    price: 80, stats: { Growth: 1, Beauty: 2, Yield: 4, Atmosphere: 2 }, tool: true,
+    blurb: 'Harvest a whole raised bed at once. Tap the Sickle, then a raised bed: every ripe plant in that bed is harvested in one sweep (normal yields and seeds). Ready again right away: no rest between sweeps.',
   },
   plow: {
     id: 'plow', name: 'Hand Plow', rarity: 'epic', type: 'Tool · Planting',
-    price: 90, stats: { Growth: 3, Beauty: 1, Yield: 3, Atmosphere: 2 }, cooldownS: 30,
-    blurb: 'Plant a whole raised bed at once. Tap the Plow, pick a seed, then a raised bed: every empty tile in that bed is planted, as far as your seeds go. Rests 30 s between uses (15% shorter per card level; skip the rest for 1 Jewel).',
+    price: 90, stats: { Growth: 3, Beauty: 1, Yield: 3, Atmosphere: 2 }, tool: true,
+    blurb: 'Plant a whole raised bed at once. Tap the Plow, pick a seed, then a raised bed: every empty tile in that bed is planted, as far as your seeds go. Ready again right away: no rest between uses.',
   },
   parking: {
     id: 'parking', name: 'Parking Lot', rarity: 'legendary', type: 'Feature · Traffic',
@@ -287,13 +287,12 @@ export const TINC_DUP_COINS = 10;
 // Copies are kept as progress (never consumed): at 3 / 6 / 10 copies the card can be upgraded to Lv2 / Lv3 / Lv4 with a tap.
 // Plant levels: +10% sell price and -5% grow time per level above 1, +1 Beauty/Yield pip per level, and +1 flower per harvest at Lv4.
 // Seeds per harvest always follow the plant's tier rule (PLANT_TIERS) — levels never change them.
-// Tool levels (Sickle, Plow): -15% rest time per level. Irrigation (v0.63): owning one card hooks up any number of beds
+// v0.64: Sickle and Plow have no rest and no levels (copies just stack). Irrigation (v0.63): owning one card hooks up any number of beds
 // (barrel limit applies); its level lowers the water a hooked bed needs per stage (see WATER.stage).
 export const CARD_LEVELS = {
   thresholds: [3, 6, 10],          // copies needed for Lv2, Lv3, Lv4 (max)
   plant: { sell: 0.10, grow: 0.05, statPip: 1, bonusFlowerAt: 4 },
-  tool: { cooldown: 0.15 },
-  upgradable: (id, card) => !!card.tier || id === 'sickle' || id === 'plow' || id === 'parking' || id === 'windmill' || id === 'irrigation',
+  upgradable: (id, card) => !!card.tier || id === 'parking' || id === 'windmill' || id === 'irrigation',
   parking: { extraItem: 0.10 },   // v0.52: spots / cars per arrival / gap per level live in PARKING; each level adds +10% extra-item chance
 };
 // v0.41: Card Packs cost Jewels, not coins (1 Jewel = one standard pack). Add more pack types here (e.g. a premium pack at 3 Jewels).
@@ -327,15 +326,22 @@ export const DAILY = {
   ],
 };
 // v0.63: stands take real time to build. After paying & placing, a stand is under construction (wall-clock, saved, keeps
-// running while the game is closed) and only works when done. 'Finish now' costs 1 Jewel per started 5 minutes left (min 1).
+// running while the game is closed) and only works when done.
+// v0.64: slower builds (first builds stay quick), coin upgrades take build time too, and 'Finish now' is ALWAYS 1 Jewel.
 // Seconds per stand:
 export const CONS = {
-  s: { stand: 20, rack: 20, fruitstand: 60, tincture: 180, still: 300, teastand: 480, press: 900, oshed: 1200 },
-  jewelPerMin: 5,
+  s: { stand: 5, rack: 60, fruitstand: 300, tincture: 900, still: 1800, teastand: 3600, press: 7200, oshed: 14400 },
+  // v0.64: coin-upgrade build time, index = target level − 2 (Lv2, Lv3, Lv4[, Lv5]). The building keeps working at its old level meanwhile.
+  upg: { stand: [300, 1200, 3600], rack: [300, 1200, 3600], barrel: [300, 1200, 3600, 7200] },
+  jewels: 1,
 };
-export const consJewels = (msLeft) => Math.max(1, Math.ceil(msLeft / (CONS.jewelPerMin * 60000)));
-// v0.63: a resting tool can be woken right away for Jewels
-export const TOOL_SKIP_JEWELS = 1;
+export const consJewels = () => CONS.jewels;   // v0.64: flat 1 Jewel, however long is left
+// v0.64 Jewel uses. Instant Bloom: every growing plant (or orchard tree) at the current location → harvest-ready, skipping water
+// and bud stops. Cost = ceil(plants / perJewel), between min and max. Customer Rush: for `ms`, customers arrive `gapK` × as far
+// apart at this location's stand (parking / visitor capacity still applies).
+export const BLOOM = { perJewel: 6, min: 1, max: 5 };
+export const bloomJewels = (n) => Math.min(BLOOM.max, Math.max(BLOOM.min, Math.ceil(n / BLOOM.perJewel)));
+export const RUSH = { jewels: 1, ms: 150000, gapK: 0.2, firstMs: 1200 };
 export const BUILDING_LV = {
   stand: { cost: [250, 750, 2000], space: [0, 4, 8, 12], sell: [0, 0, 0.05, 0.10] },   // +shelf space · +% coins on Farm Stand sales
   rack:  { cost: [150, 450, 1200], slots: [3, 4, 5, 6], faster: [0, 0.10, 0.20, 0.30] }, // drying slots · % shorter drying time

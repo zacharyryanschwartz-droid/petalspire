@@ -601,8 +601,8 @@ body.ads-on{--sab:calc(env(safe-area-inset-bottom,0px) + 48px)}
 .panel{z-index:12}
 .tile-sheet{z-index:11}
 .tooldock{left:calc(var(--sal) + 10px)!important}
-body.modal-open .tooldock, body.modal-open .goal, body.modal-open .bubble{visibility:hidden;opacity:0;pointer-events:none!important}
-.tooldock, .goal{transition:opacity .15s ease}
+body.modal-open .tooldock, body.modal-open .jeweldock, body.bar-open .jeweldock, body.modal-open .goal, body.modal-open .bubble{visibility:hidden;opacity:0;pointer-events:none!important}
+.tooldock, .jeweldock, .goal{transition:opacity .15s ease}
 #tabbar{z-index:13}
 .ad-banner{z-index:13}
 .toast{z-index:70}
@@ -906,11 +906,8 @@ body.modal-open .tooldock, body.modal-open .goal, body.modal-open .bubble{visibi
 .dl-next{font-size:12.5px;margin:0 0 8px;display:flex;align-items:center;justify-content:center;gap:4px;flex-wrap:wrap}
 .dl-next span{display:inline-flex;align-items:center;gap:1px;font-weight:800}.dl-next i{width:13px;height:13px}.dl-next i svg{width:100%;height:100%}
 .dl-claim{width:100%}
-/* v0.63: Skip a resting tool for a Jewel */
+/* tool dock row (v0.64: the Skip button is gone) */
 .tool-row{display:flex;align-items:center;gap:6px}
-.tool-skip{display:flex;align-items:center;gap:3px;height:30px;padding:0 9px;border-radius:999px;border:1.5px solid #D9A93F;background:linear-gradient(180deg,#FFF3C4,#F8DC93);color:#5A4214;font:800 12px Nunito,sans-serif;box-shadow:0 3px 8px rgba(61,90,64,.18);white-space:nowrap}
-.tool-skip i{width:15px;height:15px}.tool-skip i svg{width:100%;height:100%}
-.tool-skip.hidden{display:none}
 /* v0.63: a stand under construction */
 .cons-card{display:flex;flex-direction:column;align-items:center;text-align:center;gap:6px;background:#FFF9EC;border:1.5px dashed #E6CF97;border-radius:18px;padding:16px 14px;margin:2px 2px 10px}
 .cons-card .cons-sign{font-size:38px;line-height:1}
@@ -927,3 +924,29 @@ body.modal-open .tooldock, body.modal-open .goal, body.modal-open .bubble{visibi
 .bed-water .bw-top small{color:#6C7A63;font-size:12px}
 .bed-water .bw-bar{display:block;height:8px;margin-top:6px;border-radius:6px;background:#FFFBEF;overflow:hidden;box-shadow:inset 0 1px 2px rgba(0,0,0,.08)}
 .bed-water .bw-bar em{display:block;height:100%;border-radius:6px;background:linear-gradient(90deg,#9CC9D6,#7FB3C6);transition:width .3s}
+/* v0.64: a coin upgrade under way (keeps working at its old level) */
+.upg-card.upgrading{border-style:dashed;background:#FFF9EC}
+.upg-card.upgrading .progress{height:7px;border-radius:6px;background:#EFE3C6;overflow:hidden;margin:5px 0 2px}
+.upg-card.upgrading .progress b{display:block;height:100%;background:linear-gradient(90deg,#A8C3A0,#D9B45A);border-radius:6px}
+/* v0.64: Swap · 1 Jewel on the pack reveal */
+.deal .slotw{display:flex;flex-direction:column;align-items:center}
+.swap-btn{margin-top:8px;display:inline-flex;align-items:center;gap:3px;height:30px;padding:0 11px;border-radius:999px;border:1.5px solid #D9A93F;background:linear-gradient(180deg,#FFF3C4,#F8DC93);color:#5A4214;font:800 12px Nunito,sans-serif;box-shadow:0 3px 8px rgba(90,66,20,.2);animation:fade .25s ease both;position:relative}
+.swap-btn i{width:15px;height:15px}.swap-btn i svg{width:100%;height:100%}
+.swap-btn.off{opacity:.55;filter:grayscale(.5);flex-direction:column;height:auto;padding:4px 10px;gap:0}
+.swap-btn.off small{font:700 10px Nunito,sans-serif;color:#7A6A4A}
+.swap-tag{position:absolute;left:50%;bottom:-9px;transform:translateX(-50%);z-index:3;background:#E8B4B8;color:#fff;font:800 10px Nunito,sans-serif;padding:2px 8px;border-radius:999px;box-shadow:0 2px 6px rgba(0,0,0,.18);white-space:nowrap}
+.card.flip.swap-in{animation:swapin .75s cubic-bezier(.2,1.4,.4,1) both}
+.card.flip.swap-in .flip-inner{animation:swapspin .75s ease-out both}
+@keyframes swapin{0%{transform:scale(.4) translateY(-40px);opacity:0;filter:brightness(2.2)}60%{opacity:1;filter:brightness(1.4)}100%{transform:none;filter:none}}
+@keyframes swapspin{0%{transform:rotateY(540deg)}100%{transform:rotateY(180deg)}}
+/* v0.64: Jewel dock (Instant Bloom, Customer Rush) — right side, mirrors the tool dock */
+.jeweldock{position:absolute;right:10px;bottom:calc(86px + env(safe-area-inset-bottom));display:flex;flex-direction:column;gap:8px;z-index:6}
+.jeweldock.hidden,.jd.hidden{display:none}
+.jd{position:relative;width:58px;height:62px;border-radius:16px;border:2px solid #E8B4B8;background:rgba(255,251,242,.95);box-shadow:0 4px 12px rgba(61,90,64,.18);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:2px;color:#3D5A40;font-family:Nunito,sans-serif}
+.jd .jd-ico{font-size:24px;line-height:1.1}
+.jd b{font-size:10px;line-height:1;margin-top:2px}
+.jd em{position:absolute;top:-7px;right:-7px;display:flex;align-items:center;gap:1px;font-style:normal;font-size:10px;font-weight:800;background:linear-gradient(180deg,#FFF3C4,#F8DC93);color:#5A4214;border:1px solid #D9A93F;border-radius:9px;padding:1px 5px}
+.jd em i{width:11px;height:11px;display:inline-block}.jd em i svg{width:100%;height:100%}
+.jd.active{border-color:#D9B45A;background:linear-gradient(180deg,#FFF9EC,#FBEBC0);animation:rushpulse 1.4s ease-in-out infinite}
+.jd.active em{background:#3D5A40;color:#fff;border-color:#3D5A40}
+@keyframes rushpulse{0%,100%{box-shadow:0 4px 12px rgba(61,90,64,.18)}50%{box-shadow:0 0 0 5px rgba(217,180,90,.35),0 4px 12px rgba(61,90,64,.18)}}
