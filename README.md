@@ -1,4 +1,4 @@
-# Petalspire v0.67
+# Petalspire v0.67.1
 
 A cozy 3D flower-garden prototype for iPhone Safari (portrait, one thumb). Also plays on desktop with a mouse.
 This is a **prototype**: version numbers stay below 1.0 until the first official release.
@@ -20,6 +20,37 @@ This is a **prototype**: version numbers stay below 1.0 until the first official
 7. **Land for sale.** Five wooded plots, each with a floating For Sale sign: 150 → 300 → 600 → 1000 → 1500 coins.
 
 Drag with one finger to pan, pinch to zoom, and twist with two fingers to turn. On desktop, right-drag or shift-drag turns the view.
+
+## New in v0.67.1: trees need water, tree-row Irrigation, no delivery van yet, Market fix, bouquet packs
+
+- **Trees need water to fruit again.** After a pick the tree is dry and shows the usual needs-water drop. Its next fruit only starts growing once it is watered: tap the tree, or use **Water the tree** in its sheet. Watering takes 1 water from a rain barrel: the tree's plot barrel first, then any Orchard barrel (by hand, any barrel). The fruit is ready one cycle after watering. **Gardeners** water the picked trees on their plot too, including the ones they pick.
+- **Tree-row Irrigation** is sold in the Orchard Build menu and the Orchard Market for 150 coins. Each purchase covers **exactly one row** of tree spots: the next row in order (Orchard rows 1–3, then 2 rows on each Orchard plot you own). That row's trees are watered automatically right after every pick. You can buy it again until every row you own is covered. Each row shows its status: a drip line and drip badge when irrigated, a pale dashed badge when not. The Build card, the tree sheet and the Market show it too.
+- **No delivery van until the production location opens.** The van only comes with the production spot on the Map, a later location that isn't built yet. Until then, Market orders, goods sent between Home and the Orchard, and placed buys arrive instantly, as before v0.65. The van code stays behind one switch (`VAN_LOT = 'production'`; on when `S.lots.production`).
+- **Saves:** no row starts irrigated, and trees that were mid-cycle keep their timer. Van trips still pending in older saves are delivered at once on load.
+- **Market fix: nothing repeatable disappears any more.** Only true one-time items leave the Market once bought:
+  - single builds: Tincture Stand, Essential Oil Stand, Tea Stand, Windmill, Billboard, and the craft stands;
+  - unique features: Sundial, Sickle, Plow and the garden charms.
+
+  Everything else always stays buyable:
+  - **consumables**: Wood, Scrap Metal, every seed, saplings, Vinegar and Glycerin (singles and packs of 5), and the water truck;
+  - **repeatables and stackables**: Irrigation, Parking copies, and the Honeybee Skep (one per plot).
+
+  The items that had gone missing in v0.67:
+  - **Irrigation:** hidden at Home once you owned it, including its "hook up another bed" button, and never listed in the Orchard. It now has a Home row where each buy adds a card copy that levels it up, with *Hook up another bed* alongside, plus **Irrigation · tree rows** in the Orchard.
+  - **Vinegar and Glycerin, and their ×5 packs:** never sold in the Orchard Market, and locked at Home until you had found the card *and* built the Tincture Stand. They are now always buyable at both Markets. Bought in the Orchard, they go to the Home Bag, where the Tincture Stand is.
+  - **Every flower seed:** missing from the Orchard Market unless the Orchard had beds. Seeds are now sold there too, and go to the Home Bag when the Orchard has no beds.
+  - **Parking Lot copies:** gone once owned, though Parking stacks up to 6 spots. There is now a copy row that levels the card up.
+  - **The Honeybee Skep row:** vanished once every plot had one. It now stays as a status row.
+
+  Nothing was taken from saves: the items were hidden by the Market listing, not removed from your state. Old saves see them again on load.
+- **The Stand button opens the stand where you are.** In the Orchard, the bottom-menu Stand button opens the Orchard Stand (or its build card); at Home it opens the Farm Stand. The badge counts the goods on that stand.
+- **Map teaser is generic now.** The single fogged *Coming soon* spot (shown once the Orchard is yours) is an unnamed signpost, **Somewhere new**. The named future places were removed from the Map; for now the game is Home and the Orchard.
+- **Packs are bouquets now.** The Starter Pack and the Collector's Bundle, in both the popup and the Jewel Shop, lead with a painted, gift-wrapped bouquet of what's inside:
+  - a flower per tier fanned out;
+  - the Plow and Sickle tucked in;
+  - Jewels, coins and Wood spilling at the base.
+
+  The Collector's Bundle is bigger and fuller, with a glowing Other World bloom at the centre and a *Double Daily* ribbon. Under the art, icon chips show the counts. The art has a gentle pop-in and a slow shimmer, and the wording stays calm. Reduced-motion settings turn the animation off.
 
 ## New in v0.67 — real-money packs, and the v0.66.1 fixes
 

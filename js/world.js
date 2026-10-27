@@ -1016,7 +1016,29 @@ export function createWorld(canvas) {
     const t = makeFruitTree(def); t.position.set(spot.x, 0, spot.z); t.rotation.y = (k * 1.7) % (Math.PI * 2);
     Object.assign(t.userData, { kind: 'orchardtree', k, sp }); orchardG.add(t); orchardTrees.set(k, t); return t;
   }
-  function setOrchardTree(k, stage, ripe) { const t = orchardTrees.get(k); if (!t) return; const s = STAGE_SCALE[Math.max(0, Math.min(3, stage))]; t.userData.grow.scale.setScalar(s); t.userData.fruits.visible = stage >= 3 && !!ripe; t.userData.stage = stage; t.userData.ripe = !!ripe; }
+  function setOrchardTree(k, stage, ripe, dry = false) { const t = orchardTrees.get(k); if (!t) return; const s = STAGE_SCALE[Math.max(0, Math.min(3, stage))]; t.userData.grow.scale.setScalar(s); t.userData.fruits.visible = stage >= 3 && !!ripe; t.userData.stage = stage; t.userData.ripe = !!ripe;
+    // v0.67.1: a picked tree waits for water — the usual needs-water icon floats over it
+    let ic = t.userData.waterIcon; if (dry && !ic) { ic = new THREE.Sprite(new THREE.SpriteMaterial({ map: ICON_TEX.water, transparent: true, depthWrite: false, depthTest: false })); ic.renderOrder = 12; ic.scale.setScalar(0.85); t.add(ic); t.userData.waterIcon = ic; }
+    if (ic) { ic.visible = !!dry; ic.position.set(0, 0.9 + 3.1 * s, 0); } }
+  frameHooks.push((dt, tt) => { for (const t of orchardTrees.values()) { const ic = t.userData.waterIcon; if (ic?.visible) ic.scale.setScalar(0.85 + 0.05 * Math.sin(tt * 3 + t.userData.k)); } });
+  // v0.67.1: tree-row irrigation. Each owned row shows a badge at its west end: the drip badge + a drip line when irrigated,
+  // a pale "not irrigated" badge otherwise.
+  const DRY_TEX = (() => { const c = document.createElement('canvas'); c.width = c.height = 128; const g = c.getContext('2d');
+    g.globalAlpha = 0.9; g.fillStyle = '#FFF9F0'; g.beginPath(); g.arc(64, 62, 48, 0, 7); g.fill(); g.lineWidth = 6; g.setLineDash([10, 8]); g.strokeStyle = '#B9AE9C'; g.stroke(); g.setLineDash([]);
+    g.strokeStyle = '#B9AE9C'; g.lineWidth = 6; g.lineCap = 'round'; g.beginPath(); g.moveTo(30, 48); g.bezierCurveTo(48, 36, 70, 60, 98, 46); g.stroke();
+    g.lineWidth = 4; g.beginPath(); const x = 64, y = 70; g.moveTo(x, y - 14); g.bezierCurveTo(x + 10, y, x + 8, y + 10, x, y + 10); g.bezierCurveTo(x - 8, y + 10, x - 10, y, x, y - 14); g.stroke();
+    const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t; })();
+  const treeRowG = new THREE.Group(); scene.add(treeRowG); const treeRows = new Map();
+  function setTreeRows(rows) {   // rows: [{ id, x0, x1, z, on }]
+    for (const g of treeRows.values()) treeRowG.remove(g); treeRows.clear();
+    for (const r of rows) { const g = new THREE.Group(); g.userData = { treeRow: r.id, on: !!r.on };
+      const b = new THREE.Sprite(new THREE.SpriteMaterial({ map: r.on ? IRRIG_TEX : DRY_TEX, transparent: true, depthWrite: false, depthTest: false })); b.scale.setScalar(0.62); b.renderOrder = 11; b.position.set(r.x0 - 1.5, 0.75, r.z); g.add(b); g.userData.badge = b;
+      if (r.on) { const len = r.x1 - r.x0 + 2.2, line = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, len, 6), hoseM); line.rotation.z = Math.PI / 2; line.position.set((r.x0 + r.x1) / 2 - 0.1, 0.05, r.z + 0.75); g.add(line);
+        for (let x = r.x0; x <= r.x1 + 0.01; x += (r.x1 - r.x0) / Math.max(1, r.n - 1) || 1) { const e = new THREE.Mesh(new THREE.SphereGeometry(0.05, 6, 5), mat('#8EC0D0', { emissive: '#8EC0D0', emissiveIntensity: 0.25 })); e.position.set(x, 0.06, r.z + 0.75); g.add(e); } }
+      treeRowG.add(g); treeRows.set(r.id, g); }
+  }
+  function treeRowPulse(id) { const g = treeRows.get(id); if (g) g.userData.pulse = performance.now(); }
+  frameHooks.push((dt, t) => { for (const g of treeRows.values()) { const b = g.userData.badge, k = g.userData.pulse ? Math.max(0, 1 - (performance.now() - g.userData.pulse) / 700) : 0; b.scale.setScalar(0.62 + 0.2 * k + (g.userData.on ? 0.02 * Math.sin(t * 3) : 0)); } });
   function removeOrchardTree(k) { const t = orchardTrees.get(k); if (t) { orchardG.remove(t); orchardTrees.delete(k); } }
   frameHooks.push(() => { const tt = performance.now() / 1000; for (const t of orchardTrees.values()) if (t.userData.ripe) t.userData.grow.rotation.z = Math.sin(tt * 0.8 + t.userData.k) * 0.012; });
 
@@ -1764,7 +1786,7 @@ export function createWorld(canvas) {
 
   return {
     setPaused, PR_CAP, IOS,
-    renderer, scene, camera, ctl, DEF, tiles, beds, obs, stand, rack, market, barrel, still, setStill, teastand, setTea, press, opress, orchFenceInfo: () => ({ posts: orchFenceG?.children[0]?.count || 0, owned: [...orchOwned] }), fruitstand, setCraft, addOrchardTree, setOrchardTree, removeOrchardTree, orchardTrees, makeFruitTree, parking, setParking, windmill, billboard, setBillboard, spotGhosts, setSpotGhosts, bedTargets, setBedTargets, barrels, addBarrel, removeBarrel, gutters, setGutter, setBarrelInfo, setBarrelLv, hives, addHive, removeHive, setBeeBeds, tincture, setTincture, cars, frameHooks,
+    renderer, scene, camera, ctl, DEF, tiles, beds, obs, stand, rack, market, barrel, still, setStill, teastand, setTea, press, opress, orchFenceInfo: () => ({ posts: orchFenceG?.children[0]?.count || 0, owned: [...orchOwned] }), fruitstand, setCraft, addOrchardTree, setOrchardTree, removeOrchardTree, orchardTrees, setTreeRows, treeRows, treeRowPulse, makeFruitTree, parking, setParking, windmill, billboard, setBillboard, spotGhosts, setSpotGhosts, bedTargets, setBedTargets, barrels, addBarrel, removeBarrel, gutters, setGutter, setBarrelInfo, setBarrelLv, hives, addHive, removeHive, setBeeBeds, tincture, setTincture, cars, frameHooks,
     updateCamera, resize, glide, intro, pick, project, tileWorld, sickleSweep, plowFurrows, fxCount: () => fxs.length,
     setObstacle, chop, clearObstacle, addBed, setGhosts, setLotOwned, setLocation, orchardScene, orchardShed, setOStandStock, setStandShelf, standShelf, setStandStock, setMarketOpen, setRack, appear, spawnCar, spawnTruck, poof,
     tilePlant: (i) => tiles[i]?.plant || null, addWorker, removeWorker, setWorker, workerAt, workerGo, workerIdle, workerPose, placeWorker, setPlant, attachPlant, setIcon, setShade, bgTrees, setIrrigation, irrigPulse, irrig, select, splash, render, textSprite, relabel, groundAt,

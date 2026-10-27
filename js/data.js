@@ -560,6 +560,8 @@ export const ORCH_STAND = { coins: 300, wood: 30, cap: 18 };   // v0.65: cap 12 
 // v0.61: every crafting stand can also be unlocked with coins (no real money needed). In the order players reach them;
 // only the next one on the ladder is offered. A Card Pack find (or the Tincture goal reward) is still the faster, luckier route.
 export const STAND_UNLOCK = [{ id: 'tincture', coins: 1000 }, { id: 'still', coins: 2500 }, { id: 'teastand', coins: 5000 }, { id: 'press', coins: 8000 }];
+// v0.67.1: Orchard tree-row Irrigation — each purchase drips one more row of tree spots (next row in order), up to every row you own.
+export const TREE_IRRIG = { coins: 150 };
 export const WORKER = { hire: 2000, wage: 500, shiftH: 6, stepS: 5, catchStepS: 120 };
 const kindRank = (id) => ['oil_', 'press_', 'jar_', 'tea_', 'tinc_', 'hydro_', 'dried_', 'fruit_', 'flower_', 'bag', 'seed_'].findIndex((p) => id.startsWith(p));
 export const SELL_ORDER = Object.keys(ITEMS).sort((a, b) => kindRank(a) - kindRank(b) || ITEMS[b].sell - ITEMS[a].sell || (a.startsWith('tinc_g') ? -1 : 1));
@@ -829,9 +831,9 @@ export const BOOSTS = {
 // give more value per dollar. The Jewel Shop lists them highest value first. once: true = can be bought only once.
 // The Starter Pack pops up once, right after the beginning goals are done (the closing card), and stays in the Jewel Shop after.
 export const OFFER_PACKS = [
-  { id: 'starter_pack', productId: 'com.petalspire.starter2', name: 'Starter Pack', blurb: 'One plant of every tier, both tools and a head start · one time only', price: '$4.99', usd: 4.99, once: true, starter: true,
+  { id: 'starter_pack', productId: 'com.petalspire.starter2', name: 'Starter Pack', blurb: 'A bouquet of one plant from every tier, both tools and a gentle head start', price: '$4.99', usd: 4.99, once: true, starter: true,
     jewels: 20, coins: 1000, wood: 100, tools: ['plow', 'sickle'], plantsPerTier: 1, seedsPerPlant: 3 },
-  { id: 'collector_bundle', productId: 'com.petalspire.collector', name: 'Collector’s Bundle', blurb: 'Everything in the Starter Pack, plus an extra Other World plant, more Jewels, coins and Wood — and Double Daily Rewards for good', price: '$19.99', usd: 19.99,
+  { id: 'collector_bundle', productId: 'com.petalspire.collector', name: 'Collector’s Bundle', blurb: 'A grand bouquet: everything in the Starter Pack, a glowing Other World bloom, more Jewels, coins and Wood, and Double Daily Rewards for good', price: '$19.99', usd: 19.99,
     plantsPerTier: 1, plantTier: 'otherworld', seedsPerPlant: 3, jewels: 120, coins: 6000, wood: 400, tools: ['plow', 'sickle'], dailyX2: true },
 ];
 // A tool the player already owns is swapped for TOOL_SUB_JEWELS Jewels (a fair substitute).
