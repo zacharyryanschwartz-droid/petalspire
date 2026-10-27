@@ -21,6 +21,13 @@ This is a **prototype**: version numbers stay below 1.0 until the first official
 
 Drag with one finger to pan, pinch to zoom, and twist with two fingers to turn. On desktop, right-drag or shift-drag turns the view.
 
+## New in v0.68.1: quick fixes (Home + Orchard, no new features)
+- **No flower seeds at the Orchard.** The Orchard Market sells tree saplings, Tree-row Irrigation, supplies and Orchard builds only; flower seeds are sold at the Home Market.
+- **Parking Lot + Billboard at the Orchard.** Both can be bought & built at the Orchard (Market or Build menu): the Orchard Parking Lot paints bays beside the Orchard Stand (visitors arrive in groups, like at Home); the Orchard Billboard stands across the Orchard road. One ad campaign lights every Billboard you've built and boosts traffic wherever one stands.
+- **Parking Lots level up.** The Parking Lot used to leave the Build menu once built and its copies were sold only in the Home Market, so there was no obvious way to buy more. Parking Lot cards now stay buyable in the Market at both places and on the Parking Lot's Build card; each copy counts toward the next level, which applies at once (the level is shared by the Home and Orchard lots).
+- **Market sections.** The Supply Market is grouped under headers: Seeds (Home) / Tree saplings (Orchard), Supplies, Water & irrigation, Buildings & features, Garden charms & tools — each still sorted from the highest price down.
+- **Pack art centred.** The Starter Pack and Collector's Bundle bouquets are shown whole and centred in the offer popup and the Jewel Shop cards.
+
 ## New in v0.68: polish pass (no new features)
 
 A full play-through of Home and the Orchard on a fresh save and on older saves, at iPhone size (390×844, touch). Fixes only:

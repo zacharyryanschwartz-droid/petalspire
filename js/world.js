@@ -1058,6 +1058,10 @@ export function createWorld(canvas) {
     const hit = new THREE.Mesh(new THREE.BoxGeometry(0.9, 1.9, 0.6), new THREE.MeshBasicMaterial({ visible: false })); hit.position.set(2.15 - PARK_X[1], 0.95, 4.8 - ROAD.near); parking.add(hit); }
   parking.userData.kind = 'parking';
   function setParking(cap) { parking.visible = cap > 1; parkBays.forEach((b, k) => (b.visible = k < cap)); parking.userData.spots = cap; }
+  // v0.68.1: the Orchard's own Parking Lot — the same painted bays + P sign along the Orchard road, beside the Orchard Stand
+  const oparking = (() => { const ud = parking.userData; parking.userData = {}; const o = parking.clone(); parking.userData = ud; return o; })(); oparking.position.x = PARK_X[1] + (SPOTS.orchardshed[0] - PARK_X[0]); oparking.visible = false; oparking.userData = { kind: 'parking', loc: 'orchard' }; scene.add(oparking);
+  const oparkBays = oparking.children.slice(0, PARK_X.length);
+  function setOParking(cap, built = cap > 1) { oparking.visible = built; oparkBays.forEach((b, k) => (b.visible = k < cap)); oparking.userData.spots = cap; }
 
   // ---------- v0.41: Windmill (placed once anywhere on owned ground; sails turn gently) ----------
   const windmill = new THREE.Group(); windmill.position.set(SPOTS.windmill[0], 0, SPOTS.windmill[1]); windmill.rotation.y = 0.35; windmill.visible = false; scene.add(windmill);
@@ -1121,7 +1125,9 @@ export function createWorld(canvas) {
   if (document.fonts?.ready) document.fonts.ready.then(() => bbRedraw(true));
   document.fonts?.addEventListener?.('loadingdone', () => bbRedraw(true));
   bbRedraw(true);
-  frameHooks.push(() => { if (!billboard.visible) return; const t = performance.now() / 1000, d = billboard.userData.bb;
+  // v0.68.1: the Orchard's Billboard across the Orchard road — shares the face, bulbs and glow with the Home one (one ad campaign)
+  const obillboard = (() => { const ud = billboard.userData; billboard.userData = {}; const o = billboard.clone(); billboard.userData = ud; return o; })(); obillboard.position.set(SPOTS.obillboard[0], 0, SPOTS.obillboard[1]); obillboard.visible = false; obillboard.userData = { ...billboard.userData, loc: 'orchard' }; scene.add(obillboard);
+  frameHooks.push(() => { if (!billboard.visible && !obillboard.visible) return; const t = performance.now() / 1000, d = billboard.userData.bb;
     if (bbOn && performance.now() - (d.since || 0) > BB_PANEL_MS) { d.since = performance.now(); d.panel = (d.panel + 1) % BB_PANELS; bbRedraw(); }
     bulbs.forEach((b, k) => { const lit = bbOn && ((Math.floor(t * 5) + k) % 3 !== 0); b.material.emissive.set(lit ? '#FFC94A' : '#000000'); b.material.emissiveIntensity = lit ? 1.7 : 0; b.material.color.set(lit ? '#FFF2B0' : '#D9CFBA'); });
     billboard.userData.face.material.emissiveIntensity = bbOn ? 0.32 + 0.08 * Math.sin(t * 3) : 0.04; bbGlow.material.opacity = bbOn ? 0.6 + 0.15 * Math.sin(t * 3) : 0;
@@ -1652,7 +1658,7 @@ export function createWorld(canvas) {
     if (mode === 'build') { const h = raycaster.intersectObjects(ghostMeshes, false)[0]; return h ? h.object.userData : null; }
     if (mode === 'ground') { const p = raycaster.ray.intersectPlane(groundPlane, new THREE.Vector3()); return p ? { kind: 'ground', point: p } : null; }
     const targets = [...tiles.map((t) => t.mesh), ...tiles.map((t) => t.holder), woods, lootG, decorG, featG, bpGroup];
-    if (stand.visible) targets.push(stand); if (rack.visible) targets.push(rack); if (tincture.visible) targets.push(tincture); if (still.visible) targets.push(still); if (teastand.visible) targets.push(teastand); if (press.visible) targets.push(press); if (opress.visible) targets.push(opress); if (fruitstand.visible) targets.push(fruitstand); targets.push(orchardG); if (orchardShed.visible) targets.push(orchardShed);   /* v0.65 fix: the Orchard Stand (and its scaffold while it's being built) was never tappable */ if (parking.visible) targets.push(parking); if (windmill.visible) targets.push(windmill); if (billboard.visible) targets.push(billboard); targets.push(market); for (const g of barrels.values()) if (g.visible) targets.push(g); for (const g of hives.values()) if (g.visible) targets.push(g); for (const g of workers.values()) if (g.visible) targets.push(g);
+    if (stand.visible) targets.push(stand); if (rack.visible) targets.push(rack); if (tincture.visible) targets.push(tincture); if (still.visible) targets.push(still); if (teastand.visible) targets.push(teastand); if (press.visible) targets.push(press); if (opress.visible) targets.push(opress); if (fruitstand.visible) targets.push(fruitstand); targets.push(orchardG); if (orchardShed.visible) targets.push(orchardShed);   /* v0.65 fix: the Orchard Stand (and its scaffold while it's being built) was never tappable */ if (parking.visible) targets.push(parking); if (oparking.visible) targets.push(oparking); if (obillboard.visible) targets.push(obillboard); if (windmill.visible) targets.push(windmill); if (billboard.visible) targets.push(billboard); targets.push(market); for (const g of barrels.values()) if (g.visible) targets.push(g); for (const g of hives.values()) if (g.visible) targets.push(g); for (const g of workers.values()) if (g.visible) targets.push(g);
     for (const id of Object.keys(lotFx)) if (lotFx[id].fx.visible) targets.push(lotFx[id].sign, lotFx[id].tag);
     const hits = raycaster.intersectObjects(targets, true);
     for (const h of hits) { if (h.object.userData?.tag && visibleChain(h.object)) return { kind: 'lot', id: h.object.userData.id }; }
@@ -1786,7 +1792,7 @@ export function createWorld(canvas) {
 
   return {
     setPaused, PR_CAP, IOS,
-    renderer, scene, camera, ctl, DEF, tiles, beds, obs, stand, rack, market, barrel, still, setStill, teastand, setTea, press, opress, orchFenceInfo: () => ({ posts: orchFenceG?.children[0]?.count || 0, owned: [...orchOwned] }), fruitstand, setCraft, addOrchardTree, setOrchardTree, removeOrchardTree, orchardTrees, setTreeRows, treeRows, treeRowPulse, makeFruitTree, parking, setParking, windmill, billboard, setBillboard, spotGhosts, setSpotGhosts, bedTargets, setBedTargets, barrels, addBarrel, removeBarrel, gutters, setGutter, setBarrelInfo, setBarrelLv, hives, addHive, removeHive, setBeeBeds, tincture, setTincture, cars, frameHooks,
+    renderer, scene, camera, ctl, DEF, tiles, beds, obs, stand, rack, market, barrel, still, setStill, teastand, setTea, press, opress, orchFenceInfo: () => ({ posts: orchFenceG?.children[0]?.count || 0, owned: [...orchOwned] }), fruitstand, setCraft, addOrchardTree, setOrchardTree, removeOrchardTree, orchardTrees, setTreeRows, treeRows, treeRowPulse, makeFruitTree, parking, setParking, oparking, setOParking, obillboard, windmill, billboard, setBillboard, spotGhosts, setSpotGhosts, bedTargets, setBedTargets, barrels, addBarrel, removeBarrel, gutters, setGutter, setBarrelInfo, setBarrelLv, hives, addHive, removeHive, setBeeBeds, tincture, setTincture, cars, frameHooks,
     updateCamera, resize, glide, intro, pick, project, tileWorld, sickleSweep, plowFurrows, fxCount: () => fxs.length,
     setObstacle, chop, clearObstacle, addBed, setGhosts, setLotOwned, setLocation, orchardScene, orchardShed, setOStandStock, setStandShelf, standShelf, setStandStock, setMarketOpen, setRack, appear, spawnCar, spawnTruck, poof,
     tilePlant: (i) => tiles[i]?.plant || null, addWorker, removeWorker, setWorker, workerAt, workerGo, workerIdle, workerPose, placeWorker, setPlant, attachPlant, setIcon, setShade, bgTrees, setIrrigation, irrigPulse, irrig, select, splash, render, textSprite, relabel, groundAt,
