@@ -1140,3 +1140,17 @@ body.on-title #hud, body.on-title #tabbar, body.on-title #ad-banner, body.on-tit
 /* v0.68.1: the pack art is shown whole and centred (contain + a backdrop matching the art's cream edge), Market sections */
 .mkt-sec{margin:14px 4px 6px;padding-bottom:4px;border-bottom:1.5px solid #F2E3C2}
 .mkt-sec:first-of-type{margin-top:4px}
+
+/* v0.7 — Sound settings */
+.sound-set .vol-row { display: grid; grid-template-columns: 1fr auto; grid-template-areas: "lbl btn" "rng btn"; gap: 4px 10px; align-items: center; }
+.sound-set .vol-row b { grid-area: lbl; font-family: 'Nunito', sans-serif; }
+.sound-set .vol-row input.vol { grid-area: rng; width: 100%; accent-color: #3D5A40; min-height: 28px; }
+.sound-set .vol-row .mute-btn { grid-area: btn; min-width: 76px; }
+.sound-set .vol-row .mute-btn.on { background: #F7C5C5; color: #3D5A40; }
+.sound-set .vol-row.muted input.vol { opacity: .5; }
+
+/* v0.7 — Gardener shift timer above each hired worker */
+.wk-timer { position: absolute; transform: translate(-50%, -100%); background: #FFF9F0; border: 2px solid #B7D4B5; color: #3D5A40; font: 700 11px/1 'Nunito', sans-serif; padding: 3px 7px; border-radius: 999px; white-space: nowrap; pointer-events: none; box-shadow: 0 1px 3px rgba(61,90,64,.2); z-index: 3; }
+.wk-timer.low { background: #F5D07A; border-color: #F5D07A; }
+.wk-timer.done { background: #F7C5C5; border-color: #F7C5C5; }
+body.modal-open .wk-timer { display: none; }

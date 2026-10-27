@@ -241,7 +241,7 @@ export const FEATURES = {
   pocketwatch: {
     id: 'pocketwatch', name: "Gardener's Pocket Watch", rarity: 'ultra', type: 'Charm · Helpers', packW: 0.27,
     price: 300, stats: { Growth: 4, Beauty: 3, Yield: 4, Atmosphere: 4 },
-    blurb: 'Once bought and placed, every Gardener shift lasts 1 hour longer for the same wage (Lv4: +3 hours).',
+    blurb: 'Once bought and placed, every Gardener hire lasts 10 minutes longer for the same cost (Lv4: +30 minutes).',
   },
   moonfountain: {
     id: 'moonfountain', name: 'Moonlit Fountain', rarity: 'otherworld', type: 'Charm · Otherworldly', packW: 0.13,
@@ -254,13 +254,13 @@ export const FEATURES = {
     blurb: 'Once bought and placed, drying and crafting (rack, still, tinctures, tea, press, fruit stand) take 15% less time (Lv4: 25%).',
   },
 };
-// v0.65: per-level values of the garden charms (index = card level − 1). Fractions are % (0.08 = 8%); pocketwatch is hours.
+// v0.65: per-level values of the garden charms (index = card level − 1). Fractions are % (0.08 = 8%); pocketwatch is hours (v0.7: fractions of an hour).
 export const CHARMS = {
   gardenbell:   { lv: [0.08, 0.10, 0.12, 0.15], fx: 'gap',   where: 'home' },
   rainchain:    { lv: [0.10, 0.13, 0.16, 0.20], fx: 'water', where: 'all' },
   seedtin:      { lv: [0.15, 0.20, 0.25, 0.30], fx: 'seed',  where: 'all' },
   scales:       { lv: [0.05, 0.06, 0.08, 0.10], fx: 'sell',  where: 'stands' },
-  pocketwatch:  { lv: [1, 1.5, 2, 3],           fx: 'shift', where: 'all' },
+  pocketwatch:  { lv: [10 / 60, 15 / 60, 20 / 60, 30 / 60], fx: 'shift', where: 'all' },   // v0.7: +10/15/20/30 minutes (was hours)
   moonfountain: { lv: [0.20, 0.25, 0.30, 0.35], fx: 'flower', where: 'all' },
   faelantern:   { lv: [0.15, 0.18, 0.21, 0.25], fx: 'craft', where: 'all' },
 };
@@ -427,15 +427,15 @@ export const TINCTURE = {
 // v0.41 Essential Oil Stand: SEEDS only in, oil out. Each oil is worth well over selling those seeds (or buying them new).
 export const STILL = {
   slots: 2,
-  recipes: {   // seeds per distill, time (s), Farm Stand price
-    lavender:  { n: 5, s: 180, sell: 70 },
-    calendula: { n: 4, s: 210, sell: 95 },
-    chamomile: { n: 3, s: 240, sell: 120 },
+  recipes: {   // seeds per distill, time (s), Farm Stand price · v0.7: every seed oil takes 10 seeds (Eucalyptus stays 3 leaves)
+    lavender:  { n: 10, s: 180, sell: 70 },
+    calendula: { n: 10, s: 210, sell: 95 },
+    chamomile: { n: 10, s: 240, sell: 120 },
     // v0.5: peppermint, rosemary, rose otto and jasmine oils
-    peppermint: { n: 4, s: 240, sell: 150 },
-    rosemary:   { n: 4, s: 270, sell: 250 },
-    damaskrose: { n: 3, s: 300, sell: 330 },
-    jasmine:    { n: 2, s: 360, sell: 420 },
+    peppermint: { n: 10, s: 240, sell: 150 },
+    rosemary:   { n: 10, s: 270, sell: 250 },
+    damaskrose: { n: 10, s: 300, sell: 330 },
+    jasmine:    { n: 10, s: 360, sell: 420 },
     // v0.6: Rainbow Eucalyptus LEAVES (orchard tree) — 3 leaves → Eucalyptus Essential Oil + Eucalyptus Hydrosol
     eucalyptus: { n: 3, s: 300, sell: 600, in: 'fruit_eucalyptus' },
   },
@@ -452,8 +452,38 @@ export const DRYING = {
 };
 // v0.52: every plant dries now (the Tea Stand blends dried herbs). The new ones dry for a time set by their tier and sell
 // for 2.45× the fresh flower — the same ratio as the v0.5 dried herbs (Peppermint 70 / 28 = 2.5, Tulsi 190 / 78 = 2.44).
+// ---------------- v0.7 economy pass ----------------
+// Money came in too fast at the top. Sell prices now fall off by tier (Basic barely changes, Other World is cut the most).
+// Costs (seed prices, saplings, packs, Gardeners, builds, plots) are NOT changed. Every crafted good stays worth more than its
+// raw inputs: a tincture is worth at least ECON.margin × (its flowers + its base), an essential oil at least ECON.margin × the
+// seeds (or leaves) it takes, and press/jar/tea multipliers stay above 1.
+export const ECON = {
+  tier: { basic: 0.9, epic: 0.7, legendary: 0.6, rare: 0.6, superrare: 0.55, ultra: 0.5, otherworld: 0.45 },
+  tinc: 0.9,     // tinctures: a further cut on top of the tier factor
+  margin: 1.25,
+  // v0.7: shorter grow times for the top tiers (×), so a late-game bed earns more per hour than a mid-game one. Grow times still rise by tier.
+  grow: { rare: 0.83, superrare: 0.48, ultra: 0.33, otherworld: 0.24 },
+  dryRatio: 1.25,   // dried herb = 1.25× the fresh flower (was 2.45×) · = DRY_RATIO below
+};
+const econF = (tier) => ECON.tier[tier] ?? 1;
+for (const sp of Object.values(SPECIES)) {
+  const f = econF(sp.tier);
+  sp.flowerSell = Math.max(1, Math.round(sp.flowerSell * f));
+  if (ECON.grow[sp.tier]) { sp.growS = Math.round(sp.growS * ECON.grow[sp.tier]); sp.stats.Growth = Math.max(sp.stats.Growth, 2); }   // card Growth stat follows the faster grow
+  if (sp.tier !== 'basic' && !sp.noFlower) sp.seedSell = Math.max(1, Math.round(sp.seedPrice / 2 * f));
+}
+{ let prev = 0;   // keep tiers apart: a tier's cheapest flower still sells above the tier below's priciest (Epic vs Chamomile)
+  for (const t of TIER_ORDER) { const ps = Object.values(SPECIES).filter((x) => x.tier === t && !x.noFlower);
+    for (const x of ps) x.flowerSell = Math.max(x.flowerSell, prev + 1); prev = Math.max(prev, ...ps.map((x) => x.flowerSell)); } }
+for (const t of Object.values(TREES)) t.fruitSell = Math.max(1, Math.round(t.fruitSell * econF(t.tier)));
+for (const [k, d] of Object.entries(DRYING)) d.sell = Math.max(SPECIES[k].flowerSell + 1, Math.round(SPECIES[k].flowerSell * ECON.dryRatio));   // v0.7: every dried herb = 1.25× its fresh flower
+for (const [k, r] of Object.entries(TINCTURE.recipes)) { const sp = SPECIES[k], f = econF(sp.tier);
+  const per = Math.max(sp.flowerSell, DRYING[k]?.sell ?? Math.round(sp.flowerSell * ECON.dryRatio));   // a flower could be dried instead: beat that too
+  for (const b of ['glycerin', 'vinegar']) r.sell[b] = Math.max(Math.ceil(ECON.margin * (r.n * per + BASES[b].price)), Math.round(r.sell[b] * f * ECON.tinc)); }
+for (const [k, r] of Object.entries(STILL.recipes)) { const src = SPECIES[k] || TREES[k], f = econF(src.tier);
+  const raw = r.n * (r.in ? src.fruitSell : src.seedSell); r.sell = Math.max(Math.ceil(ECON.margin * raw), Math.round(r.sell * f)); }
 export const DRY_TIER_S = { basic: 40, epic: 60, legendary: 75, rare: 90, superrare: 110, ultra: 130, otherworld: 150 };
-export const DRY_RATIO = 2.45;
+export const DRY_RATIO = ECON.dryRatio;   // v0.7: 1.25 (was 2.45)
 for (const sp of Object.values(SPECIES)) { if (sp.noFlower) { delete DRYING[sp.id]; sp.dries = false; continue; } DRYING[sp.id] ??= { s: DRY_TIER_S[sp.tier], sell: Math.round(sp.flowerSell * DRY_RATIO) }; sp.dries = true; }
 export const oilId = (sp) => 'oil_' + sp;
 export const tinctureId = (sp, base) => `tinc_${base === 'vinegar' ? 'v' : 'g'}_${sp}`;
@@ -474,28 +504,28 @@ for (const sp of Object.values(SPECIES)) {
 }
 // v0.4 originals (exact icons and colours kept)
 Object.assign(ITEMS, {
-  seed_lavender:  { name: 'Lavender Seeds',  sell: 3,  icon: ['seed', '#B9A6DC'] },
-  seed_calendula:   { name: 'Calendula Seeds',   sell: 5,  icon: ['seed', '#F0A33A'] },
-  seed_chamomile: { name: 'Chamomile Seeds', sell: 9,  icon: ['seed', '#F3EFC9'] },
-  flower_lavender:{ name: 'Lavender',        sell: 5,  icon: ['spike', '#9C86C9'] },
-  flower_calendula: { name: 'Calendula',  sell: 9,  icon: ['daisy', '#F0A33A'] },
-  flower_chamomile:{ name: 'Chamomile',      sell: 24, icon: ['daisy', '#FFFFFF'] },
-  dried_lavender: { name: 'Dried Lavender',  sell: 14, icon: ['bundle', '#A58BC9'] },
-  oil_lavender:  { name: 'Lavender Essential Oil',  sell: 70,  icon: ['dropper', '#7E5FB0'] },
-  oil_calendula: { name: 'Calendula Essential Oil', sell: 95,  icon: ['dropper', '#D9822B'] },
-  oil_chamomile: { name: 'Chamomile Essential Oil', sell: 120, icon: ['dropper', '#C9A43A'] },
-  tinc_g_lavender:  { name: 'Lavender Glycerite',         sell: 42, icon: ['dropper', '#C7B3E6'] },
-  tinc_v_lavender:  { name: 'Lavender Vinegar Tincture',  sell: 36, icon: ['dropper', '#9A7A9A'] },
-  tinc_g_calendula:   { name: 'Calendula Glycerite',          sell: 52, icon: ['dropper', '#EDC15A'] },
-  tinc_v_calendula:   { name: 'Calendula Vinegar Tincture',   sell: 46, icon: ['dropper', '#C08A3A'] },
-  tinc_g_chamomile: { name: 'Chamomile Glycerite',        sell: 80, icon: ['dropper', '#F3E7B5'] },
-  tinc_v_chamomile: { name: 'Chamomile Vinegar Tincture', sell: 72, icon: ['dropper', '#D2B67A'] },
+  seed_lavender:  { name: 'Lavender Seeds',  sell: SPECIES.lavender.seedSell,  icon: ['seed', '#B9A6DC'] },
+  seed_calendula:   { name: 'Calendula Seeds',   sell: SPECIES.calendula.seedSell,  icon: ['seed', '#F0A33A'] },
+  seed_chamomile: { name: 'Chamomile Seeds', sell: SPECIES.chamomile.seedSell,  icon: ['seed', '#F3EFC9'] },
+  flower_lavender:{ name: 'Lavender',        sell: SPECIES.lavender.flowerSell,  icon: ['spike', '#9C86C9'] },
+  flower_calendula: { name: 'Calendula',  sell: SPECIES.calendula.flowerSell,  icon: ['daisy', '#F0A33A'] },
+  flower_chamomile:{ name: 'Chamomile',      sell: SPECIES.chamomile.flowerSell, icon: ['daisy', '#FFFFFF'] },
+  dried_lavender: { name: 'Dried Lavender',  sell: DRYING.lavender.sell, icon: ['bundle', '#A58BC9'] },
+  oil_lavender:  { name: 'Lavender Essential Oil',  sell: STILL.recipes.lavender.sell,  icon: ['dropper', '#7E5FB0'] },
+  oil_calendula: { name: 'Calendula Essential Oil', sell: STILL.recipes.calendula.sell,  icon: ['dropper', '#D9822B'] },
+  oil_chamomile: { name: 'Chamomile Essential Oil', sell: STILL.recipes.chamomile.sell, icon: ['dropper', '#C9A43A'] },
+  tinc_g_lavender:  { name: 'Lavender Glycerite',         sell: TINCTURE.recipes.lavender.sell.glycerin, icon: ['dropper', '#C7B3E6'] },
+  tinc_v_lavender:  { name: 'Lavender Vinegar Tincture',  sell: TINCTURE.recipes.lavender.sell.vinegar, icon: ['dropper', '#9A7A9A'] },
+  tinc_g_calendula:   { name: 'Calendula Glycerite',          sell: TINCTURE.recipes.calendula.sell.glycerin, icon: ['dropper', '#EDC15A'] },
+  tinc_v_calendula:   { name: 'Calendula Vinegar Tincture',   sell: TINCTURE.recipes.calendula.sell.vinegar, icon: ['dropper', '#C08A3A'] },
+  tinc_g_chamomile: { name: 'Chamomile Glycerite',        sell: TINCTURE.recipes.chamomile.sell.glycerin, icon: ['dropper', '#F3E7B5'] },
+  tinc_v_chamomile: { name: 'Chamomile Vinegar Tincture', sell: TINCTURE.recipes.chamomile.sell.vinegar, icon: ['dropper', '#D2B67A'] },
 });
 // Most valuable first (oils, tinctures, dried, flowers, seeds) — the same order as v0.4 for the Basic items.
 // v0.52 Hydrosols: like a real steam still, every essential-oil distillation gives two products: 1 oil + 1 hydrosol (the
 // scented water) named after its plant — Damask Rose gives Rose Water. Hydrosol sells for 11% of that oil's price, Rose Water
 // for 15% (a little more than other hydrosols, still far below rose oil). Only plants with an oil recipe can be distilled.
-export const HYDROSOL = { share: 0.11, roseWater: 'damaskrose', roseShare: 0.15 };
+export const HYDROSOL = { share: 0.11, roseWater: 'damaskrose', roseShare: 0.19 };   // v0.7: Rose Water 15% → 19% so it stays the top flower hydrosol after the oil re-pricing
 export const hydroId = (sp) => 'hydro_' + sp;
 const hydroTint = (hex) => { const n = parseInt(hex.slice(1), 16), m = (v) => Math.round(v + (255 - v) * 0.55); return '#' + [n >> 16, (n >> 8) & 255, n & 255].map((v) => m(v).toString(16).padStart(2, '0')).join(''); };
 for (const [sp, r] of Object.entries(STILL.recipes)) {
@@ -506,7 +536,7 @@ for (const [sp, r] of Object.entries(STILL.recipes)) {
 // ---------------- v0.6 Sunflower seed bags ----------------
 // A Sunflower harvest is 50 seeds (v0.65; was 100) (no flowers). Seeds sell for 1 coin each singly; a bag of 50 sells for 85 and a bag of 100
 // for 200 (2 a seed) — about a fair Legendary harvest (e.g. Rosemary: ~2.5 flowers × 46 + 4 seeds × 19 ≈ 191).
-export const SEED_BAGS = { sunflower: [{ n: 50, sell: 85 }, { n: 100, sell: 200 }] };
+export const SEED_BAGS = { sunflower: [{ n: 50, sell: 60 }, { n: 100, sell: 140 }] };   // v0.7: was 85 / 200
 export const bagId = (sp, n) => `bag${n}_${sp}`;
 for (const [sp, bags] of Object.entries(SEED_BAGS)) for (const b of bags) ITEMS[bagId(sp, b.n)] = { name: `${SPECIES[sp].name} Seeds · bag of ${b.n}`, sell: b.sell, icon: ['seedbag', SPECIES[sp].color], bag: b.n };
 // ---------------- v0.6 fruit + crafting stands ----------------
@@ -516,17 +546,19 @@ for (const t of Object.values(TREES)) ITEMS[t.fruit] = { name: t.fruitName, sell
 // butter/preserves 1.12; time 40 + 20·(o − 1) s. No market ingredient — fruit alone (simpler on a phone; see README).
 const ordOf = (id) => PLANT_TIERS[(SPECIES[id] || TREES[id]).tier].order;
 const R_ = (id, name, src, input, n, kind, icon, color, extra = {}) => ({ id, name, src, in: input, n, kind, icon, color, ...extra });
-export const PRESS = { slots: 2, mult: (o) => 1.7 + 0.25 * (o - 1), kinds: { oil: 1, butter: 1.06 }, recipes: [
-  R_('sunoil', 'Sunflower Oil', 'sunflower', 'seed_sunflower', 30, 'oil', 'oilbottle', '#F2C53D', { sell: 110, s: 60 }),
-  R_('sunbutter', 'Sun Butter', 'sunflower', 'seed_sunflower', 50, 'butter', 'butterjar', '#D9A441', { sell: 190, s: 90 }),
+export const PRESS = { slots: 2, mult: (o) => 1.4 + 0.1 * (o - 1),   // v0.7: was 1.7 + 0.25·(o − 1)
+  kinds: { oil: 1, butter: 1.06 }, recipes: [
+  R_('sunoil', 'Sunflower Oil', 'sunflower', 'seed_sunflower', 30, 'oil', 'oilbottle', '#F2C53D', { sell: 80, s: 60 }),
+  R_('sunbutter', 'Sun Butter', 'sunflower', 'seed_sunflower', 50, 'butter', 'butterjar', '#D9A441', { sell: 135, s: 90 }),
   R_('rosehip', 'Rosehip Oil', 'damaskrose', 'seed_damaskrose', 3, 'oil', 'oilbottle', '#D4553A', { s: 120, only: 'home' }),   // v0.68: rose hips come from Home roses — Home press only
   R_('olive', 'Olive Oil', 'olive', 'fruit_olive', 6, 'oil', 'oilbottle', '#B5B03A', { s: 120 }),
   R_('almondoil', 'Almond Oil', 'almond', 'fruit_almond', 6, 'oil', 'oilbottle', '#EAD3A8', { s: 120, only: 'orchard' }),   // v0.68: almonds grow on Orchard trees — Orchard Oil Press only
   R_('almondbutter', 'Almond Butter', 'almond', 'fruit_almond', 8, 'butter', 'butterjar', '#B9895A', { s: 150, only: 'orchard' }),
   R_('cocoa', 'Cocoa Butter', 'cacao', 'fruit_cacao', 4, 'butter', 'butterjar', '#F1E0C0', { s: 180 }),
-  R_('sunpetal', 'Sunpetal Oil', 'sunpetal', 'seed_sunpetal', 2, 'oil', 'oilbottle', '#FFD86A', { sell: 1600, s: 240, glow: 3 }),
+  R_('sunpetal', 'Sunpetal Oil', 'sunpetal', 'seed_sunpetal', 2, 'oil', 'oilbottle', '#FFD86A', { sell: 640, s: 240, glow: 3 }),
 ] };
-export const FRUITSTAND = { slots: 2, mult: (o) => 1.6 + 0.25 * (o - 1), kinds: { sauce: 1, canned: 1, jelly: 1.08, butter: 1.12, preserves: 1.12 }, recipes: [
+export const FRUITSTAND = { slots: 2, mult: (o) => 1.3 + 0.1 * (o - 1),   // v0.7: was 1.6 + 0.25·(o − 1)
+  kinds: { sauce: 1, canned: 1, jelly: 1.08, butter: 1.12, preserves: 1.12 }, recipes: [
   R_('applesauce', 'Apple Sauce', 'apple', 'fruit_apple', 4, 'sauce', 'jar', '#E9C27A'),
   R_('applebutter', 'Apple Butter', 'apple', 'fruit_apple', 6, 'butter', 'jar', '#8A4A22'),
   R_('cannedpeach', 'Canned Peaches', 'peach', 'fruit_peach', 4, 'canned', 'can', '#F6A46B'),
@@ -562,29 +594,32 @@ export const ORCH_STAND = { coins: 300, wood: 30, cap: 18 };   // v0.65: cap 12 
 export const STAND_UNLOCK = [{ id: 'tincture', coins: 1000 }, { id: 'still', coins: 2500 }, { id: 'teastand', coins: 5000 }, { id: 'press', coins: 8000 }];
 // v0.67.1: Orchard tree-row Irrigation — each purchase drips one more row of tree spots (next row in order), up to every row you own.
 export const TREE_IRRIG = { coins: 150 };
-export const WORKER = { hire: 2000, wage: 500, shiftH: 6, stepS: 5, catchStepS: 120 };
+// v0.7: a hire lasts 1 real-time hour, then the Gardener stops and must be hired again for the same cost (wage = hire).
+export const WORKER = { hire: 2000, wage: 2000, shiftH: 1, stepS: 5, catchStepS: 120 };
 const kindRank = (id) => ['oil_', 'press_', 'jar_', 'tea_', 'tinc_', 'hydro_', 'dried_', 'fruit_', 'flower_', 'bag', 'seed_'].findIndex((p) => id.startsWith(p));
 export const SELL_ORDER = Object.keys(ITEMS).sort((a, b) => kindRank(a) - kindRank(b) || ITEMS[b].sell - ITEMS[a].sell || (a.startsWith('tinc_g') ? -1 : 1));
 
 // ---------------- v0.52 Tea Stand ----------------
 // Any THREE dried herbs (duplicates allowed) → one tea. o = the average tier order of the three (Basic 1 … Other World 7).
-//   tea price = round( Σ dried sell × mult(o) × (three different plants ? 1 + distinct : 1) ),  mult(o) = 1.4 + 0.35·(o − 1)
-//   → 3 Basic ×1.40 · 3 Epic ×1.75 · Legendary ×2.10 · Rare ×2.45 · Super Rare ×2.80 · Ultra ×3.15 · 3 Other World ×3.50
+//   tea price = round( Σ dried sell × min(1.8, mult(o) × (three different plants ? 1 + distinct : 1)) ),  mult(o) = 1.2 + 0.1·(o − 1)
+//   → 3 Basic ×1.20 · Epic ×1.30 · Legendary ×1.40 · Rare ×1.50 · Super Rare ×1.60 · Ultra ×1.70 · Other World ×1.80 (v0.7; capped at 1.8)
 //   brew time = 15 + 10·(o − 1) s  → 15 s for Basic … 75 s for Other World.
-export const TEA = { slots: 2, n: 3, distinct: 0.10, mult: (o) => 1.4 + 0.35 * (o - 1), brewS: (o) => Math.round(15 + 10 * (o - 1)) };
+// v0.7 TEA RULE: the multiplier runs 1.2 (Basic) … 1.8 (Other World) and, with the different-herbs bonus, never exceeds 1.8×
+// the three dried herbs (was 1.4 … 3.5, +10%).
+export const TEA = { slots: 2, n: 3, distinct: 0.10, max: 1.8, mult: (o) => 1.2 + 0.1 * (o - 1), brewS: (o) => Math.round(15 + 10 * (o - 1)) };
 export const teaId = (sps) => 'tea_' + [...sps].sort().join('-');
 export const teaSps = (id) => id.slice(4).split('-');
 export function teaInfo(sps) {
   const sp = sps.map((k) => SPECIES[k]); if (sps.length !== TEA.n || sp.some((x) => !x || !DRYING[x.id])) return null;
   const ord = (x) => PLANT_TIERS[x.tier].order, o = sp.reduce((a, x) => a + ord(x), 0) / sp.length;
   const dried = sp.reduce((a, x) => a + DRYING[x.id].sell, 0), distinct = new Set(sps).size;
-  const mult = TEA.mult(o) * (distinct === 3 ? 1 + TEA.distinct : 1);
+  const mult = Math.min(TEA.max, TEA.mult(o) * (distinct === 3 ? 1 + TEA.distinct : 1));
   const counts = {}; for (const x of sps) counts[x] = (counts[x] || 0) + 1;
   const names = Object.keys(counts).sort((a, b) => counts[b] - counts[a] || ord(SPECIES[b]) - ord(SPECIES[a]) || sps.indexOf(a) - sps.indexOf(b)).map((k) => SPECIES[k].name);
   const top = [...sp].sort((a, b) => ord(b) - ord(a))[0];
   const name = o >= 6.5 ? `${top.name} Starlight Tea` : o >= 5.5 ? `${top.name} Moonlit Blend`
     : names.length === 1 ? `${names[0]} Tea` : names.length === 2 ? `${names[0]} & ${names[1]} Blend` : `${names[0]}, ${names[1]} & ${names[2]} Blend`;
-  return { id: teaId(sps), name, sell: Math.round(dried * mult), dried, mult, o, distinct, s: TEA.brewS(o), color: top.color, tier: Object.keys(PLANT_TIERS).find((t) => PLANT_TIERS[t].order === Math.round(o)) };
+  return { id: teaId(sps), name, sell: Math.min(Math.round(dried * mult), Math.floor(dried * TEA.max)), dried, mult, o, distinct, s: TEA.brewS(o), color: top.color, tier: Object.keys(PLANT_TIERS).find((t) => PLANT_TIERS[t].order === Math.round(o)) };
 }
 // teas are registered on demand (any 3 of 21 herbs = 1771 blends) so they behave like every other bag / stand item
 export function registerTea(id) {
@@ -760,7 +795,7 @@ export const TIPS = {
   press: 'Your <b>Pressed Oil Stand</b> is ready! Tap it and pick a recipe — Sunflower seeds become <b>Sunflower Oil</b> or <b>Sun Butter</b>; Damask Rose seeds, olives, cacao and Sunpetal seeds make richer oils.',
   fruitstand: 'Your <b>Fruit Stand</b> is ready! Tap it to cook orchard fruit into <b>jellies, butters, sauces and canned fruit</b> — each sells for well above the raw fruit.',
   orchard: 'Welcome to <b>The Orchard</b>! Fruit-tree cards are in Card Packs now. Buy saplings at the Supply Market and plant them on the tree spots. Build beds and a rain barrel here too (the shed roof feeds it). Tap <b>Map</b> to go home: both places keep growing.',
-  still: 'Your <b>Essential Oil Stand</b> is ready! Distill <b>seeds</b> into essential oils (5 Lavender, 4 Calendula or 3 Chamomile seeds each) — oils sell for a premium at the Farm Stand, far more than the seeds. Each distillation also leaves a <b>hydrosol</b> (Rose Water from Damask Rose) — a small extra to sell.',
+  still: 'Your <b>Essential Oil Stand</b> is ready! Distill <b>seeds</b> into essential oils (10 seeds each, e.g. 10 Lavender, Calendula or Chamomile seeds) — oils sell for a premium at the Farm Stand, far more than the seeds. Each distillation also leaves a <b>hydrosol</b> (Rose Water from Damask Rose) — a small extra to sell.',
   tincture: 'Your <b>Tincture Stand</b> is ready! Steep flowers with <b>Glycerin</b> or <b>Vinegar</b> — find their cards in Card Packs, then buy them at the Supply Market — tinctures sell for far more at the Farm Stand.',
   customer: 'A customer! They’ll pick what they want from your stand and pay in coins.',
   lavender: 'You can now build a <b>Drying Rack</b> (Build). Dried Lavender sells for almost 3× fresh.',

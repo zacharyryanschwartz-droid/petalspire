@@ -11,10 +11,11 @@ import { Payments } from './payments.js';
 import { createAds, gameArt } from './ads.js';
 import { initTracker } from './games-tracker.js';
 import { shadeAt, speedFor, sunLabel, rebaseStart } from './shade.js';
+import { createAudio } from './audio.js';
 
 // Save format: v0.3, v0.31 and v0.4 share one localStorage key (schema v: 3). `build` records which prototype build last wrote the save;
 // v0.3 / v0.31 saves (no `build`, no per-plot barrels) are migrated on load (migrate04 below); v0.4 saves load as-is and are re-tagged. Prototype builds stay below 1.0.
-export const BUILD = '0.68.1';
+export const BUILD = '0.7';
 // v0.65: anonymous player tracking (Games Backend on Appwrite; no API key in the game, nothing personal). Skipped for automated runs (navigator.webdriver).
 try { if (!navigator.webdriver) initTracker({ endpoint: 'https://nyc.cloud.appwrite.io/v1', projectId: '6ae0a41a002ce0a48fac', gameId: 'petalspire', platform: 'web', appVersion: BUILD }); } catch (_) {}
 const SAVE_KEY = 'petalspire.v03', V02_KEY = 'petalspire.v02', OLD_KEYS = ['petalspire.v01'];
@@ -26,6 +27,9 @@ const SHOW_LOCKED = false;
 const el = (tag, cls, html) => { const e = document.createElement(tag); if (cls) e.className = cls; if (html != null) e.innerHTML = html; return e; };
 let clockAt = null, quiet = 0;   // v0.61: workers' offline catch-up runs on a virtual clock, quietly
 const now = () => clockAt ?? Date.now();
+// v0.7: music + sound effects (js/audio.js). Silent during offline catch-up and while Gardeners work on their own.
+let Sound = null, workerBusy = 0;
+const sfx = (name) => { if (quiet || clockAt != null || workerBusy || !Sound) return; Sound.play(name); };
 const fillIcons = (root = document) => root.querySelectorAll('i[data-icon]').forEach((i) => { if (!i.firstChild) i.innerHTML = ICONS[i.dataset.icon] || ''; });
 const jewelPrice = (n) => `<span class="price"><i data-icon="jewel"></i>${n}</span>`;
 const coin = (n) => `<span class="price"><i data-icon="coin"></i>${n}</span>`;
@@ -140,6 +144,9 @@ function installBags() {
   Object.defineProperty(S, 'inv', { get: () => S.bags[bagCtx || viewLoc()], set: () => {}, enumerable: false, configurable: true });
 }
 installBags();
+// v0.7: Glycerin and Vinegar are Home-only supplies — any left in the Orchard Bag move to the Home Bag (nothing lost)
+function migBasesHome() { const o = S.bags?.orchard, h = S.bags?.home; let n = 0; if (!o || !h) return 0; for (const b of ['glycerin', 'vinegar']) if (o[b] > 0) { h[b] = (h[b] || 0) + o[b]; n += o[b]; o[b] = 0; } return n; }
+migBasesHome();
 // v0.68: every Orchard plot is a 4×4 tree grid (was 3×4 on The Orchard, 2×3 on the other plots). Planted trees are re-keyed
 // to their plot's new grid (same plot, same row order, same side), irrigated rows follow their trees, and anything placed
 // on Hilltop Grove moves back 2 m with the plot. Runs once (S.orchGrid = 4); a fresh save has nothing to move.
@@ -593,7 +600,15 @@ for (const p of S.tiles) if (p && p.sp === 'bluelotus' && p.fill === undefined) 
 // ---- v0.61 location rules: migrate old saves without loss ----
 const mig061 = { fruitBack: 0, moved: [], fsCard: null };
 if (!S.ostand || typeof S.ostand !== 'object') S.ostand = {};
-if (!S.workers || typeof S.workers !== 'object') S.workers = {};   // v0.61: Garden Workers ({ lot: { x, z, end, done, made } })
+// v0.7: sound settings (Music / Sound Effects volume 0–1 + a mute each), kept in the save
+S.audio = { music: 0.6, sfx: 0.8, musicMute: false, sfxMute: false, ...(S.audio && typeof S.audio === 'object' ? S.audio : {}) };
+for (const k of ['music', 'sfx']) S.audio[k] = Math.min(1, Math.max(0, +S.audio[k] || 0)); for (const k of ['musicMute', 'sfxMute']) S.audio[k] = !!S.audio[k];
+if (!S.workers || typeof S.workers !== 'object') S.workers = {};
+// v0.7: the sound player. Nothing plays until the first tap/click/key (browser autoplay rules); then the place's tune loops softly.
+Sound = createAudio({ prefs: () => S.audio }); Sound.setScene(S.loc === 'orchard' ? 'orchard' : 'home');
+{ const first = () => Sound.unlock(); for (const ev of ['pointerdown', 'touchend', 'click', 'keydown']) document.addEventListener(ev, first, { capture: true, passive: true }); }
+document.addEventListener('click', (e) => { const b = e.target.closest?.('button, .btn, [data-act], [data-buy], .tab, .seg button, .follow-btn'); if (b && !b.disabled) sfx('tap'); }, true);
+{ const ba = W.buildAnim; if (ba) W.buildAnim = (...a) => { sfx('build'); return ba(...a); }; }   // v0.61: Garden Workers ({ lot: { x, z, end, done, made } })
 const bootSavedAt = S.savedAt;
 // the old Orchard Shed came free with the Orchard (and fed its barrel), so a save that already owns the Orchard keeps it, built
 if (S.oshedBuilt === undefined) S.oshedBuilt = !!S.lots.orchard;
@@ -655,7 +670,13 @@ function normalizeCards(st) {
 if (S.owned.beehive && !S.hivesSold && !Object.keys(S.hives).length && !(S.hiveInv > 0)) { const sp = freeSpot('home', S.barrels.home); if (sp) { S.hives.home = sp; hiveMigrated = true; } else S.hiveInv = 1; writeSave(); }
 for (const [lot, h] of Object.entries(S.hives)) W.addHive(lot, h.x, h.z, false);
 for (const [lot, w] of Object.entries(S.workers)) { W.addWorker(lot, w.x, w.z, false); W.setWorker(lot, Date.now() >= w.end ? 'pay' : 'work'); }
-setTimeout(() => { catchUpWorkers(); syncWorkers(); }, 0);
+setTimeout(() => { catchUpWorkers(); migWorkerHour(); syncWorkers(); }, 0);
+// v0.7: Gardeners now work 1-hour hires. Existing saves: every current worker (working or waiting for pay) gets a fresh hour, once.
+function migWorkerHour() {
+  if (S.workerHour) return 0; let n = 0; const t = Date.now();
+  for (const [lot, w] of Object.entries(S.workers || {})) { w.hired = t; w.end = t + 3600e3; w.ended = false; w.pass = false; W.setWorker(lot, 'work'); n++; }
+  S.workerHour = true; save(); return n;
+}
 if (S.tinctureBuilt) W.appear(W.tincture, false);
 if (S.stillBuilt && S.stillPos) W.appear(W.still, false);
 if (S.teaBuilt && S.teaPos) W.appear(W.teastand, false);
@@ -799,7 +820,7 @@ function checkGoals(silent = false) {
     const g = GOALS[S.goal]; S.goal++; save();
     if (silent) continue;
     const card = $('#goal'); card.classList.remove('done'); void card.offsetWidth; card.classList.add('done'); goalPeek(4500);
-    toast(`<i data-icon="flag"></i> Goal complete · ${g.text}`);
+    toast(`<i data-icon="flag"></i> Goal complete · ${g.text}`); sfx('goal');
     if (g.id === 'clear') setTimeout(() => tip('build'), 600);
     if (g.id === 'market') setTimeout(() => tip('plot'), 4000);
     if (S.goal >= GOALS.length) closingAfter = Date.now() + 4500;   // let the reward toast / stand placement go first
@@ -1054,7 +1075,7 @@ function placeIt(p, x, z) {
   const key = 'd' + S.uid++; S.decorInv[p.type]--; if (!S.decorInv[p.type]) delete S.decorInv[p.type];
   const r = Math.atan2(W.camera.position.x - x, W.camera.position.z - z);
   S.decor.push({ key, type: p.type, x, z, r }); W.addDecor(key, p.type, x, z, r, true);
-  popAt(V3(x, 1.6, z), `<i data-icon="heart"></i>+${DECOR_INFO[p.type].atm} atmosphere`); tip('decor');
+  popAt(V3(x, 1.6, z), `<i data-icon="heart"></i>+${DECOR_INFO[p.type].atm} atmosphere`); tip('decor'); sfx('build');
   save(); hud(); return true;
 }
 // v0.65: garden features (Sundial + charms) — place from the bag, tap on the map to put back in the bag
@@ -1280,7 +1301,7 @@ function finishCons(k, paid = false) {
   if (!S.cons?.[k]) return; delete S.cons[k]; save();
   W.setCons(consObj(k), consSize(k), null);
   const o = consObj(k); if (o) W.poof(o.position.clone().setY(1.2), '#F5D07A', 14, 1.4);
-  toast(`✨ The ${CONS_NAME[k]} is ready${paid ? '' : ' · the builders are done'}!`);
+  toast(`✨ The ${CONS_NAME[k]} is ready${paid ? '' : ' · the builders are done'}!`); sfx('build');
   if (k === 'stand') tip('stand');
   hud(); checkGoals(); if (panel && (CONS_PANEL[panel] === k || panel === k)) renderPanel();
 }
@@ -1445,7 +1466,7 @@ function plant(i, sp) { return inBag(tileLoc(i), () => plant_(i, sp)); }
 function plant_(i, sp) {
   if (S.tiles[i] || !(S.inv['seed_' + sp] > 0)) return;
   S.inv['seed_' + sp]--; S.tiles[i] = { sp, plantedAt: now(), wateredAt: null, growMs: SPECIES[sp].growS * 1000 * growK(sp) }; if (sp === 'bluelotus') S.tiles[i].fill = 0;
-  syncTile(i); save(); hud(); renderSheet(); tip('water');
+  syncTile(i); save(); hud(); renderSheet(); tip('water'); sfx('plant');
 }
 // v0.63: Fill bed — keep pouring until this bed's thirsty plants have their water (or the barrels run dry)
 function waterBed(i) {
@@ -1467,7 +1488,7 @@ function water(i, auto = false) {
   const started = ev.filter((e) => e.kind === 'start').length, budded = ev.filter((e) => e.kind === 'bud').length;
   if (started) applyShade(); for (const k of new Set(ev.map((e) => e.i).concat([i]))) { const q = S.tiles[k]; if (q && q.wateredAt && !q.sun) q.sun = tileSun[k] ?? 1; syncTile(k); }
   if (started) for (const e of ev) if (e.kind === 'start') { const q = S.tiles[e.i]; q.sun = tileSun[e.i] ?? 1; q.growMs = q.baseMs / speedFor(q.sun); }
-  W.splash(i); save(); hud(); if (selected === i || (!auto && selected != null)) renderSheet();
+  W.splash(i); if (!auto) sfx('water'); save(); hud(); if (selected === i || (!auto && selected != null)) renderSheet();
   const bw = bedWater(bed, i), prog = bw.need ? ` · bed ${bw.have}/${bw.need}` : '';
   const msg = started ? `Growing!${prog}` : budded ? `Budding!${prog}` : p.sp === 'bluelotus' && !p.wateredAt ? `Barrel ${LOTUS_TXT[lotusFill(p)]}${prog}` : `Watered${prog}`;
   if (auto) { if (!quiet) { W.irrigPulse(bed); popAt(W.tileWorld(i).setY(1), `<i data-icon="water"></i>${started || budded ? msg : 'Irrigated' + prog}`); } checkGoals(); return true; }
@@ -1485,7 +1506,7 @@ const sellOf = (id) => { const sp = spOfItem(id); return sp ? Math.round(ITEMS[i
 const lvFlower = (sp) => (cardLv(sp) >= CARD_LEVELS.plant.bonusFlowerAt ? 1 : 0);
 function addCard(id, n = 1) { const c = S.cards[id] || (S.cards[id] = { n: 0, lv: 1 }); c.n += n; return c; }
 function upgradeCard(id) {
-  if (!canUpgrade(id)) return false; const c = S.cards[id]; c.lv = cardLv(id) + 1; c.n = +c.n; S.stats.upgrades = (S.stats.upgrades || 0) + 1; save(); hud(); if (panel) renderPanel();
+  if (!canUpgrade(id)) return false; sfx('levelup'); const c = S.cards[id]; c.lv = cardLv(id) + 1; c.n = +c.n; S.stats.upgrades = (S.stats.upgrades || 0) + 1; save(); hud(); if (panel) renderPanel();
   const L = CARD_LEVELS.plant, lv = c.lv;
   toast(CARDS[id].tier ? `✨ ${CARDS[id].name} reached Lv${lv}: +${Math.round(L.sell * (lv - 1) * 100)}% sell price · ${Math.round(L.grow * (lv - 1) * 100)}% faster growth${lv >= L.bonusFlowerAt ? ' · +1 flower per harvest' : ''}` : id === 'windmill' ? `✨ Windmill reached Lv${lv}: barrels refill every ${regenS()} s` : CHARMS[id] ? `✨ ${CARDS[id].name} reached Lv${lv}: ${charmText(id, lv)}` : id === 'parking' ? `✨ Parking Lot reached Lv${lv}: room for ${PARKING.spots[parkI()]} cars · ${Math.round((PARKING.extraItem + CARD_LEVELS.parking.extraItem * (lv - 1)) * 100)}% buy an extra item${S.parkingBuilt && S.oparkingBuilt ? ' · at Home and the Orchard' : ''}` : `✨ ${CARDS[id].name} reached Lv${lv}`);
   if (id === 'parking') syncParking();
@@ -1499,7 +1520,7 @@ function charmText(id, lv = charmLv(id)) {
     : id === 'rainchain' ? `Every rain barrel refills ${pct(v)} faster`
     : id === 'seedtin' ? `${pct(v)} chance of +1 seed per raised-bed harvest`
     : id === 'scales' ? `+${pct(v)} coins on Farm Stand and Fruit Stand sales`
-    : id === 'pocketwatch' ? `Gardener shifts last +${v} h (same wage)`
+    : id === 'pocketwatch' ? `Gardener hires last +${Math.round(v * 60)} min (same cost)`
     : id === 'moonfountain' ? `${pct(v)} chance of +1 flower per raised-bed harvest`
     : id === 'faelantern' ? `Drying and crafting take ${pct(v)} less time` : '';
 }
@@ -1517,7 +1538,7 @@ function harvestCore_(i) {   // normal yields/seeds rules, shared by the hand ha
 }
 function harvest(i) {
   const p = S.tiles[i]; if (!p || stageOf(p) < 3) return;
-  const sp = SPECIES[p.sp], loc = tileLoc(i); const { f, s } = harvestCore(i);
+  const sp = SPECIES[p.sp], loc = tileLoc(i); const { f, s } = harvestCore(i); sfx('harvest');
   syncTile(i); save(); hud();
   setTimeout(() => maybeBoost('harvest', { loc, sp: p.sp, f, s }), 900);   // v0.66: now and then, offer a Double Harvest
   if (S.stats.harvests % 50 === 0) promoMilestone('harvest' + S.stats.harvests);
@@ -1779,7 +1800,7 @@ for (const t of TREE_IDS) PLACE_BUY['tree_' + t] = { what: 'orchardtree', tree: 
 function commitBuy(p) {
   const b = p?.buy; if (!b) return true;
   const c = buyCost(b.id); if (!canPay(c)) { toast(`You need ${missingText(c)}`); return false; }
-  S.coins -= c.coins; b.paid = c.coins; PLACE_BUY[b.id].apply(); S.stats.placeBuys = (S.stats.placeBuys || 0) + 1;
+  S.coins -= c.coins; b.paid = c.coins; PLACE_BUY[b.id].apply(); sfx('buy'); S.stats.placeBuys = (S.stats.placeBuys || 0) + 1;
   if (truckTimed()) { const loc = curLoc(); W.spawnVan({ stopX: DELIV_STOP[loc](), ox: loc === 'orchard' ? ORCH_X : 0, from: 22, onPark: (car) => { W.dropCrates(car.group.position.x, ROAD.z0 - 0.45, 1); setTimeout(() => car.leave(), TRUCK.park); } }); }   // v0.65: placed buys arrive by van too (placed at once)
   return true;
 }
@@ -1922,13 +1943,13 @@ function craftMake_(c, rid) {
   if (!S[C.built] || building[c] || k < 0 || !r || !recipeHere(c, r) || (S.inv[r.in] || 0) < r.n) return false;
   S.inv[r.in] -= r.n; slots[k] = { rid, item: r.item, start: now(), ms: r.s * 1000 * craftK() };
   save(); syncCraft(c); hud(); if (panel === c) renderPanel();
-  popAt(spotV(c, 2.4), `${C.doing} ${r.name}…`); return true;
+  popAt(spotV(c, 2.4), `${C.doing} ${r.name}…`); sfx(c === 'press' || c === 'opress' ? 'press' : 'tap'); return true;
 }
 function craftCollect(c, k) { return inBag(standLoc(c), () => craftCollect_(c, k)); }
 function craftCollect_(c, k) {
   const C = CRAFT[c], t = S[C.slots][k]; if (!t || now() < t.start + t.ms) return false;
   S.inv[t.item] = (S.inv[t.item] || 0) + 1; S[C.slots][k] = null; S.stats.crafts = (S.stats.crafts || 0) + 1;
-  popAt(spotV(c, 2.4), `${itemSvg(t.item)}+1 ${ITEMS[t.item].name}`);
+  popAt(spotV(c, 2.4), `${itemSvg(t.item)}+1 ${ITEMS[t.item].name}`); sfx(c === 'press' || c === 'opress' ? 'press' : 'pick');
   save(); syncCraft(c); hud(); if (panel === c) renderPanel(); return true;
 }
 function syncCraft(c) { if (!W.setCraft) return; W.setCraft(c, S[CRAFT[c].slots].map((t) => { if (!t) return null; const r = craftRecipe(c, t.rid); return { done: now() >= t.start + t.ms, color: r.color, glow: ITEMS[t.item].glow }; })); }
@@ -1976,7 +1997,7 @@ function plantOrchard(k, sp, at = now()) {
   S.orchard[k] = { sp, at, growMs, cycleMs: d.cycleS * 1000 * lk, next: at + growMs };
   S.stats.treesPlanted = (S.stats.treesPlanted || 0) + 1;
   W.addOrchardTree(k, sp); syncOrchard(); save(); hud(); refreshShade(true);
-  const p = ORCHARD_TREE_SPOTS[k]; W.poof(V3(p.x, 0.4, p.z), '#9CC49A', 14, 1.4); popAt(V3(p.x, 1.4, p.z), `${d.name} planted`);
+  const p = ORCHARD_TREE_SPOTS[k]; W.poof(V3(p.x, 0.4, p.z), '#9CC49A', 14, 1.4); popAt(V3(p.x, 1.4, p.z), `${d.name} planted`); sfx('plant');
   return true;
 }
 function pickTree(k) { return inBag('orchard', () => pickTree_(k)); }
@@ -1985,7 +2006,7 @@ function pickTree_(k) {
   const d = TREES[t.sp], n = d.yield + lvFlower(t.sp);
   S.inv[d.fruit] = (S.inv[d.fruit] || 0) + n; t.dry = now(); t.next = t.dry + t.cycleMs; S.stats.fruitPicks = (S.stats.fruitPicks || 0) + 1;
   const p = ORCHARD_TREE_SPOTS[k]; popAt(V3(p.x, 2.4, p.z), `${itemSvg(d.fruit)}+${n} ${d.fruitName}`);
-  autoWaterTrees(); save(); syncOrchard(); hud(); if (panel === 'orchardtree') renderPanel(); return true;
+  autoWaterTrees(); save(); syncOrchard(); hud(); if (panel === 'orchardtree') renderPanel(); sfx('pick'); return true;
 }
 // ---- v0.67.1: trees need water to fruit again; tree-row Irrigation ----
 // After a pick the tree is dry (t.dry = when it was picked): its next fruit only starts growing once it is watered — 1 water
@@ -2006,7 +2027,7 @@ function waterTree(k, auto = false, at = now()) {
   const b = treeWaterSrc(k, !auto); if (!b) { if (!auto) toast('Your rain barrels are empty — build a Rain Barrel in the Orchard (Build menu) or wait for the rain'); return false; }
   takeFromBarrel(b); t.next = Math.max(t.dry, at) + t.cycleMs; delete t.dry;
   S.stats.treesWatered = (S.stats.treesWatered || 0) + 1; if (auto) S.stats.irrigated = (S.stats.irrigated || 0) + 1; else S.stats.watered++;
-  if (!quiet) { const p = ORCHARD_TREE_SPOTS[k]; W.poof?.(V3(p.x, 1.2, p.z), '#8EC0D0', 12, 1.2); if (!auto) popAt(V3(p.x, 2.2, p.z), `<i data-icon="water"></i>Watered · fruiting again in ${fmtTime(t.cycleMs)}`); }
+  if (!quiet) { const p = ORCHARD_TREE_SPOTS[k]; W.poof?.(V3(p.x, 1.2, p.z), '#8EC0D0', 12, 1.2); if (!auto) sfx('water'); if (!auto) popAt(V3(p.x, 2.2, p.z), `<i data-icon="water"></i>Watered · fruiting again in ${fmtTime(t.cycleMs)}`); }
   syncBarrels(); syncOrchard(); return true;
 }
 // irrigated rows water their own trees as soon as they are picked (from the row's plot barrel, else any Orchard barrel)
@@ -2168,6 +2189,29 @@ function claimFollow(id) {
   if (panel === 'settings') renderPanel();
   return true;
 }
+// v0.7 — Sound settings: separate Music / Sound Effects volume + mute, saved in S.audio.
+function soundSetHTML() {
+  const A = S.audio, row = (k, name) => {
+    const v = Math.round((A[k] || 0) * 100), m = !!A[k + 'Mute'];
+    return `<div class="row vol-row${m ? ' muted' : ''}" data-vol-row="${k}"><b>${name} · <span data-vol-pct="${k}">${m ? 'Muted' : v + '%'}</span></b><input class="vol" type="range" min="0" max="100" step="5" value="${v}" data-vol="${k}" aria-label="${name} volume"><button class="btn mute-btn${m ? ' on' : ''}" data-act="mute-${k}">${m ? 'Unmute' : 'Mute'}</button></div>`;
+  };
+  return `<div class="sec-title" id="sound-settings">Sound</div><div class="list sound-set">${row('music', 'Music')}${row('sfx', 'Sound Effects')}</div>`;
+}
+function setVolume(k, v, commit) {
+  if (k !== 'music' && k !== 'sfx') return;
+  S.audio[k] = Math.max(0, Math.min(1, (+v || 0) / 100));
+  if (commit && S.audio[k] > 0) S.audio[k + 'Mute'] = false;
+  Sound?.apply();
+  document.querySelectorAll(`[data-vol-pct="${k}"]`).forEach(e => { e.textContent = S.audio[k + 'Mute'] ? 'Muted' : Math.round(S.audio[k] * 100) + '%'; });
+  if (commit) { save(); if (k === 'sfx') sfx('coin'); if (panel === 'settings') renderPanel(); }
+}
+function toggleMute(k) {
+  S.audio[k + 'Mute'] = !S.audio[k + 'Mute'];
+  Sound?.apply(); save();
+  if (panel === 'settings') renderPanel();
+}
+document.addEventListener('input', e => { const t = e.target; if (t?.matches?.('input[data-vol]')) setVolume(t.dataset.vol, t.value, false); });
+document.addEventListener('change', e => { const t = e.target; if (t?.matches?.('input[data-vol]')) setVolume(t.dataset.vol, t.value, true); });
 function settingsHTML() {
   const games = OTHER_GAMES.filter((g) => g.id !== CROSS_PROMO.gameId).map((g) => `<div class="game-row" data-game="${g.id}"><div class="game-art">${gameArt(g.id)}</div>
     <div class="meta"><b>${g.name}${g.status === 'soon' ? ' <span class="soon-tag">Coming soon</span>' : ''}</b><small class="gr-tag">${g.tagline}</small><small>${g.blurb}</small></div>
@@ -2180,7 +2224,7 @@ function settingsHTML() {
       <span class="fb-ico">${SOCIAL_ART[p.id]}</span><span class="fb-txt"><b>${p.name}</b><small>${p.handle}</small></span>
       <em>${got ? '✓ Claimed' : `+${FOLLOW_REWARD} <i data-icon="jewel"></i>`}</em></a>`; }).join('');
   const nGot = SOCIALS.filter((p) => S.follows?.[p.id]).length;
-  return `<div class="sec-title" id="follow-us">Follow us</div><p class="muted follow-note">${nGot < SOCIALS.length ? `Follow Petalspire for news and sneak peeks — get ${FOLLOW_REWARD} free Jewel for each one (once per platform).` : 'Thanks for following Petalspire everywhere!'}</p><div class="follow-list">${follow}</div>
+  return soundSetHTML() + `<div class="sec-title" id="follow-us">Follow us</div><p class="muted follow-note">${nGot < SOCIALS.length ? `Follow Petalspire for news and sneak peeks — get ${FOLLOW_REWARD} free Jewel for each one (once per platform).` : 'Thanks for following Petalspire everywhere!'}</p><div class="follow-list">${follow}</div>
     <div class="sec-title" id="play-other-games">More from ${STUDIO.name}</div>${studioHeadHTML()}<div class="list games">${promoCardHTML()}${games}</div>
     ${adsRow ? `<div class="sec-title">Ads</div><div class="list">${adsRow}</div>` : ''}
     <div class="sec-title">Help</div><div class="list"><button class="row set-btn" data-act="tips-again"><b>Show tips again</b><small>Replay the helpful hints from the start</small></button></div>
@@ -2238,13 +2282,13 @@ function satchelHTML() {
   const cells = res('wood', 'Wood', S.wood) + res('scrap', 'Scrap Metal', S.scrap || 0) + (S.inv.sapling ? res('sapling', 'Tree sapling', S.inv.sapling) : '') +
     byValue(ids.filter((id) => S.inv[id] > 0)).map((id) => `<div class="inv">${itemSvg(id)}<b>${ITEMS[id].name}</b><small>×${S.inv[id]}</small>${locTagCell(id)}</div>`).join('') +
     // v0.65: rain barrels are installed fixtures — never in the Bag (tap one in the garden to see its water and upgrade it with coins)
-    byValue(['glycerin', 'vinegar'].filter((id) => S.inv[id] > 0 || S.owned.tincture)).map((id) => `<div class="inv">${itemSvg(id)}<b>${BASES[id].name}</b><small>×${S.inv[id]}</small></div>`).join('') +
+    byValue(['glycerin', 'vinegar'].filter((id) => S.inv[id] > 0 || (S.owned.tincture && S.inv === bagOf('home')))).map((id) => `<div class="inv">${itemSvg(id)}<b>${BASES[id].name}</b><small>×${S.inv[id]}</small></div>`).join('') +
     byValue(SELL_ORDER.filter((id) => ['tinc_', 'oil_', 'hydro_', 'tea_', 'press_', 'jar_', 'fruit_', 'bag'].some((p) => id.startsWith(p)) && S.inv[id] > 0)).map((id) => `<div class="inv">${itemSvg(id)}<b>${ITEMS[id].name}</b><small>×${S.inv[id]}</small>${locTagCell(id)}</div>`).join('');
   // v0.65: garden features show in the bag only while they are NOT on the map (placed/built ones leave it; picked up → back in)
   // v0.66.1: the Bag lists ONLY garden features bought at the Market and not placed yet (tools live on the tool dock,
   // Irrigation on its barrels, built stands on the map). Unbuilt bought buildings keep their Place button below.
   const feats = GF_IDS.filter((k) => S.gfInv?.[k] > 0 && S.gfBought?.[k]).sort((a, b) => (FEATURES[b].price || 0) - (FEATURES[a].price || 0) || FEATURES[a].name.localeCompare(FEATURES[b].name)).map(gfBagRow).join('');
-  const here = curLoc(), sendable = S.lots.orchard ? [...ids, ...(here === 'home' ? ['sapling'] : []),   /* v0.65: saplings never go Home */ 'glycerin', 'vinegar', ...SELL_ORDER.filter((id) => !ids.includes(id))].filter((id, k, a) => a.indexOf(id) === k && S.inv[id] > 0) : [];
+  const here = curLoc(), sendable = S.lots.orchard ? [...ids, ...(here === 'home' ? ['sapling'] : []),   /* v0.65: saplings never go Home */ ...(here === 'home' ? [] : ['glycerin', 'vinegar']) /* v0.7: Tincture bases are Home-only (never sent to the Orchard) */, ...SELL_ORDER.filter((id) => !ids.includes(id))].filter((id, k, a) => a.indexOf(id) === k && S.inv[id] > 0) : [];
   const sendRows = byValue(sendable).map((id) => `<div class="row send-row" data-send-row="${id}"><div class="ico">${id === 'sapling' ? '<i data-icon="sapling" style="width:34px;height:34px"></i>' : itemSvg(id)}</div><div class="meta"><b>${id === 'sapling' ? 'Tree sapling' : ITEMS[id]?.name || BASES[id]?.name} ×${S.inv[id]}</b>${ITEMS[id] && !sellsAt(id, here) ? `<small><span class="loc-tag sm">${sellTag(id)}</span></small>` : ''}</div><div class="acts">${sendBtns(id)}</div></div>`).join('');
   return `<div class="bag-loc" data-bag-loc="${here}"><i data-icon="${here === 'orchard' ? 'sapling' : 'stand'}"></i><span><b>${here === 'orchard' ? 'Orchard Bag' : 'Home Bag'}</b><small>Goods here stay ${here === 'orchard' ? 'at the Orchard' : 'at Home'} · Coins, Wood, Scrap, Jewels and cards are shared</small></span></div>
     <div class="inv-grid">${cells || ''}</div>${bagStrip()}
@@ -2578,7 +2622,7 @@ function rewardHTML() {
 }
 // v0.65: the Watch Ad bonus scales with progression (Home plots, the Orchard and its plots) so it stays worth a few minutes
 // of typical income at every stage. Base picks (data.js) × adMult(): fresh garden ×1 · all 6 Home plots ×4 · + Orchard ×6 · + its 3 plots ×7.8.
-const adMult = () => +(1 + 0.5 * homeLotsOwned() + (S.lots.orchard ? 2 : 0) + 0.6 * ORCH_FOR_SALE.filter((l) => S.lots[l]).length).toFixed(2);
+const adMult = () => +(1 + 0.25 * homeLotsOwned() + (S.lots.orchard ? 1 : 0) + 0.3 * ORCH_FOR_SALE.filter((l) => S.lots[l]).length).toFixed(2);   // v0.7 economy: was 0.5 / 2 / 0.6 (max ×7.8 → ×4.4)
 function adPicks() { const B = ADS.rewarded.picks, m = adMult(); return { coins: Math.round(B.coins * m / 5) * 5, wood: Math.round(B.wood * m), scrap: Math.max(B.scrap, Math.round(B.scrap * m)) }; }
 let adPickEl = null;
 function closeAdPicker() { adPickEl?.remove(); adPickEl = null; }
@@ -3044,7 +3088,7 @@ function bulkSell_(id, n, loc = curLoc()) {
 function bulkAll(loc = curLoc()) { return inBag(loc, () => bulkAll_(loc = curLoc())); }
 function bulkAll_(loc = curLoc()) { let t = 0, q = 0; for (const id of bulkItems(loc)) { const n = S.inv[id]; const each = bulkPrice(id, loc); S.inv[id] = 0; t += n * each; q += n; }
   if (!q) return 0; S.coins += t; S.stats.bulkSold = (S.stats.bulkSold || 0) + q; S.stats.bulkEarned = (S.stats.bulkEarned || 0) + t;
-  save(); hud(); checkGoals(); if (panel) renderPanel(); W.bulkPop?.(loc); toast(`📦 Bulk sold ${q} items · +${t} coins`); return t; }
+  save(); hud(); checkGoals(); if (panel) renderPanel(); W.bulkPop?.(loc); sfx('coin'); toast(`📦 Bulk sold ${q} items · +${t} coins`); return t; }
 
 // v0.67.1: Market item classes. ONE-TIME items (single builds and unique features) leave the Market once bought.
 // Everything else always stays buyable: CONSUMABLES (supplies, seeds, saplings, bases, water) and REPEATABLE / STACKABLE items
@@ -3059,7 +3103,7 @@ function buyCopy(id) {   // v0.67.1: stackables stay buyable — another card co
   if (!MKT_STACK.includes(id) || (!S.marketBuilt && id !== 'parking')) return false; const p = copyPrice(id);   // v0.68.1: Parking copies are sold in the Build menu too
   if (copyMax(id)) { toast(`${FEATURES[id].name} has every copy it can use`); return false; }
   if (S.coins < p) { toast(`You need ${p - S.coins} more coins`); return false; }
-  S.coins -= p; S.stats.marketBuys = (S.stats.marketBuys || 0) + 1; S.discovered[id] = S.unlocked[id] = true; if (id !== 'parking') S.owned[id] = true; const c = addCard(id);
+  S.coins -= p; sfx('buy'); S.stats.marketBuys = (S.stats.marketBuys || 0) + 1; S.discovered[id] = S.unlocked[id] = true; if (id !== 'parking') S.owned[id] = true; const c = addCard(id);
   if (id === 'parking' && canUpgrade(id)) { upgradeCard(id); syncParking(); return true; }   // v0.68.1: a Parking Lot copy that reaches the next level levels it up at once (Home and Orchard lots)
   save(); hud(); if (panel) renderPanel();
   toast(`+1 ${FEATURES[id].name} card · ${c.n} cop${c.n === 1 ? 'y' : 'ies'}${canUpgrade(id) ? ' · ready to level up!' : ''}`); return true;
@@ -3139,7 +3183,7 @@ function marketHTML() {
       return `<div class="row place-buy" data-traffic-row="${id}"><div class="ico">${FEATURE_ART[b]}</div><div class="meta"><b>${o ? 'Orchard ' : ''}${FEATURES[b].name}</b><small>${ftag(b)} · built by the ${o ? 'Orchard ' : ''}road as soon as you buy it · ${b === 'parking' ? `${g ? g.split(' — ')[0] + ' · ' : ''}customers arrive 2 cars at a time · more Parking Lot cards level it up (up to 6 spots)` : `Run ad: ${BILLBOARD.mult}× traffic for ${BILLBOARD.boostMs / 60000} min, 1-hour cool-off`}</small></div><div class="acts"><button class="btn btn-primary sm buy-place" data-buy="${id}" data-price="${c.coins}" ${canPay(c) && !g ? '' : 'disabled'}>${[coin(c.coins), c.wood && woodTag(c.wood)].filter(Boolean).join('')}</button></div></div>`; };
     for (const [id, b] of [[pid, 'parking'], [bid, 'billboard']]) { if (S.owned[id] || S[TRAF[id].key]) continue;
       sec.build.push(S.unlocked[b] ? tRow(id) : lockedRow(FEATURE_ART[b], FEATURES[b].name)); } }
-  for (const b of SUPPLY_CARDS) { const d = BASES[b], hb = inBag('home', () => S.inv[b]);   // v0.67.1: consumable — always buyable, at every Market (goes to the Home Bag)
+  if (atHome) for (const b of SUPPLY_CARDS) { const d = BASES[b], hb = inBag('home', () => S.inv[b]);   // v0.67.1: consumable — always buyable · v0.7: Home Market only (Tincture bases are used at Home only)
     sec.supplies.push(...(baseOpen(b) ? [buyRow(b, itemSvg(b), d.name, `${d.blurb} · for the Tincture Stand · you have ${hb}${atHome ? '' : ' · goes to your Home Bag'}`, d.price), buyRow(b + '5', itemSvg(b), `${d.name} ×${d.pack.n}`, `Pack of ${d.pack.n} · save ${d.price * d.pack.n - d.pack.price} coins`, d.pack.price)]   // v0.68: two rows, so each sorts by its own price
       : !S.unlocked[b] && !SHOW_LOCKED ? [] : [ `<div class="row locked supply-locked" data-supply-locked="${b}"><div class="ico">${itemSvg(b)}</div><div class="meta"><b>${d.name}</b><small>${baseNeeds(b).join(' · ')}${S.inv[b] ? ` · you have ${S.inv[b]}` : ''}</small></div><i data-icon="lock" style="width:22px;height:22px"></i></div>`])); }
   { const d = FEATURES.beehive, need = hiveLots(), more = need.length - (S.hiveInv || 0);
@@ -3285,7 +3329,7 @@ function buy(id, price) {
   { const b = BASES[id] ? id : BASES[id.slice(0, -1)] ? id.slice(0, -1) : null; if (b && !baseOpen(b)) { toast(baseNeeds(b).join(' · ')); return; } }   // v0.52
   if (MKT_STACK.includes(id) && (S.owned[id] || (id === 'parking' && S.owned.oparking))) return buyCopy(id);   // v0.67.1: stackables stay buyable
   if (FEATURES[id] && !BASES[id] && (S.owned[id] || inTransit(id))) return;   // v0.65: a feature is bought once (also while its truck is on the way)
-  S.coins -= price; S.stats.marketBuys = (S.stats.marketBuys || 0) + 1;
+  S.coins -= price; S.stats.marketBuys = (S.stats.marketBuys || 0) + 1; sfx('buy');
   { const dest = mktDest(id); if (dest !== curLoc()) { inBag(dest, () => grantBuy(id)); return; } }   // v0.67.1: used elsewhere → straight to that Bag
   if (!truckTimed()) return grantBuy(id);   // automated test browsers: delivered at once unless a test opts in ('petalspire.truckTest')
   orderDelivery(id); save(); hud(); if (panel) renderPanel();
@@ -3373,6 +3417,8 @@ const orchardLocked = () => LOT_FOR_SALE.some((l) => !S.lots[l]);   // v0.6: eve
 // location's selling stand with what it made (Farm Stand at Home, Orchard Stand at the Orchard — sell-by-location rules).
 const shiftH = () => WORKER.shiftH + charmV('pocketwatch');   // v0.65: + Gardener's Pocket Watch hours
 const SHIFT_MS = () => shiftH() * 3600000;
+// v0.7: '1 hour' / '1 h 15 min' / '24 hours'
+const shiftTxt = (h = shiftH()) => { const mn = Math.round(h * 60), hh = Math.floor(mn / 60), r = mn % 60; return r ? (hh ? `${hh} h ${r} min` : `${r} min`) : `${hh} hour${hh === 1 ? '' : 's'}`; };
 function workersOn() { return !!S.mapOpen; }
 function workerLoc(lot) { return ORCH_LOTS.includes(lot) ? 'orchard' : 'home'; }
 function lotBedTiles(lot) { return S.beds.flatMap((sid, b) => (lotOfSite(sid) === lot ? bedTiles(b) : [])); }
@@ -3382,7 +3428,7 @@ function workStands0(lot) {
   if (S.rackBuilt && SPOTS.rack && lotAt(SPOTS.rack[0], SPOTS.rack[1]) === lot) out.unshift('rack');
   return out;
 }
-function workerStatus(lot) { const w = S.workers[lot]; if (!w) return null; const left = w.end - now(); return left > 0 ? { working: true, left, txt: `Working · ${fmtTime(left)} left` } : { working: false, left: 0, txt: 'Needs pay' }; }
+function workerStatus(lot) { const w = S.workers[lot]; if (!w) return null; const left = w.end - now(); return left > 0 ? { working: true, left, txt: `Working · ${fmtTime(left)} left` } : { working: false, left: 0, txt: 'Shift over · hire again' }; }
 function workerSpot(lot) {
   const b = S.beds.findIndex((sid) => lotOfSite(sid) === lot), near = b >= 0 ? bedCenter(b) : (([x, z]) => ({ x, z }))(lotCenter(lot));
   if (b >= 0) {   // just outside the bed's rim, behind it first (facing the camera across the bed, never hidden by a stand)
@@ -3401,20 +3447,20 @@ function hireWorker(lot) {
   S.workers[lot] = { x: p.x, z: p.z, hired: now(), end: now() + (pass ? (S.gardenerPassH || 24) * 3600e3 : SHIFT_MS()), pass, done: { harvests: 0, planted: 0, watered: 0, picked: 0, made: 0, stocked: 0 }, made: [] };
   S.stats.workersHired = (S.stats.workersHired || 0) + 1;
   W.addWorker(lot, p.x, p.z, true); W.setWorker(lot, 'work'); save(); hud(); renderPanel();
-  toast(`🌿 A Gardener is tending ${lotName(lot)} · ${pass ? S.gardenerPassH || 24 : shiftH()}-hour shift`); workerPass(lot); return true;
+  toast(`🌿 A Gardener is tending ${lotName(lot)} for ${pass ? shiftTxt(S.gardenerPassH || 24) : shiftTxt()}`); sfx('buy'); workerPass(lot); return true;
 }
 function payWorker(lot) {
   const w = S.workers[lot]; if (!w || now() < w.end) return false;
-  if (S.coins < WORKER.wage) { toast(`The Gardener’s wage is ${WORKER.wage} coins`); return false; }
-  S.coins -= WORKER.wage; w.end = now() + SHIFT_MS(); w.ended = false; w.done = { harvests: 0, planted: 0, watered: 0, picked: 0, made: 0, stocked: 0 };
+  if (S.coins < WORKER.wage) { toast(`Hiring the Gardener again costs ${WORKER.wage} coins`); return false; }
+  S.coins -= WORKER.wage; w.hired = now(); w.pass = false; w.end = now() + SHIFT_MS(); w.ended = false; w.done = { harvests: 0, planted: 0, watered: 0, picked: 0, made: 0, stocked: 0 };
   S.stats.workerPay = (S.stats.workerPay || 0) + WORKER.wage;
   W.setWorker(lot, 'work'); save(); hud(); renderPanel(); if (selected != null) renderSheet();
-  toast(`🌿 Paid ${WORKER.wage} coins · a new ${shiftH()}-hour shift on ${lotName(lot)}`); workerPass(lot); return true;
+  toast(`🌿 Hired again for ${WORKER.wage} coins · ${shiftTxt()} on ${lotName(lot)}`); sfx('buy'); workerPass(lot); return true;
 }
 const workerKeep = (lot, sp) => lotBedTiles(lot).length;   // seeds of each kind held back for replanting
 // v0.66.1: the seed a gardener plants into an empty plot: the most valuable flower whose seeds are in this location's Bag
 const workerSeed = () => Object.keys(SPECIES).filter((sp) => S.inv['seed_' + sp] > 0 && ITEMS['flower_' + sp]).sort((a, b) => sellOf('flower_' + b) - sellOf('flower_' + a) || a.localeCompare(b))[0] || null;
-function workerPass(lot) { return inBag(workerLoc(lot), () => workerPass_(lot)); }
+function workerPass(lot) { workerBusy++; try { return inBag(workerLoc(lot), () => workerPass_(lot)); } finally { workerBusy--; } }
 function workerPass_(lot) {
   const w = S.workers[lot]; if (!w || now() >= w.end) return 0;
   const d = w.done || (w.done = {}), made = new Set(w.made || []); let n = 0; quiet++;
@@ -3483,7 +3529,7 @@ function catchUpWorkers(from = bootSavedAt, to = Date.now()) {
 function syncWorkers() {
   for (const [lot, w] of Object.entries(S.workers)) {
     const done = now() >= w.end; W.setWorker(lot, done ? 'pay' : 'work');
-    if (done && !w.ended) { w.ended = true; save(); toast(`🌿 The Gardener on ${lotName(lot)} finished their shift · pay ${WORKER.wage} coins for another ${shiftH()} hours`); if (panel === 'worker' && panelArg === lot) renderPanel(); }
+    if (done && !w.ended) { w.ended = true; save(); toast(`🌿 The Gardener on ${lotName(lot)} finished their ${w.pass ? shiftTxt(S.gardenerPassH || 24) : shiftTxt()} shift · hire again for ${WORKER.wage} coins`); if (panel === 'worker' && panelArg === lot) renderPanel(); }
   }
 }
 
@@ -3576,24 +3622,24 @@ const GARDENER_SVG = `<svg viewBox="0 0 64 64" width="54" height="54"><ellipse c
 function workerRowLine(lot) { const s = workerStatus(lot); return s ? `<small class="worker-line ${s.working ? '' : 'pay'}">Gardener · ${s.txt}</small>` : `<small class="worker-line">No Gardener yet</small>`; }
 function workerRowAct(lot) {
   const s = workerStatus(lot);
-  if (!s) return `<div class="acts"><button class="btn btn-primary sm" data-act="hire-worker" data-lot="${lot}" ${S.coins >= WORKER.hire || S.gardenerPasses > 0 ? '' : 'disabled'}>${S.gardenerPasses > 0 ? `Hire · free ${S.gardenerPassH || 24} h pass` : `Hire · ${coin(WORKER.hire)}`}</button></div>`;
-  return `<div class="acts">${s.working ? `<button class="btn sm" data-act="open-worker" data-lot="${lot}">View</button>` : `<button class="btn btn-gold sm" data-act="pay-worker" data-lot="${lot}" ${S.coins >= WORKER.wage ? '' : 'disabled'}>Pay · ${coin(WORKER.wage)}</button>`}</div>`;
+  if (!s) return `<div class="acts"><button class="btn btn-primary sm" data-act="hire-worker" data-lot="${lot}" ${S.coins >= WORKER.hire || S.gardenerPasses > 0 ? '' : 'disabled'}>${S.gardenerPasses > 0 ? `Hire · free ${S.gardenerPassH || 24} h pass` : `Hire 1 h · ${coin(WORKER.hire)}`}</button></div>`;
+  return `<div class="acts">${s.working ? `<button class="btn sm" data-act="open-worker" data-lot="${lot}">View</button>` : `<button class="btn btn-gold sm" data-act="pay-worker" data-lot="${lot}" ${S.coins >= WORKER.wage ? '' : 'disabled'}>Hire again · ${coin(WORKER.wage)}</button>`}</div>`;
 }
 function workerLine(i) {
   const lot = lotOfSite(bedOfTile(i)), s = workerStatus(lot); if (!s) return '';
-  return `<p class="worker-sheet ${s.working ? '' : 'pay'}"><span class="wk-ico">👩‍🌾</span><span><b>Gardener</b> · <span id="sheet-worker">${s.txt}</span></span>${s.working ? `<button class="btn sm" data-act="open-worker" data-lot="${lot}">Details</button>` : `<button class="btn btn-gold sm" data-act="pay-worker" data-lot="${lot}" ${S.coins >= WORKER.wage ? '' : 'disabled'}>Pay ${WORKER.wage}</button>`}</p>`;
+  return `<p class="worker-sheet ${s.working ? '' : 'pay'}"><span class="wk-ico">👩‍🌾</span><span><b>Gardener</b> · <span id="sheet-worker">${s.txt}</span></span>${s.working ? `<button class="btn sm" data-act="open-worker" data-lot="${lot}">Details</button>` : `<button class="btn btn-gold sm" data-act="pay-worker" data-lot="${lot}" ${S.coins >= WORKER.wage ? '' : 'disabled'}>Hire again ${WORKER.wage}</button>`}</p>`;
 }
 function workerHTML(lot) {
   const w = S.workers[lot], s = workerStatus(lot); if (!w) return `<p class="muted">No Gardener on this plot.</p>`;
   const d = w.done || {}, st = workStands(lot).map((r) => ROOF_NAMES[r] || 'Drying Rack'), loc = workerLoc(lot);
-  const k = s.working ? 1 - s.left / SHIFT_MS() : 1;
+  const k = s.working ? 1 - s.left / Math.max(1, w.end - (w.hired || w.end - SHIFT_MS())) : 1;
   return `<div class="lot-card worker-card">${GARDENER_SVG}<div><b>Gardener · ${lotName(lot)}</b><small id="worker-status" class="${s.working ? '' : 'pay'}">${s.txt}</small></div></div>
     <div class="progress"><b style="width:${(Math.min(1, k) * 100).toFixed(1)}%"></b></div>
     <div class="sec-title">This shift</div><p class="muted" style="margin:4px">${d.harvests || 0} harvested · ${d.planted || 0} replanted · ${d.watered || 0} watered${d.picked ? ` · ${d.picked} fruit picks` : ''} · ${d.made || 0} goods made · ${d.stocked || 0} put on the ${loc === 'orchard' ? 'Orchard Stand' : 'Farm Stand'}</p>
     <div class="sec-title">On this plot</div><p class="muted" style="margin:4px">Harvests ripe plants and replants the same seed from your Bag (skips if none), waters from this plot’s barrel (Blue Lotus barrels get both fills), ${ORCHARD_TREE_SPOTS.some((p) => p.lot === lot) ? 'picks ripe fruit, ' : ''}${st.length ? `runs the ${st.length > 1 ? st.slice(0, -1).join(', ') + ' and the ' + st[st.length - 1] : st[0]} with your ingredients, ` : ''}and restocks the ${loc === 'orchard' ? 'Orchard Stand' : 'Farm Stand'} with what it makes${(loc === 'orchard' ? S.oshedBuilt : S.standBuilt) ? '' : ' (once it is built)'}.</p>
-    <div class="ts-actions">${s.working ? `<button class="btn" disabled>Paid · next pay in ${fmtTime(s.left)}</button>` : `<button class="btn btn-gold" data-act="pay-worker" data-lot="${lot}" ${S.coins >= WORKER.wage ? '' : 'disabled'}>Pay ${coin(WORKER.wage)} · new ${shiftH()}-hour shift</button>`}</div>
+    <div class="ts-actions">${s.working ? `<button class="btn" disabled>Hired · ${fmtTime(s.left)} left</button>` : `<button class="btn btn-gold" data-act="pay-worker" data-lot="${lot}" ${S.coins >= WORKER.wage ? '' : 'disabled'}>Hire again · ${coin(WORKER.wage)} · ${shiftTxt()}</button>`}</div>
     ${!s.working && S.coins < WORKER.wage ? `<p class="muted" style="margin:8px 4px 0;text-align:center">You need ${WORKER.wage - S.coins} more coins.</p>` : ''}
-    <p class="muted" style="margin:10px 4px 0">A shift lasts ${shiftH()} hours of real time, including while you’re away.</p>`;
+    <p class="muted" style="margin:10px 4px 0">A hire lasts ${shiftTxt()} of real time (the clock keeps running while you’re away). Then the Gardener stops and needs hiring again for ${WORKER.hire} coins.</p>`;
 }
 function lotHTML(id) {
   if (ORCH_FOR_SALE.includes(id)) return orchLotHTML(id);
@@ -3643,7 +3689,7 @@ function buyLot(id) {
 const curLoc = () => (S.loc === 'orchard' && S.lots.orchard ? 'orchard' : 'home');
 function setLoc(loc, quiet) {
   if (loc === 'orchard' && !S.lots.orchard) return false;
-  S.loc = loc; PAN = PANS[loc]; W.setLocation(loc === 'home' ? null : LOCATIONS[loc].target);
+  S.loc = loc; PAN = PANS[loc]; Sound?.setScene(loc); W.setLocation(loc === 'home' ? null : LOCATIONS[loc].target);
   document.body.dataset.loc = loc; $('#loc-chip').textContent = LOCATIONS[loc].name;
   $('#loc-chip').classList.toggle('hidden', loc === 'home');
   if (!quiet) save();
@@ -3998,6 +4044,7 @@ $('#panel-body').addEventListener('click', (e) => {
   if (a === 'watch-ad') return watchAd();
   if (a === 'cons-finish') return hurryCons(b.dataset.kind);
   if (a === 'open-daily') { closePanel(); return showDaily(); }
+  if (a === 'mute-music' || a === 'mute-sfx') return toggleMute(a.slice(5));
   if (a === 'tips-again') { S.tips = {}; save(); closePanel(); const g = GOALS[S.goal]; tip(g ? g.hint : 'chop'); return; }
   if (a === 'reset') return confirmBox('<h3>Reset your garden?</h3><p class="muted">This erases all progress on this device and starts again in the woods.</p>', 'Reset', () => {
     clearTimeout(saveTimer); localStorage.removeItem(SAVE_KEY); localStorage.removeItem(V02_KEY); S = null; location.reload(); });
@@ -4132,6 +4179,7 @@ function oleaveQueue() {
   nextOCust = Math.max(nextOCust, now() + 2500); if (panel === 'ostand') renderPanel();
 }
 function coinFly(pos) {
+  sfx('coin');
   const s = W.project(new THREE.Vector3(pos.x, 1.4, pos.z)); const t = $('#pill-coins').getBoundingClientRect();
   const c = el('div', 'coin-fly', ICONS.coin); c.style.left = s.x + 'px'; c.style.top = s.y + 'px'; c.style.setProperty('--tx', (t.left + t.width * 0.25 - s.x) + 'px'); c.style.setProperty('--ty', (t.top + t.height / 2 - s.y) + 'px');
   $('#popups').appendChild(c); setTimeout(() => c.remove(), 900);
@@ -4139,6 +4187,20 @@ function coinFly(pos) {
 W.frameHooks.push(() => {
   const here = curLoc();
   for (const c of [...custs, ...ocusts]) if (c.bubble && c.car) { c.bubble.style.visibility = (c.loc || 'home') === here ? '' : 'hidden'; const p = c.car.group.position; const s = W.project(new THREE.Vector3(p.x, 2.15, p.z)); c.bubble.style.left = s.x + 'px'; c.bubble.style.top = s.y + 'px'; }
+});
+
+// v0.7: a small timer pill over each hired Gardener (time left, or 'Hire again' once the hour is up)
+const wkTimers = new Map();
+function wkTimerText(lot) { const w = S.workers[lot]; if (!w) return null; const left = w.end - now(); if (left <= 0) return { t: 'Hire again', c: 'done' }; const mn = Math.ceil(left / 60000); return { t: '⏱ ' + (mn >= 60 ? `${Math.floor(mn / 60)}h ${mn % 60 ? (mn % 60) + 'm' : ''}`.trim() : mn + 'm'), c: mn <= 5 ? 'low' : '' }; }
+W.frameHooks.push(() => {
+  const here = curLoc();
+  for (const [lot, el_] of wkTimers) if (!S.workers[lot]) { el_.remove(); wkTimers.delete(lot); }
+  for (const lot of Object.keys(S.workers)) {
+    let e = wkTimers.get(lot); if (!e) { e = document.createElement('div'); e.className = 'wk-timer'; e.dataset.lot = lot; $('#popups').appendChild(e); wkTimers.set(lot, e); }
+    const p = W.workerPose(lot), tt = wkTimerText(lot); if (!p || !tt || workerLoc(lot) !== here) { e.style.display = 'none'; continue; }
+    const s = W.project(new THREE.Vector3(p.x, 2.0, p.z)); e.style.display = ''; e.style.left = s.x + 'px'; e.style.top = s.y + 'px';
+    if (e.textContent !== tt.t) e.textContent = tt.t; const cn = 'wk-timer' + (tt.c ? ' ' + tt.c : ''); if (e.className !== cn) e.className = cn;
+  }
 });
 
 // ---------------- Cards ----------------
@@ -4203,7 +4265,7 @@ function applyPackCard(id, seen = new Set()) {
   const undo = { disc: !!S.discovered[id], unl: !!S.unlocked[id], irr: !!S.owned.irrigation, supply: 0 };
   S.discovered[id] = true; if (isNew) S.unlocked[id] = true;
   // v0.4: every copy stacks on its card (v0.63: Irrigation copies are level-up progress like any card); a maxed card still pays the old duplicate coins.
-    const c = addCard(id); let coins = 0; if (id === 'irrigation') S.owned.irrigation = true; if (!isNew && SUPPLY_CARDS.includes(id)) { S.inv[id] += SUPPLY_DUP; undo.supply = SUPPLY_DUP; }   /* v0.52: +2 free units per duplicate supply card */ if (!isNew && (CARD_LEVELS.upgradable(id, CARDS[id]) || FEATURES[id]?.tool) && nextAt(id) == null) {   /* v0.64: a Sickle/Plow kept at max level from an older save still pays */ coins = DUP_COINS; S.coins += coins; }
+    const c = addCard(id); let coins = 0; if (id === 'irrigation') S.owned.irrigation = true; if (!isNew && SUPPLY_CARDS.includes(id)) { bagOf('home')[id] += SUPPLY_DUP; undo.supply = SUPPLY_DUP; }   /* v0.7: free units always go to the Home Bag */   /* v0.52: +2 free units per duplicate supply card */ if (!isNew && (CARD_LEVELS.upgradable(id, CARDS[id]) || FEATURES[id]?.tool) && nextAt(id) == null) {   /* v0.64: a Sickle/Plow kept at max level from an older save still pays */ coins = DUP_COINS; S.coins += coins; }
   return { id, isNew, n: c.n, up: canUpgrade(id), coins, undo };
 }
 function buyPack(forced) {
@@ -4237,7 +4299,7 @@ const swapTierOdds = (plant, t) => { const L = swapPool(plant, false), tot = L.r
 function unapplyPackCard(r) {
   const c = S.cards[r.id], u = r.undo || {};
   if (c) { c.n = (+c.n || 1) - 1; if (c.n <= 0) delete S.cards[r.id]; }
-  S.coins -= r.coins || 0; if (u.supply) S.inv[r.id] = Math.max(0, (S.inv[r.id] || 0) - u.supply);
+  S.coins -= r.coins || 0; if (u.supply) { const hb = bagOf('home'); hb[r.id] = Math.max(0, (hb[r.id] || 0) - u.supply); }
   const still = revealCards.some((x) => x !== r && x.id === r.id && !x.gone);
   if (!still && !S.cards[r.id]) { if (!u.disc) delete S.discovered[r.id]; if (!u.unl) delete S.unlocked[r.id]; if (r.id === 'irrigation' && !u.irr) S.owned.irrigation = false; }
 }
@@ -4285,7 +4347,7 @@ function showReveal(results, opts = {}) {
   // glows in that tier's colour (Other World adds a starfield + aurora and a longer build-up). Tap anywhere to skip.
   const top = results.map((r) => cardTier(CARDS[r.id])).sort((a, b) => tierRank(b) - tierRank(a))[0], H = HERO_TIERS[top];
   const open = () => {
-    bp.removeEventListener('click', open);
+    bp.removeEventListener('click', open); sfx('pack');
     if (H) return suspense(R, bp, top, H, results);
     bp.classList.add('shake');
     setTimeout(() => { bp.classList.remove('shake'); bp.classList.add('burst'); R.appendChild(el('div', 'flash')); sparkles(R, window.innerWidth / 2, window.innerHeight * 0.45, 26); }, 850);
@@ -4608,7 +4670,7 @@ setInterval(save, 5000);
 // ---------------- Debug hooks (used by automated tests) ----------------
 const V = (x, y, z) => new THREE.Vector3(x, y, z);
 window.__ps = {
-  STAND_UNLOCK, coinUnlock, coinUnlockAsk, nextCoinStand, WORKER, hireWorker, payWorker, workerPass, catchUpWorkers, syncWorkers, workerStatus, workStands, workersOn, workerAt: (l) => W.workerAt(l), workerPose: (l) => W.workerPose(l), camAt: (x, z, zoom = 0.7) => { W.ctl.moved = true; W.glide({ target: V3(x, 0.3, z), zoom }, 0.01); }, wkPath, wkQueue, wkVis, wkGrid, standXZ, get workers() { return S.workers; },
+  STAND_UNLOCK, coinUnlock, coinUnlockAsk, nextCoinStand, WORKER, hireWorker, payWorker, migWorkerHour, migBasesHome, shiftTxt, wkTimerText, get sound() { return Sound?.state; }, get audioPrefs() { return S.audio; }, setVolume, toggleMute, soundSetHTML, sfxPlay: (n) => Sound?.play(n), workerPass, catchUpWorkers, syncWorkers, workerStatus, workStands, workersOn, workerAt: (l) => W.workerAt(l), workerPose: (l) => W.workerPose(l), camAt: (x, z, zoom = 0.7) => { W.ctl.moved = true; W.glide({ target: V3(x, 0.3, z), zoom }, 0.01); }, wkPath, wkQueue, wkVis, wkGrid, standXZ, get workers() { return S.workers; },
   setClock: (t) => { clockAt = t; },
   BUILD, adMult, adPicks, standHTML, itemVal, byValue, sortRows, rewardHTML, get fromBuild() { return fromBuild; }, get bags() { return S.bags; }, get migBags() { return migBags; }, inBag, bagOf, sendGoods, tileLoc, standLoc, splitOrchardGoods, buildHTML, marketHTML, satchelHTML, billboardHTML, bbStatusText, bbReadyIn, BILLBOARD, CHARMS, CHARM_IDS, charmV, charmLv, charmText, craftK, shiftH, standPrice, ostandPrice, custGap, harvestCore, setCharmRoll(v) { charmRoll = v; }, freeGFSpot, bulkSell, bulkAll, bulkPrice, bulkItems, bulkHTML, rollWants, STAND_BUY, BULK, GF_IDS, gfOn, gfPlaced, placeGF, storeGF, onMapOnly, charmAt, oGap, TRUCK, orderDelivery, deliverTrip, syncDeliv, inTransit, vanOn, VAN_LOT, rowOfTree, exitPlace, buyCopy, mktDest, MKT_ONE_TIME, MKT_STACK, MKT_CONSUMABLE, MKT_REPEAT, tabPanel, get deliv() { return S.deliv; }, get vanOut() { return vanOut.size; }, migGF065, get mig065() { return mig065; }, regenNow: () => regenS(), SWAP_TIERS, swapPool, get bagTab() { return bagTab; }, setBagTab(t) { bagTab = t; }, shelfMig063, rollIds, rollPackLoot, catTierOdds, drawPlant, drawOther, isPlantCard, PACK_LOOT, OWNED_K, setForcedLoot(L) { forcedLoot = L; }, consLeft, finishCons, hurryCons, startCons, plantTile: plant, syncTile, bloomTargets, instantBloom, askBloom, customerRush, askRush, rushLeft, rushReady, syncJewelDock, get rush() { return S.rush; }, get nextCustAt() { return nextCust; }, get nextOCustAt() { return nextOCust; }, swapCard, swapIn, swapPool, swapTierOdds, SWAP, setSwapForced(id) { swapForced = id; }, get revealCards() { return revealCards; }, upgLeft, finishUpg, hurryUpg, deselect, get upg() { return S.upg; }, toolLeft, get cons() { return S.cons; }, dailyStatus, claimDaily, showDaily, maybeDaily, dayKey, watchAd, playRewardAd, DAILY, upgradeBuilding, get standLv() { return S.standLv; }, cardFix063, normalizeCards,
   TIPS, JEWEL_DROP, obsState, PACKS,

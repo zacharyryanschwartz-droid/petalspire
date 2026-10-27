@@ -21,6 +21,54 @@ This is a **prototype**: version numbers stay below 1.0 until the first official
 
 Drag with one finger to pan, pinch to zoom, and twist with two fingers to turn. On desktop, right-drag or shift-drag turns the view.
 
+## New in v0.7: music, sound effects, sound settings, and 1-hour Gardeners
+
+### Music
+Two gentle, looping folk tunes in a cozy countryside style:
+- **Home Hearth** plays at Home. It is a D-major waltz for tin whistle and fiddle, with harp, a soft bass and a frame drum. Each loop is about 52 s.
+- **Orchard Lane** plays at the Orchard. It is a G-major waltz for fiddle and whistle, with guitar. Each loop is about 58 s.
+
+The tunes crossfade when you travel. Music starts after your first tap, because browsers block autoplay.
+
+### Sound effects
+Short, soft sounds for:
+- UI taps, planting, watering, harvesting and picking fruit
+- coins and selling, buying, and building or placing
+- opening a card pack, levelling up, finishing a goal, and the Oil Press
+
+Gardeners work quietly, and offline catch-up makes no sound.
+
+### Audio license
+All music and sound effects are **original compositions and synthesized sounds created for Petalspire**. They are generated in the browser with the Web Audio API (`js/audio.js`). There are no third-party audio files or samples, and nothing to download, so mobile load size does not change. The melodies are new and are not based on, or imitations of, any film score or existing tune. They are released with the game's code.
+
+### Settings › Sound
+- **Music** and **Sound Effects** each have their own volume slider (0–100 %) and a **Mute** button.
+- These settings are saved with your game.
+
+### Gardeners: 1-hour hires
+- A Gardener hire now lasts **1 real-time hour**. The clock keeps running while you are away.
+- When the hour is up, the Gardener stops working. To keep them working, **hire them again for the same cost** (2,000 coins).
+- A small timer above each Gardener shows the time left. When the hour ends, it changes to "Hire again", and a gentle notice tells you the shift is over.
+- **Gardener's Pocket Watch** now adds +10 / 15 / 20 / 30 minutes per hire (by card level). It used to add hours.
+- A Gardener's Pack free pass still gives the hours you bought with it.
+- **Existing saves:** every Gardener you already had gets a fresh 1-hour timer when you first load v0.7.
+
+### Economy pass: slower earnings
+Money was coming in too fast (teas sold for over 13,000), so sell prices are lower, especially at the top. Costs are unchanged: seed prices, saplings, packs, Gardeners, builds and plots. Real-money packs are unchanged too. Items already in your Bag or on a stand use the new prices.
+- **Sell prices by tier** (flowers, fruit and seed sales): Basic ×0.9, Epic ×0.7, Legendary ×0.6, Rare ×0.6, Super Rare ×0.55, Ultra Rare ×0.5, Other World ×0.45. Each tier's cheapest flower still sells for more than the most expensive flower one tier down.
+- **Dried herbs** sell for 1.25× the fresh flower (was 2.45×).
+- **Tea:** the multiplier runs from ×1.2 (Basic) to ×1.8 (Other World). Even with the different-herbs bonus, a tea never sells for more than **1.8×** its three dried herbs (it used to reach ×3.85). The top tea is now about 1,580 (was 13,377).
+- **Crafted goods always beat their inputs.** Every tincture, essential oil, press product and jar sells for at least 1.25× what goes into it. For tinctures, the herbs are counted at the higher of their fresh or dried price, which fixes Holy Basil and Elderflower tinctures selling below the dried herb.
+- **Lower multipliers:** Oil Press 1.4–2.0× (was 1.7–3.2×), Fruit Stand 1.3–1.9× (was 1.6–3.1×). Sunpetal Oil 1,600 → 640, Cocoa Butter 938 → 306, Crystal Apple Jelly 1,473 → 406, Moonpeach Preserves 1,389 → 383, Sunflower seed bags 85/200 → 60/140. Rose Water is now 19% of the rose oil price (was 15%).
+- **Faster top-tier plants:** Rare plants grow in about 17 min (was 20), Super Rare about 22 min (was 45), Ultra Rare about 30 min (was 90) and Other World about 43 min (was 3 h). Higher tiers still grow slower than lower ones, but each tier from Legendary up now earns more per bed-hour than the one below, and a late-game Home earns more than a mid-game one. Card Growth stats now reflect the faster times.
+- **Watch-ad coin rewards** grow more slowly as you buy land: up to ×4.4 (was ×7.8).
+- Modelled earnings, in coins per hour: early game 14.8k → 11.9k, mid game 62k → 21k, late game (Home + Orchard) 184k → 65k.
+
+### Other v0.7 changes
+- **Essential oils take 10 seeds.** Every seed-based oil at the Still (Lavender, Calendula, Chamomile, Peppermint, Rosemary, Damask Rose, Jasmine) now uses 10 seeds. Eucalyptus still uses 3 leaves. Sell prices are unchanged.
+- **Glycerin and Vinegar are Home only.** They are sold only in the Home Market, because the Tincture Stand is at Home. Nothing at the Orchard uses them. Any Glycerin or Vinegar left in an old Orchard Bag moves to the Home Bag on load, so nothing is lost.
+- **Orchard Wood and Scrap.** Wood and Scrap bought at the Orchard Market go into your shared Wood and Scrap (shown in the top bar and in either Bag). A test now covers this.
+
 ## New in v0.68.1: quick fixes (Home + Orchard, no new features)
 - **No flower seeds at the Orchard.** The Orchard Market sells tree saplings, Tree-row Irrigation, supplies and Orchard builds only; flower seeds are sold at the Home Market.
 - **Parking Lot + Billboard at the Orchard.** Both can be bought & built at the Orchard (Market or Build menu): the Orchard Parking Lot paints bays beside the Orchard Stand (visitors arrive in groups, like at Home); the Orchard Billboard stands across the Orchard road. One ad campaign lights every Billboard you've built and boosts traffic wherever one stands.
@@ -151,7 +199,7 @@ Find the card in a pack or swap, buy it once in the Supply Market, place it on y
 | Copper Rain Chain | Super Rare | 180 | rain barrels refill 10% → 20% faster |
 | Seed Keeper's Tin | Super Rare | 200 | 15% → 30% chance of +1 seed per harvest |
 | Honeygold Scales | Ultra Rare | 280 | Farm Stand / Fruit Stand sales +5% → +10% |
-| Gardener's Pocket Watch | Ultra Rare | 300 | Gardener shifts +1 h → +3 h, same wage |
+| Gardener's Pocket Watch | Ultra Rare | 300 | Gardener hires +10 min → +30 min, same cost (v0.7; was +1 h → +3 h) |
 | Moonlit Fountain | Other World | 420 | 20% → 35% chance of +1 flower |
 | Fae Lantern | Other World | 450 | drying and crafting 15% → 25% faster |
 
