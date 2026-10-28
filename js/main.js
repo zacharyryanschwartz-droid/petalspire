@@ -2,7 +2,7 @@
 import * as THREE from 'three';
 import { createWorld } from './world.js';
 import { buildPlant } from './plants.js';
-import { CHARMS, CHARM_IDS, STAND_BUY, BULK, BLOOM, bloomJewels, RUSH, STAND_UNLOCK, WORKER, itemLoc, sellsAt, ORCH_STAND, parkLv, hydroId, HYDROSOL, NON_CARDS, ROAD_SCRAP, TINC_DUP_COINS, SPECIES, FANTASY_SPECIES, PLANT_TIERS, cardTier, FEATURE_TIER_FROM_OLD, TIER_ORDER, PACK_W, DRYING, rollSeeds, FEATURES, CARDS, RARITY, ITEMS, SELL_ORDER, TIPS, RESALE, PACKS, PACK_JEWELS, JEWEL_EXCHANGE, JEWEL_DROP, PARKING, BILLBOARD, WINDMILL, DUP_COINS, SUPPLY_CARDS, SUPPLY_DUP, WATER_TRUCK, CARD_LEVELS, RACK_SLOTS, BUILDING_LV, CONS, consJewels,  DAILY, PACK_LOOT, rollLoot, PACK_MIX, OWNED_K, WATER, BARREL_LV, DRY_S, BARREL, BASES, TINCTURE, STILL, oilId, tinctureId, TINCTURE_NAMES,
+import { CHARMS, CHARM_IDS, STAND_BUY, BULK, BLOOM, bloomJewels, RUSH, STAND_UNLOCK, WORKER, itemLoc, sellsAt, ORCH_STAND, parkLv, hydroId, HYDROSOL, NON_CARDS, ROAD_SCRAP, TINC_DUP_COINS, SPECIES, FANTASY_SPECIES, PLANT_TIERS, cardTier, FEATURE_TIER_FROM_OLD, TIER_ORDER, PACK_W, DRYING, rollSeeds, FEATURES, CARDS, RARITY, ITEMS, SELL_ORDER, TIPS, RESALE, PACKS, PACK_JEWELS, JEWEL_EXCHANGE, JEWEL_DROP, PARKING, ENDLESS_LV, DECO8, DECO8_IDS, DECO8_SHOP, DECO8_LOCS, DECO8_PACK, DECO8_DUP, BILLBOARD, WINDMILL, DUP_COINS, SUPPLY_CARDS, SUPPLY_DUP, WATER_TRUCK, CARD_LEVELS, RACK_SLOTS, BUILDING_LV, CONS, consJewels,  DAILY, PACK_LOOT, rollLoot, PACK_MIX, OWNED_K, WATER, BARREL_LV, DRY_S, BARREL, BASES, TINCTURE, STILL, oilId, tinctureId, TINCTURE_NAMES,
   WOOD, BED_COSTS, STAND_CAP, MARKET_GOAL, WATER_REGEN_S, WATER_REGEN_MAX, STARTER, STARTER_FILL, STARTER_JEWELS,
   BUILDS, FINDS, FIND_IDS, FIND_CHANCE, SAPLING_CHANCE, RESTORE_HURRY_JEWELS, ATMOS_STEP, ATMOS_MAX, TREE, SHOP, JEWEL_BUNDLES, NO_ADS_BUNDLE, ADS, ADS_MODE, OTHER_GAMES, BOOSTS, STARTER_PACK, OFFER_PACKS, OFFER_VALUE, TOOL_SUB_JEWELS, TREE_IRRIG, STUDIO, CROSS_PROMO, SOCIALS, FOLLOW_REWARD, SHADE, TEA, teaInfo, teaId, teaSps, registerTea, DRY_TIER_S, PACK_W_ORCH, TREES, TREE_IDS, PRESS, FRUITSTAND, SEED_BAGS, bagId } from './data.js';
 import { ROAD, LOTS, SIGNS, LOT_FOR_SALE, LOT_PRICES, SITES, OBSTACLES, SPOTS, PARK_X, BEHIND, FRONT, BED_N, TILE, SITE_HALF, siteById, obstacleById, inSite, lotCenter, lotAt, ORCHARD_TREE_SPOTS, ORCH_GRID_OLD_TO_NEW, ORCH_ROW_OLD_TO_NEW, ORCH_NORTH_OLD, OWNABLE_LOTS, LOCATIONS, ORCHARD_PRICE, ORCH_X, ORCH_FOR_SALE, ORCH_PLOT_PRICES, ORCH_LOTS, lotLoc } from './layout.js';
@@ -10,12 +10,13 @@ import { ICONS, itemIcon, FEATURE_ART, findIcon, decorIcon } from './icons.js';
 import { Payments } from './payments.js';
 import { createAds, gameArt } from './ads.js';
 import { initTracker } from './games-tracker.js';
+import { createReferral, cleanCode } from './referral.js';
 import { shadeAt, speedFor, sunLabel, rebaseStart } from './shade.js';
 import { createAudio, MUSIC_CREDITS } from './audio.js';
 
 // Save format: v0.3, v0.31 and v0.4 share one localStorage key (schema v: 3). `build` records which prototype build last wrote the save;
 // v0.3 / v0.31 saves (no `build`, no per-plot barrels) are migrated on load (migrate04 below); v0.4 saves load as-is and are re-tagged. Prototype builds stay below 1.0.
-export const BUILD = '0.7.2.3';
+export const BUILD = '0.8';
 // v0.65: anonymous player tracking (Games Backend on Appwrite; no API key in the game, nothing personal). Skipped for automated runs (navigator.webdriver).
 try { if (!navigator.webdriver) initTracker({ endpoint: 'https://nyc.cloud.appwrite.io/v1', projectId: '6ae0a41a002ce0a48fac', gameId: 'petalspire', platform: 'web', appVersion: BUILD }); } catch (_) {}
 const SAVE_KEY = 'petalspire.v03', V02_KEY = 'petalspire.v02', OLD_KEYS = ['petalspire.v01'];
@@ -201,7 +202,7 @@ const standCount = () => Object.values(S.stand).reduce((a, b) => a + b, 0);
 const SHELF_BONUS = 4;
 const shelfOn = () => !!(S.shelfOn && S.standBuilt);
 // v0.63: Farm Stand / Drying Rack levels (bought with coins, permanent)
-const BLV_MAX = 4, blv = (k) => { const v = Math.round(+S[k + 'Lv']); return v >= 1 ? Math.min(v, BLV_MAX) : 1; };
+const BLV_MAX = ENDLESS_LV, blv = (k) => { const v = Math.round(+S[k + 'Lv']); return v >= 1 ? Math.min(v, BLV_MAX) : 1; };
 const standSpaceLv = () => BUILDING_LV.stand.space[blv('stand') - 1];
 const standSellK = () => 1 + BUILDING_LV.stand.sell[blv('stand') - 1];
 // v0.65 garden charms: the value of an owned charm at its card level (0 when not bought). Fractions, or hours for the watch.
@@ -253,9 +254,11 @@ const regenS = () => Math.round((S.bonus.can ? WATER_REGEN_S / 2 : WATER_REGEN_S
 // v0.63: per-barrel size levels (BARREL_LV); the Brass Watering Can still adds +5 on top
 const barrelLv = (b) => { const v = Math.round(+b?.lv); return v >= 1 ? Math.min(v, BARREL_LV.length) : 1; };
 const barrelCap = (b) => BARREL_LV[barrelLv(b) - 1].cap + (S.bonus.can ? 5 : 0);
-const atmosphere = () => S.decor.reduce((a, d) => a + (Object.values(FINDS).find((f) => f.into.decor === d.type)?.into.atm || 0), 0);
-const atmosMult = () => Math.max(1 - ATMOS_MAX, 1 - ATMOS_STEP * atmosphere());
-const DECOR_INFO = Object.fromEntries(Object.entries(FINDS).filter(([, f]) => f.into.decor).map(([k, f]) => [f.into.decor, { name: f.into.name, atm: f.into.atm, from: k }]));
+// v0.8: restored finds help everywhere (as before); the new garden decorations (DECO8) only help the location they stand at
+const decoLocOf = (d) => lotLoc(lotAt(d.x, d.z) || 'home');
+const atmosphere = (loc) => S.decor.reduce((a, d) => a + (DECO8[d.type] ? (loc && decoLocOf(d) === loc ? DECO8[d.type].atm : 0) : Object.values(FINDS).find((f) => f.into.decor === d.type)?.into.atm || 0), 0);
+const atmosMult = (loc) => Math.max(1 - ATMOS_MAX, 1 - ATMOS_STEP * atmosphere(loc));
+const DECOR_INFO = { ...Object.fromEntries(Object.entries(FINDS).filter(([, f]) => f.into.decor).map(([k, f]) => [f.into.decor, { name: f.into.name, atm: f.into.atm, from: k }])), ...Object.fromEntries(DECO8_IDS.map((k) => [k, { name: DECO8[k].name, atm: DECO8[k].atm, tier: DECO8[k].tier, d8: true }])) };
 const treeStage = (t) => { if (t.st === 'stump') return 3; const k = Math.min(1, (now() - t.at) / t.ms); return k >= 1 ? 3 : k >= TREE.stageAt[2] ? 2 : k >= TREE.stageAt[1] ? 1 : 0; };
 const treeById = (id) => S.trees.find((t) => t.id === id);
 const marketK = () => (S.marketProj ? Math.min(1, (now() - S.marketProj.start) / S.marketProj.ms) : 0);
@@ -775,7 +778,7 @@ document.fonts?.ready.then(() => W.relabel());
 const shown = { coins: S.coins, wood: S.wood, water: totalWater(), jewels: S.jewels };
 function bump(id) { const p = $(id); p.classList.remove('bump'); void p.offsetWidth; p.classList.add('bump'); }
 function hud() {
-  syncMapBtn();
+  syncMapBtn(); v8Hud();   // v0.8: level badge + spin button
   $('#coin-count').textContent = S.coins; const tw = totalWater(); $('#water-count').textContent = tw; $('#wood-count').textContent = S.wood; $('#jewel-count').textContent = S.jewels;
   if (S.coins !== shown.coins) { bump('#pill-coins'); shown.coins = S.coins; }
   if (S.wood !== shown.wood) { bump('#pill-wood'); shown.wood = S.wood; }
@@ -1094,6 +1097,7 @@ function placeAt(x, z) {
   }
   if (placing?.what === 'barrel') { const lot = lotAt(x, z); if (lot && S.lots[lot] && S.barrels[lot]) { toast('This plot already has its rain barrel (one per plot)'); return false; } if (lot === 'home' && !S.barrel) { toast('The home plot’s barrel comes free with your first bed'); return false; } }
   if (placing?.what === 'hive') { const lot = lotAt(x, z); if (lot && S.lots[lot] && S.hives[lot]) { toast('This plot already has a beehive (one per plot)'); return false; } }
+  if (placing?.what === 'decor' && DECO8[placing.type]) { const L = lotLoc(lotAt(x, z) || 'home'); if (S.decor.some((d) => d.type === placing.type && decoLocOf(d) === L)) { toast(`${DECO8[placing.type].name} already stands ${L === 'orchard' ? 'at the Orchard' : 'at Home'} (one per location)`); return false; } }   // v0.8
   const why = placeProblem(x, z); if (why) { toast(why); return false; }
   const p = placing; if (!commitBuy(p)) return false; exitPlace();
   const ok = placeIt(p, x, z); if (!ok) rollbackBuy(p); return ok;
@@ -1237,7 +1241,7 @@ function sellPlaced(f) {
   if (f.kind === 'stand') { toast('Your Farm Stand can’t be sold — it’s how customers buy from you'); return false; }
   if (f.kind === 'barrel' && f.lot === 'home') { toast('The Home plot’s rain barrel can’t be sold — it’s your free water, so you can never run dry'); return false; }
   let name, v, gone, note = '';
-  if (f.kind === 'decor') { const d = S.decor.find((x) => x.key === f.key); if (!d) return false; const k = kindOfDecor(d.type); name = DECOR_INFO[d.type].name; v = buyback(RESALE.antique[k]); note = ` Atmosphere −${DECOR_INFO[d.type].atm}.`;
+  if (f.kind === 'decor') { const d = S.decor.find((x) => x.key === f.key); if (!d || DECO8[d.type]) return false; const k = kindOfDecor(d.type); name = DECOR_INFO[d.type].name; v = buyback(RESALE.antique[k]); note = ` Atmosphere −${DECOR_INFO[d.type].atm}.`;
     gone = () => { S.decor = S.decor.filter((x) => x !== d); W.removeDecor(d.key); }; }
   else if (f.kind === 'hive') { if (!S.hives[f.lot]) return false; name = `Honeybee Skep (${lotName(f.lot)})`; v = buyback(RESALE.placed.beehive); note = ` ${lotName(f.lot)} loses its +${HIVE_BONUS} flower bee boost.`;
     gone = () => { delete S.hives[f.lot]; S.hivesSold = true; W.removeHive(f.lot); syncBees(); }; }
@@ -1450,8 +1454,8 @@ function renderFocus() {
       <div class="ts-actions">${canUpgrade(id) ? `<button class="btn btn-gold" data-act="upg-gf">✨ Upgrade to Lv${cardLv(id) + 1}</button>` : ''}<button class="btn" data-act="store-gf">Put back in bag</button></div>`;
   } else if (focus.kind === 'decor') {
     const d = S.decor.find((x) => x.key === focus.key); if (!d) return deselect(); const info = DECOR_INFO[d.type];
-    head = `<h3>${info.name} <small>Garden decor · +${info.atm} atmosphere</small></h3>`;
-    body = `<p class="muted">Atmosphere ${atmosphere()} · customers arrive ${Math.round((1 - atmosMult()) * 100)}% sooner.</p><div class="ts-actions"><button class="btn" data-act="store-decor">Put back in bag</button><button class="btn btn-blush" data-act="sell-placed">Sell ${coin(buyback(RESALE.antique[kindOfDecor(d.type)]))}</button></div>`;
+    head = `<h3>${info.name} <small>${info.d8 ? `${PLANT_TIERS[info.tier].label} decoration · +${info.atm} atmosphere at ${decoLocOf(d) === 'orchard' ? 'the Orchard' : 'Home'}` : `Garden decor · +${info.atm} atmosphere`}</small></h3>`;
+    body = `<p class="muted">Atmosphere ${atmosphere(curLoc())} here · customers arrive ${Math.round((1 - atmosMult(curLoc())) * 100)}% sooner.</p><div class="ts-actions"><button class="btn" data-act="store-decor">Put back in bag</button>${info.d8 ? '' : `<button class="btn btn-blush" data-act="sell-placed">Sell ${coin(buyback(RESALE.antique[kindOfDecor(d.type)]))}</button>`}</div>`;
   }
   sh.innerHTML = `<div class="ts-head"><div class="ts-ico">${focus.kind === 'tree' ? ICONS.sapling : focus.kind === 'barrel' ? FEATURE_ART.rainbarrel : focus.kind === 'hive' ? '<span style="font-size:30px;line-height:1">🐝</span>' : focus.kind === 'gfeat' ? FEATURE_ART[S.gf.find((x) => x.key === focus.key)?.id] || '' : decorIcon(S.decor.find((x) => x.key === focus.key)?.type)}</div>${head}<button class="close-btn" data-act="close">×</button></div>${body}`;
   sh.dataset.st = focus.kind === 'tree' ? treeStage(treeById(focus.id)) : -1;
@@ -1535,15 +1539,15 @@ function water(i, auto = false) {
 function cardLv(id) { const v = Math.round(+S.cards[id]?.lv); return v >= 1 ? Math.min(v, CARD_LEVELS.thresholds.length + 1) : 1; }   // v0.63: always a whole number 1–4
 const nextAt = (id) => CARD_LEVELS.thresholds[cardLv(id) - 1];   // copies needed for the next level (undefined at max)
 const canUpgrade = (id) => !!CARDS[id] && CARD_LEVELS.upgradable(id, CARDS[id]) && nextAt(id) != null && (+S.cards[id]?.n || 0) >= nextAt(id);
-function growK(sp) { return 1 - CARD_LEVELS.plant.grow * (cardLv(sp) - 1); }   // hoisted: offline catch-up runs before this line
+function growK(sp) { return 1 - CARD_LEVELS.plantBonus(cardLv(sp), 'grow'); }   // v0.8: endless levels   // hoisted: offline catch-up runs before this line
 const spOfItem = (id) => Object.keys(SPECIES).find((sp) => id.endsWith('_' + sp)) || (id.startsWith('fruit_') && TREES[id.slice(6)] ? id.slice(6) : undefined);   // v0.6: fruit gets its tree card's level bonus
-const sellOf = (id) => { const sp = spOfItem(id); return sp ? Math.round(ITEMS[id].sell * (1 + CARD_LEVELS.plant.sell * (cardLv(sp) - 1))) : ITEMS[id].sell; };
+const sellOf = (id) => { const sp = spOfItem(id); return sp ? Math.round(ITEMS[id].sell * (1 + CARD_LEVELS.plantBonus(cardLv(sp), 'sell'))) : ITEMS[id].sell; };
 const lvFlower = (sp) => (cardLv(sp) >= CARD_LEVELS.plant.bonusFlowerAt ? 1 : 0);
 function addCard(id, n = 1) { const c = S.cards[id] || (S.cards[id] = { n: 0, lv: 1 }); c.n += n; return c; }
 function upgradeCard(id) {
   if (!canUpgrade(id)) return false; sfx('levelup'); const c = S.cards[id]; c.lv = cardLv(id) + 1; c.n = +c.n; S.stats.upgrades = (S.stats.upgrades || 0) + 1; save(); hud(); if (panel) renderPanel();
   const L = CARD_LEVELS.plant, lv = c.lv;
-  toast(CARDS[id].tier ? `✨ ${CARDS[id].name} reached Lv${lv}: +${Math.round(L.sell * (lv - 1) * 100)}% sell price · ${Math.round(L.grow * (lv - 1) * 100)}% faster growth${lv >= L.bonusFlowerAt ? ' · +1 flower per harvest' : ''}` : id === 'windmill' ? `✨ Windmill reached Lv${lv}: barrels refill every ${regenS()} s` : CHARMS[id] ? `✨ ${CARDS[id].name} reached Lv${lv}: ${charmText(id, lv)}` : id === 'parking' ? `✨ Parking Lot reached Lv${lv}: room for ${PARKING.spots[parkI()]} cars · ${Math.round((PARKING.extraItem + CARD_LEVELS.parking.extraItem * (lv - 1)) * 100)}% buy an extra item${S.parkingBuilt && S.oparkingBuilt ? ' · at Home and the Orchard' : ''}` : `✨ ${CARDS[id].name} reached Lv${lv}`);
+  toast(CARDS[id].tier ? `✨ ${CARDS[id].name} reached Lv${lv}: +${Math.round(CARD_LEVELS.plantBonus(lv, 'sell') * 100)}% sell price · ${Math.round(CARD_LEVELS.plantBonus(lv, 'grow') * 100)}% faster growth${lv >= L.bonusFlowerAt ? ' · +1 flower per harvest' : ''}` : id === 'windmill' ? `✨ Windmill reached Lv${lv}: barrels refill every ${regenS()} s` : CHARMS[id] ? `✨ ${CARDS[id].name} reached Lv${lv}: ${charmText(id, lv)}` : id === 'parking' ? `✨ Parking Lot reached Lv${lv}: room for ${PARKING.spots[parkI()]} cars · ${Math.round((PARKING.extraItem + CARD_LEVELS.parking.extraItem * (lv - 1)) * 100)}% buy an extra item${S.parkingBuilt && S.oparkingBuilt ? ' · at Home and the Orchard' : ''}` : `✨ ${CARDS[id].name} reached Lv${lv}`);
   if (id === 'parking') syncParking();
   return true;
 }
@@ -2004,7 +2008,7 @@ function craftHTML(c) {
     <p class="muted" style="margin:10px 4px 0">${c === 'press' || c === 'opress' ? 'Oil = input value × (1.7 + 0.25 per tier above Basic); butters ×1.06 more. Sunflower bulk oils and Sunpetal Oil are hand-set.' : 'Price = fruit value × (1.6 + 0.25 per tier above Basic); jellies ×1.08, butters & preserves ×1.12. Cook time 40 s + 20 s per tier.'}</p>`;
 }
 // ---------- v0.6: the Orchard — fruit trees from cards, planted on fixed spots, fruit again and again ----------
-const treeLvK = (sp) => 1 - CARD_LEVELS.plant.grow * (cardLv(sp) - 1);
+const treeLvK = (sp) => 1 - CARD_LEVELS.plantBonus(cardLv(sp), 'grow');
 const orchardSpots = () => ORCHARD_TREE_SPOTS.filter((p) => S.lots[p.lot]).map((p) => ({ x: p.x, z: p.z, k: p.k, lot: p.lot, ok: !orchardProblem(p.k) }));
 function orchardProblem(k) {
   const p = ORCHARD_TREE_SPOTS[k]; if (!p) return 'Pick a tree spot in the Orchard';
@@ -2190,10 +2194,12 @@ function itemSvg(id) { const it = ITEMS[id]; if (it?.antique) return findIcon(it
 function renderPanel() { return inBag(null, () => renderPanel_()); }
 function renderPanel_() {
   const body = $('#panel-body'), title = $('#panel-title'); const st = body.scrollTop;
+  if (V8_PANELS && V8_PANELS[panel]) { const r = V8_PANELS[panel](); title.innerHTML = r.t; body.innerHTML = r.b; }   // v0.8 sheets
   if (panel === 'bag') { title.innerHTML = curLoc() === 'orchard' ? 'Orchard Bag' : 'Home Bag'; body.innerHTML = bagHTML(); }
   if (panel === 'build') { title.innerHTML = curLoc() === 'orchard' ? 'Build · Orchard' : 'Build · Home'; body.innerHTML = buildHTML(); }
   if (panel === 'stand') { title.innerHTML = 'Farm Stand'; body.innerHTML = standHTML(); }
   if (panel === 'ostand') { title.innerHTML = 'Orchard Stand'; body.innerHTML = ostandHTML(); }
+  if (panel === 'stand' || panel === 'ostand') body.insertAdjacentHTML('afterbegin', orderBoardHTML(panel === 'ostand' ? 'orchard' : 'home'));   // v0.8
   if (panel === 'bulk') { title.innerHTML = 'Bulk Sell Box'; body.innerHTML = bulkHTML(panelArg); }
   if (panel === 'market') { title.innerHTML = curLoc() === 'orchard' ? 'Supply Market · Orchard' : 'Supply Market · Home'; body.innerHTML = marketHTML(); }
   if (panel === 'rack') { title.innerHTML = 'Drying Rack'; body.innerHTML = rackHTML(); }
@@ -2263,6 +2269,7 @@ function settingsHTML() {
   return soundSetHTML() + `<div class="sec-title" id="follow-us">Follow us</div><p class="muted follow-note">${nGot < SOCIALS.length ? `Follow Petalspire for news and sneak peeks — get ${FOLLOW_REWARD} free Jewel for each one (once per platform).` : 'Thanks for following Petalspire everywhere!'}</p><div class="follow-list">${follow}</div>
     <div class="sec-title" id="play-other-games">More from ${STUDIO.name}</div>${studioHeadHTML()}<div class="list games">${promoCardHTML()}${games}</div>
     ${adsRow ? `<div class="sec-title">Ads</div><div class="list">${adsRow}</div>` : ''}
+    ${v8SettingsHTML()}
     <div class="sec-title">Help</div><div class="list"><button class="row set-btn" data-act="tips-again"><b>Show tips again</b><small>Replay the helpful hints from the start</small></button></div>
     <div class="sec-title">Your save</div><div class="list"><div class="row"><div class="meta"><b>Autosaves on this device</b><small>Progress is kept in this browser, even while the game is closed.</small></div></div>
     <button class="row set-btn danger" data-act="reset"><b>Reset garden…</b><small>Erase all progress and start again in the woods</small></button></div>
@@ -2279,7 +2286,7 @@ function cardsHTML() {   // v0.4: card stacks + upgrades
   const T = CARD_LEVELS.thresholds, ids = Object.keys(CARDS).filter((k) => S.cards[k]);
   const L = CARD_LEVELS.plant;
   const rows = ids.map((id) => { const c = { ...S.cards[id], lv: cardLv(id), n: +S.cards[id].n || 1 }, up = CARD_LEVELS.upgradable(id, CARDS[id]), nx = nextAt(id), maxLv = T.length + 1;
-    const fx = CARDS[id].tier ? (c.lv > 1 ? `+${Math.round(L.sell * (c.lv - 1) * 100)}% sell · −${Math.round(L.grow * (c.lv - 1) * 100)}% grow time${c.lv >= L.bonusFlowerAt ? ' · +1 flower' : ''}` : 'Level up for better prices and faster growth')
+    const fx = CARDS[id].tier ? (c.lv > 1 ? `+${Math.round(CARD_LEVELS.plantBonus(c.lv, 'sell') * 100)}% sell · −${Math.round(CARD_LEVELS.plantBonus(c.lv, 'grow') * 100)}% grow time${c.lv >= L.bonusFlowerAt ? ' · +1 flower' : ''}` : 'Level up for better prices and faster growth')
       : id === 'sickle' || id === 'plow' ? 'Ready again right away · no rest' : CHARMS[id] ? `${charmText(id, c.lv)}${S.owned[id] ? '' : ' · buy it in the Supply Market'}` : id === 'windmill' ? `Barrels refill every ${WINDMILL.regenS[Math.min(4, c.lv) - 1]} s (base ${WATER_REGEN_S})` : id === 'parking' ? parkLevelText(c.lv) : id === 'irrigation' ? `Lv${c.lv} · ${bedWaterLine(c.lv)}${c.lv < 4 ? ` (Lv${c.lv + 1}: ${WATER.stage[c.lv]})` : ''}` : 'Copies stack here';
     const prog = up ? (nx != null ? `<div class="lv-prog"><b style="width:${Math.min(100, (c.n / nx) * 100)}%"></b></div><small>${c.n}/${nx} copies to Lv${c.lv + 1}</small>` : `<small class="lv-max" data-lv-max>Max level · Lv${maxLv}</small>`) : FEATURES[id]?.tool ? `<small class="lv-none" data-no-level data-just-stack>Copies just stack · this tool doesn't level up</small>` : `<small class="lv-none" data-no-level>This card doesn't level up</small>`;
     return `<div class="stack-row${canUpgrade(id) ? ' glow' : ''}">${cardHTML(id)}<div class="meta"><b>${CARDS[id].name}${up ? ` · Lv${c.lv}` : ''}</b><small>×${c.n} collected · ${fx}</small>${prog}
@@ -2336,9 +2343,9 @@ function satchelHTML() {
     <p class="muted" style="margin:14px 4px 0">${here === 'orchard' ? 'Plant fruit-tree saplings from the Market, pick the ripe fruit, and sell it at the Orchard Stand or cook it at the Fruit Stand.' : 'Chop trees for Wood, build raised beds, and sell your harvest at the Farm Stand by the road.'}</p>`;   // v0.68: the Orchard Bag had the Home hint
 }
 function findsHTML() {
-  const atm = atmosphere();
+  const atm = atmosphere(curLoc());
   const head = `<div class="finds-head"><span class="chip"><i data-icon="heart"></i>Atmosphere <b>${atm}</b></span><span class="chip"><i data-icon="scrap"></i>Scrap <b>${S.scrap}</b></span><span class="chip"><i data-icon="wood"></i><b>${S.wood}</b></span></div>
-    ${atm ? `<p class="muted" style="margin:0 4px 8px">Customers arrive ${Math.round((1 - atmosMult()) * 100)}% sooner thanks to your decor.</p>` : ''}`;
+    ${atm ? `<p class="muted" style="margin:0 4px 8px">Customers arrive ${Math.round((1 - atmosMult(curLoc())) * 100)}% sooner here thanks to your decor.</p>` : ''}`;
   const restoring = S.restoring.map((r) => { const f = FINDS[r.kind], k = Math.min(1, (now() - r.start) / r.ms);
     return `<div class="find-row working"><div class="ico">${findIcon(r.kind)}</div><div class="meta"><b>${f.into.name}</b><small>Restoring · <span data-rleft="${r.id}">${fmtTime(r.ms * (1 - k))}</span> left</small>
       <div class="progress slim"><b data-rprog="${r.id}" style="width:${(k * 100).toFixed(1)}%"></b></div></div>
@@ -2348,15 +2355,17 @@ function findsHTML() {
       <small>Restore → <b>${f.into.name}</b> · ${f.into.bonus ? f.into.blurb : `decor, +${f.into.atm} atmosphere`}</small></div>
       <div class="find-acts"><button class="btn btn-primary sm" data-restore="${k}" ${ok ? '' : 'disabled'}>Restore ${costHTML(f.restore)} · ${fmtTime(f.restore.s * 1000)}</button>
       <button class="btn sm" data-recycle="${k}"><i data-icon="recycle"></i> Recycle ${gainHTML(f.recycle)}</button></div></div>`; }).join('');
-  const decor = Object.entries(S.decorInv).filter(([, n]) => n > 0).map(([t, n]) => `<div class="find-row"><div class="ico">${decorIcon(t)}</div><div class="meta"><b>${DECOR_INFO[t].name}${n > 1 ? ` ×${n}` : ''}</b><small>Restored decor · +${DECOR_INFO[t].atm} atmosphere when placed</small></div><div class="acts"><button class="btn btn-gold sm" data-place="${t}">Place</button><button class="btn sm" data-sell-restored="${kindOfDecor(t)}">Sell ${coin(buyback(RESALE.antique[kindOfDecor(t)]))}</button></div></div>`).join('');
+  const decor = Object.entries(S.decorInv).filter(([t, n]) => n > 0 && !DECO8[t]).map(([t, n]) => `<div class="find-row"><div class="ico">${decorIcon(t)}</div><div class="meta"><b>${DECOR_INFO[t].name}${n > 1 ? ` ×${n}` : ''}</b><small>Restored decor · +${DECOR_INFO[t].atm} atmosphere when placed</small></div><div class="acts"><button class="btn btn-gold sm" data-place="${t}">Place</button><button class="btn sm" data-sell-restored="${kindOfDecor(t)}">Sell ${coin(buyback(RESALE.antique[kindOfDecor(t)]))}</button></div></div>`).join('');
   // v0.63: only a Crate Shelf still in the Bag is listed; the installed one is part of the Farm Stand for good
   const shelfRow = (f) => { const k = kindOfBonus('crate'), has = !!S.shelfOn;
     return `<div class="row shelf-row" data-shelf-row><div class="ico">${findIcon(k)}</div><div class="meta"><b>${f.into.name}</b><small>${has ? `Spare · your Farm Stand already has a Crate Shelf (permanent) · sell it or stock it as an antique` : S.standBuilt ? `In your Bag · install it on your Farm Stand for +${SHELF_BONUS} shelf space (permanent)` : `In your Bag · build the Farm Stand to install it (+${SHELF_BONUS} shelf space)`}</small></div><div class="acts">${has ? '' : `<button class="btn btn-gold sm" data-install-shelf ${S.standBuilt ? '' : 'disabled'}>Install</button>`}<button class="btn sm" data-sell-restored="${k}">Sell ${coin(buyback(RESALE.antique[k]))}</button></div></div>`; };
   const bon = Object.values(FINDS).filter((f) => f.into.bonus && S.bonus[f.into.bonus]).map((f) => f.into.bonus === 'crate' ? shelfRow(f) : `<div class="row"><div class="ico">${findIcon(Object.keys(FINDS).find((k) => FINDS[k] === f))}</div><div class="meta"><b>${f.into.name}</b><small>${f.into.blurb} · <span class="ok-tag">Active</span></small></div><div class="acts"><button class="btn sm" data-sell-restored="${kindOfBonus(f.into.bonus)}">Sell ${coin(buyback(RESALE.antique[kindOfBonus(f.into.bonus)]))}</button></div></div>`).join('');
+  const deco8 = DECO8_IDS.filter((t) => S.decorInv[t] > 0).map((t) => `<div class="find-row" data-d8-bag="${t}"><div class="ico">${decorIcon(t)}</div><div class="meta"><b>${DECO8[t].name}${S.decorInv[t] > 1 ? ` ×${S.decorInv[t]}` : ''}</b><small>${PLANT_TIERS[DECO8[t].tier].label} decoration · +${DECO8[t].atm} atmosphere where it stands · one per location</small></div><div class="acts"><button class="btn btn-gold sm" data-place="${t}">Place</button></div></div>`).join('');
   const placed = S.decor.length ? `<p class="muted" style="margin:10px 4px 0">${S.decor.length} decor placed in your garden — tap one to move it back to your bag or sell it. Restored finds can also go on your <b>Farm Stand</b> as antiques (collectors pay more).</p>` : '';
-  if (!raw && !restoring && !decor && !bon) return head + `<div class="empty">Nothing found yet. About one in five trees, stumps, bushes and rocks hides something — watch for a <b>sparkle</b> when you clear.</div>${placed}`;
+  if (!raw && !restoring && !decor && !bon && !deco8) return head + `<div class="empty">Nothing found yet. About one in five trees, stumps, bushes and rocks hides something — watch for a <b>sparkle</b> when you clear.</div>${placed}`;
   return head + (restoring ? `<div class="sec-title">In the workshop</div><div class="list">${restoring}</div>` : '') +
     (raw ? `<div class="sec-title">Found while clearing</div><div class="list">${raw}</div>` : '') +
+    (deco8 ? `<div class="sec-title">Garden decorations</div><div class="list">${deco8}</div>` : '') +
     (decor ? `<div class="sec-title">Ready to place</div><div class="list">${decor}</div>` : '') +
     (bon ? `<div class="sec-title">Garden upgrades</div><div class="list">${bon}</div>` : '') + placed;
 }
@@ -3160,7 +3169,7 @@ function marketHTML() {
   let h = `<div class="hero"><img src="assets/market.jpg" alt=""/><p>Fresh seeds &amp; fair prices</p></div>${rewardHTML()}<button class="daily-strip" data-act="open-daily"><b>🌼 Daily gift</b><small>${dailyStatus().can ? 'Ready to claim!' : `Streak ${S.daily.streak} · come back tomorrow`}</small></button>
     <div class="seg"><button data-tab="buy" class="${marketTab === 'buy' ? 'on' : ''}">Supplies</button><button data-tab="packs" class="${marketTab === 'packs' ? 'on' : ''}">Card Packs</button></div>`;
   if (marketTab === 'packs') return h + packsHTML();
-  const rows = [], sec = { seeds: [], saplings: [], supplies: [], water: [], build: [], garden: [] };   // v0.68.1: grouped into sections
+  const rows = [], sec = { seeds: [], saplings: [], supplies: [], water: [], build: [], garden: [], decor: decoMarketRows(curLoc()) };   // v0.8: + garden decorations   // v0.68.1: grouped into sections
   // v0.65: each location has its own Market — it sells only what is usable there, and the van delivers to this location's Bag
   const at = curLoc(), atHome = at === 'home', bedsHere = atHome || S.beds.some((b) => lotLoc(lotOfSite(b)) === 'orchard');
   rows.push(`<p class="muted mkt-loc" data-mkt-loc-note="${at}" style="margin:2px 4px 8px">${vanOn() ? '🚚 Orders are delivered to your' : '📦 Orders go straight into your'} <b>${atHome ? 'Home' : 'Orchard'} Bag</b>.</p>`);
@@ -3243,8 +3252,8 @@ function marketHTML() {
   }
   const more = Object.keys(CARDS).some((k) => !S.unlocked[k] && (!TREES[k] || S.lots.orchard));
   // v0.68.1: clear sections with headers (each still sorted highest value first)
-  const SEC = atHome ? [['seeds', 'Seeds'], ['supplies', 'Supplies'], ['water', 'Water &amp; irrigation'], ['build', 'Buildings &amp; features'], ['garden', 'Garden charms &amp; tools']]
-    : [['saplings', 'Tree saplings'], ['supplies', 'Supplies'], ['water', 'Water &amp; irrigation'], ['build', 'Buildings &amp; features'], ['garden', 'Garden charms &amp; tools']];
+  const SEC = atHome ? [['seeds', 'Seeds'], ['supplies', 'Supplies'], ['water', 'Water &amp; irrigation'], ['build', 'Buildings &amp; features'], ['garden', 'Garden charms &amp; tools'], ['decor', 'Garden decorations']]
+    : [['saplings', 'Tree saplings'], ['supplies', 'Supplies'], ['water', 'Water &amp; irrigation'], ['build', 'Buildings &amp; features'], ['garden', 'Garden charms &amp; tools'], ['decor', 'Garden decorations']];
   for (const [k, title] of SEC) { const list = sec[k].filter(Boolean); if (!list.length) continue; rows.push(`<div class="sec-title mkt-sec" data-mkt-sec="${k}">${title}</div>`, ...list); }
   if (more) rows.push(`<p class="muted empty-hint" data-empty-hint>Open Card Packs to discover more.</p>`);
   return h + `<button class="jewel-strip" data-act="open-jewels"><i data-icon="jewel"></i><span><b>${S.jewels} Jewels</b><small>Jewel Shop</small></span><em>Shop</em></button><div class="list">${sortRows(rows).join('')}</div>`;
@@ -4167,19 +4176,19 @@ const oparkCars = () => (S.oparkingBuilt ? PARKING.cars[parkI()] : 1);
 const oBayXs = () => PARK_X.slice(0, oparkCap()).map((x) => x + SPOTS.orchardshed[0] - PARK_X[0]).sort((a, b) => b - a);
 const oBayX = (k) => oBayXs()[Math.min(k, oparkCap() - 1)];
 const oTrafficMult = () => (S.oparkingBuilt ? PARKING.gapMult[parkI()] : 1) / (bbActiveAt('orchard') ? BILLBOARD.mult : 1);
-const oExtraChance = () => (S.oparkingBuilt ? PARKING.extraItem + CARD_LEVELS.parking.extraItem * (cardLv('parking') - 1) : 0);            // v0.52: cars per arrival (each is a customer)
+const oExtraChance = () => (S.oparkingBuilt ? Math.min(0.9, PARKING.extraItem + CARD_LEVELS.parking.extraItem * (cardLv('parking') - 1)) : 0);            // v0.52: cars per arrival (each is a customer)
 // the bays in use, front (largest x, cars drive in +x) to back, so nobody drives through a parked car
 const bayXs = () => PARK_X.slice(0, parkCap()).sort((a, b) => b - a);
 const bayX = (k) => bayXs()[Math.min(k, parkCap() - 1)];
 function parkLevelText(lv) { const i = parkLv(lv);
-  return `${PARKING.spots[i]} spots · groups of ${PARKING.cars[i]} cars · a group every ~${Math.round(22.5 * PARKING.gapMult[i])} s · ${Math.round((PARKING.extraItem + CARD_LEVELS.parking.extraItem * i) * 100)}% buy an extra item`; }
+  return `${PARKING.spots[i]} spots · groups of ${PARKING.cars[i]} cars · a group every ~${Math.round(22.5 * PARKING.gapMult[i])} s · ${Math.round(Math.min(0.9, PARKING.extraItem + CARD_LEVELS.parking.extraItem * i) * 100)}% buy an extra item`; }
 const bbBuilt = () => !!(S.billboardBuilt || S.obillboardBuilt);
 const bbActive = () => bbBuilt() && now() < (S.bb?.until || 0);   // v0.68.1: one ad campaign, shown on every Billboard you have built
 const bbActiveAt = (loc) => bbActive() && !!(loc === 'orchard' ? S.obillboardBuilt : S.billboardBuilt);   // …and it boosts traffic only where a Billboard stands
 const bbReadyIn = () => Math.max(0, (S.bb?.readyAt || 0) - now());
 const trafficMult = () => (S.parkingBuilt ? PARKING.gapMult[parkI()] : 1) / (bbActiveAt('home') ? BILLBOARD.mult : 1);   // multiplies the gap between cars
-const extraItemChance = () => (S.parkingBuilt ? PARKING.extraItem + CARD_LEVELS.parking.extraItem * (cardLv('parking') - 1) : 0);
-const custGap = () => randInt(15000, 30000) * atmosMult() * trafficMult() * rushK('home') * (1 - charmAt('gardenbell', 'home'));   // v0.65: Brass Garden Bell — only where it stands
+const extraItemChance = () => (S.parkingBuilt ? Math.min(0.9, PARKING.extraItem + CARD_LEVELS.parking.extraItem * (cardLv('parking') - 1)) : 0);
+const custGap = () => randInt(15000, 30000) * atmosMult('home') * trafficMult() * rushK('home') * (1 - charmAt('gardenbell', 'home'));   // v0.65: Brass Garden Bell — only where it stands
 // v0.65: a visit picks STAND_BUY.kinds[lv] different goods (as many as the stand has) and up to STAND_BUY.upTo[lv] of each
 function rollWants(avail, stock, lv) { const i = Math.max(0, Math.min(STAND_BUY.upTo.length - 1, (lv || 1) - 1)), [a, b] = STAND_BUY.kinds[i];
   const types = avail.slice().sort(() => Math.random() - 0.5).slice(0, Math.min(avail.length, randInt(a, b)));
@@ -4237,7 +4246,7 @@ function leaveQueue() {
 }
 // v0.61: Orchard Stand visitors — one car at a time on the Orchard road, buying from S.ostand
 let ocusts = [], nextOCust = now() + 5000, nextOPass = now() + 7000;
-const oGap = () => randInt(15000, 30000) * atmosMult() * oTrafficMult() * rushK('orchard') * (1 - charmAt('gardenbell', 'orchard'));
+const oGap = () => randInt(15000, 30000) * atmosMult('orchard') * oTrafficMult() * rushK('orchard') * (1 - charmAt('gardenbell', 'orchard'));
 function spawnOArrival() {   // v0.68.1: with an Orchard Parking Lot, visitors come in groups like at Home
   const free = oparkCap() - ocusts.length, n = Math.min(oparkCars(), free); if (n < 1) return [];
   const out = []; for (let k = 0; k < n; k++) { const c = spawnOCustomer(k); if (c) out.push(c); }
@@ -4386,8 +4395,10 @@ function buyPack(forced) {
   S.coins += loot.coins; S.wood += loot.wood; S.scrap += loot.scrap; const st = (S.stats.packLoot ||= { coins: 0, wood: 0, scrap: 0 }); for (const r in loot) st[r] += loot[r];
   const seen = new Set();
   const results = ids.map((id) => applyPackCard(id, seen));
+  const d8 = forcedDeco || (Math.random() < DECO8_PACK.chance ? pickDeco(Object.keys(DECO8_PACK.w), DECO8_PACK.w) : null); forcedDeco = null;   // v0.8: a bonus decoration card (the 3 cards and their odds are unchanged)
+  const d8msg = d8 ? grantDecoCard(d8, false) : null;
   save(); hud(); closePanel();
-  showReveal(results, { title: 'Botanical Card Pack', again: !forced, loot, swap: true, onCollect: (news) => { tip('pack'); if (news.length) openPanel('market', 'buy'); if (ADS.interstitialAfterPack) setTimeout(() => Ads.maybeBreak('pack', adBlocked()), 700); } });
+  showReveal(results, { title: 'Botanical Card Pack', again: !forced, loot, swap: true, onCollect: (news) => { tip('pack'); if (d8msg) toast(d8msg); if (news.length) openPanel('market', 'buy'); if (ADS.interstitialAfterPack) setTimeout(() => Ads.maybeBreak('pack', adBlocked()), 700); } });
 }
 let revealCards = null, revealOpts = {};
 // v0.64: Swap · 1 Jewel. After a card flips, a card below Rare (Basic, Epic, Legendary) can be swapped ONCE for a random Rare-or-better
@@ -4860,3 +4871,365 @@ window.__ps = {
   clearLot(lot) { for (const o of OBSTACLES) if (o.lot === lot) { S.obs[o.id] = 'x'; W.setObstacle(o.id, 'gone'); } save(); },
   dismissTip() { clearTimeout(tipTimer); tipQueue.length = 0; $('#tip').classList.add('hidden'); },
 };
+
+// =====================================================================================================================
+// v0.8: Order Board · Bonus Wheel · Garden decorations · endless upgrades (data.js) · Garden Level (XP) · friend referrals
+// =====================================================================================================================
+var V8_PANELS = null, forcedDeco = null;   // forcedDeco: test hook — the next pack's bonus decoration card
+const V8 = {
+  orders: { home: { base: 2, plotsAt: 2, tinc: 1, refillMs: 180000 }, orchard: { base: 3, press: 1, refillMs: 240000 }, expireMs: 30 * 60000, skipFreeMs: 10 * 60000, skipJewels: 1, payK: 2, items: [1, 3], units: [2, 8], xp: 25 },
+  wheel: [   // weight %, amount × adMult (coins / wood); cards: 1 = one card (pack odds, the non-plant slot), 2 = two plant cards
+    { k: 'wood', w: 40, n: 15, label: 'Wood', c: '#E9D9B8' }, { k: 'wood', w: 10, n: 40, label: 'Big Wood', c: '#D9B98A' },
+    { k: 'coins', w: 25, n: 60, label: 'Coins', c: '#F7E3A6' }, { k: 'coins', w: 8, n: 200, label: 'Big Coins', c: '#F5D07A' },
+    { k: 'card', w: 12, n: 1, label: 'Card', c: '#B7D4B5' }, { k: 'card2', w: 4, n: 2, label: 'Card ×2', c: '#C8E0E8' }, { k: 'jewel', w: 1, n: 1, label: 'Jewel', c: '#F7C5C5' },
+  ],
+  pity: 150, wheelDecoK: 0.25,
+  xp: { sale: 0.1, order: 25, harvest: 2, craft: 3, build: 50, upg: 30, pack: 20, clear: 5, plot: 150 },
+  lvCoins: 50, backfillCap: 25,
+  ref: { gift: { coins: 100, packs: 1 }, reward: { jewels: 1, spins: 1 }, perDay: 5, maxFriends: 20, codeDays: 7, milestones: [[3, 'pack'], [5, 'arbor'], [10, 'jewels3']] },
+};
+const xpNeed = (L) => Math.round(100 * Math.pow(L, 1.6));
+const BUILT_KEYS = ['standBuilt', 'rackBuilt', 'marketBuilt', 'tinctureBuilt', 'stillBuilt', 'teaBuilt', 'pressBuilt', 'opressBuilt', 'fruitstandBuilt', 'windmillBuilt', 'parkingBuilt', 'billboardBuilt', 'oparkingBuilt', 'obillboardBuilt', 'oshedBuilt'];
+// XP is earned from the same counters the game already keeps, so nothing can be missed and old saves can be backfilled.
+function statXP() {
+  const st = S.stats || {}, X = V8.xp, tri = (lv) => (lv > 1 ? (lv * (lv + 1)) / 2 - 1 : 0);
+  let x = Math.floor(X.sale * ((st.standEarned || 0) + (st.orchEarned || 0) + (st.bulkEarned || 0) + (st.orderEarned || 0)));
+  x += X.order * (st.orders || 0) + X.harvest * ((st.harvests || 0) + (st.fruitPicks || 0));
+  x += X.craft * ((st.tinctures || 0) + (st.oils || 0) + (st.teas || 0) + (st.crafts || 0) + (st.hydrosols || 0));
+  x += X.build * (BUILT_KEYS.filter((k) => S[k]).length + (S.beds?.length || 0) + Object.keys(S.barrels || {}).length + Object.keys(S.hives || {}).length);
+  let up = 0; for (const c of Object.values(S.cards || {})) up += tri(Math.round(+c?.lv) || 1);
+  up += tri(S.standLv || 1) + tri(S.rackLv || 1); for (const b of Object.values(S.barrels || {})) up += tri(Math.round(+b?.lv) || 1);
+  x += X.upg * up + X.pack * (S.packs || 0) + X.clear * (st.cleared || 0) + X.plot * Object.keys(S.lots || {}).filter((l) => l !== 'home' && S.lots[l]).length;
+  return x;
+}
+function v8Init() {
+  const fresh = fromBuild == null && !upgraded;
+  if (!S.orders || typeof S.orders !== 'object') S.orders = {};
+  for (const L of DECO8_LOCS) if (!S.orders[L] || !Array.isArray(S.orders[L].slots)) S.orders[L] = { slots: [], skipAt: 0, auto: false };
+  if (!(S.spins >= 0)) S.spins = 0; if (!(S.spinPity >= 0)) S.spinPity = 0; if (!(S.spinsDone >= 0)) S.spinsDone = 0;
+  if (!S.decoCards || typeof S.decoCards !== 'object') S.decoCards = {};
+  if (!S.refClaimed || !Array.isArray(S.refClaimed)) S.refClaimed = [];
+  if (!S.refMiles || typeof S.refMiles !== 'object') S.refMiles = {};
+  if (!S.refDays || typeof S.refDays !== 'object') S.refDays = {};
+  if (S.installedAt == null) S.installedAt = fresh ? Date.now() : 0;   // only a brand-new save may enter a friend's code
+  if (S.xpSeen == null) {   // first run of v0.8
+    const tot = statXP(); S.xpSeen = tot; S.lvl = 1; S.xp = 0;
+    if (!fresh && tot > 0) {   // backfill from what this garden has already done — capped at Lv25, no level-up rewards, one welcome spin
+      let x = tot, L = 1; while (L < V8.backfillCap && x >= xpNeed(L)) { x -= xpNeed(L); L++; }
+      S.lvl = L; S.xp = L >= V8.backfillCap ? Math.min(x, xpNeed(L) - 1) : x; S.spins += 1; S.v8Welcome = true;
+    }
+  }
+  if (!(S.lvl >= 1)) S.lvl = 1; if (!(S.xp >= 0)) S.xp = 0;
+  const p = new URLSearchParams(location.search).get('ref'); if (p && fresh && !S.ref) S.refPending = p;
+}
+// ---------- Garden Level ----------
+function levelUp() {
+  S.lvl++; const L = S.lvl, c = Math.round(V8.lvCoins * L * adMult()); S.coins += c; S.spins++;
+  const extra = [];
+  if (L % 5 === 0) { S.jewels += 1; extra.push('+1 <i data-icon="jewel"></i>'); }
+  if (L === 10) { S.freePacks = (S.freePacks || 0) + 1; extra.push('a free Card Pack'); }
+  const dk = L === 15 || L === 25 ? pickDeco(['rare', 'superrare', 'ultra', 'otherworld'], { rare: 70, superrare: 20, ultra: 8, otherworld: 2 }) : L === 20 ? pickDeco(['superrare']) : L === 30 ? pickDeco(['ultra']) : null;
+  if (dk) { grantDecoCard(dk, false); extra.push(`the ${DECO8[dk].name} card`); }
+  S.stats.levelUps = (S.stats.levelUps || 0) + 1;
+  levelToast(L, c, extra);
+}
+function gainXP(n) { if (!(n > 0)) return; S.xp += n; let k = 0; while (S.xp >= xpNeed(S.lvl) && k++ < 200) { S.xp -= xpNeed(S.lvl); levelUp(); } }
+function levelToast(L, c, extra) {
+  sfx('levelup'); if (quiet) return;
+  const t = el('div', 'lvl-toast', `<div class="lvl-leaf">${L}</div><div><b>Garden Level ${L}!</b><small>+${fmtC(c)} <i data-icon="coin"></i> · +1 bonus spin${extra.length ? ' · ' + extra.join(' · ') : ''}</small></div>`);
+  $('#ui').appendChild(t); fillIcons(t); try { petals(t, 14); } catch (_) {} setTimeout(() => t.remove(), 3600);
+}
+function v8Hud() {
+  const b = $('#lvl-badge'); if (!b || !V8_PANELS) return;
+  const need = xpNeed(S.lvl), k = Math.max(0, Math.min(1, S.xp / need)), C = 2 * Math.PI * 15;
+  b.querySelector('.lv-n').textContent = S.lvl; b.querySelector('.lv-ring').setAttribute('stroke-dasharray', `${(C * k).toFixed(1)} ${C.toFixed(1)}`);
+  b.setAttribute('aria-label', `Garden Level ${S.lvl} · ${S.xp}/${need} XP`);
+  const sb = $('#spin-btn'); if (sb) { sb.classList.toggle('hidden', !(S.spins > 0)); sb.querySelector('b').textContent = S.spins; }
+}
+// ---------- Orders ----------
+const orderPrice = (loc, id) => (loc === 'orchard' ? ostandPrice(id) : standPrice(id));
+function orderSlots(loc) {
+  const O = V8.orders[loc];
+  if (loc === 'orchard') return S.oshedBuilt ? O.base + (S.opressBuilt ? O.press : 0) : 0;
+  if (!S.standBuilt) return 0;
+  return O.base + (Object.keys(LOTS).filter((l) => S.lots[l] && lotLoc(l) === 'home').length >= O.plotsAt ? 1 : 0) + (S.tinctureBuilt ? O.tinc : 0);
+}
+// what this location can make right now: goods in its Bag or on its stand, plus flowers of what grows in its beds / fruit of its trees
+function orderPool(loc) {
+  const bag = bagOf(loc), stand = (loc === 'orchard' ? S.ostand : S.stand) || {}, ids = new Set();
+  for (const id of SELL_ORDER) if (ITEMS[id] && !ITEMS[id].antique && sellsAt(id, loc) && ((bag[id] || 0) > 0 || (stand[id] || 0) > 0)) ids.add(id);
+  if (loc === 'home') { for (const p of S.tiles || []) if (p?.sp && ITEMS['flower_' + p.sp]) ids.add('flower_' + p.sp); }
+  else for (const t of Object.values(S.orchard || {})) if (t && TREES[t.sp]) ids.add(TREES[t.sp].fruit);
+  const onlyElse = (id) => { const r = id.startsWith('press_') && PRESS.recipes.find((x) => 'press_' + x.id === id); return !!(r && r.only && r.only !== loc); };   // Sunflower Oil / Sun Butter: Home only
+  return [...ids].filter((id) => ITEMS[id] && sellsAt(id, loc) && !id.startsWith('seed_') && !/^bag\d*_/.test(id) && !onlyElse(id) && sellOf(id) > 0);
+}
+function makeOrder(loc, rnd = Math.random) {
+  const pool = orderPool(loc); if (!pool.length) return null;
+  const O = V8.orders, n = Math.min(pool.length, O.items[0] + Math.floor(rnd() * (O.items[1] - O.items[0] + 1))), pick = [];
+  const left = [...pool]; while (pick.length < n && left.length) pick.push(left.splice(Math.floor(rnd() * left.length), 1)[0]);
+  const items = pick.map((id) => ({ id, n: Math.max(O.units[0], Math.min(O.units[1], Math.round((40 + rnd() * 100) / Math.max(1, sellOf(id))))) }));
+  return { id: 'o' + (S.uid++), items, at: now(), exp: now() + O.expireMs };
+}
+const orderPay = (loc, o) => o.items.reduce((a, it) => a + it.n * orderPrice(loc, it.id) * V8.orders.payK, 0);
+const orderReady = (loc, o) => !!o?.items && o.items.every((it) => (bagOf(loc)[it.id] || 0) >= it.n);
+function ordersTick() {
+  let ch = false;
+  for (const loc of DECO8_LOCS) {
+    const B = S.orders[loc], n = orderSlots(loc), refill = V8.orders[loc].refillMs;
+    while (B.slots.length < n) { B.slots.push({ wait: now() }); ch = true; }   // a new slot fills right away (when there is something to ask for)
+    for (let i = 0; i < B.slots.length; i++) {
+      const s = B.slots[i];
+      if (s?.items && now() >= s.exp) { B.slots[i] = makeOrder(loc) || { wait: now() + refill }; ch = true; continue; }   // an ignored order leaves; a fresh one replaces it
+      if (!s || (s.wait != null && now() >= s.wait)) { const o = makeOrder(loc); if (o) { B.slots[i] = o; ch = true; } else if (!s) B.slots[i] = { wait: now() + refill }; }
+    }
+    if (B.auto && managerAt(loc)) for (let i = 0; i < B.slots.length; i++) if (orderReady(loc, B.slots[i])) { fillOrder(loc, i, true); ch = true; }
+  }
+  return ch;
+}
+const managerAt = (loc) => Object.entries(S.managers || {}).some(([lot, w]) => w && now() < w.end && workerLoc(lot) === loc);
+function fillOrder(loc, i, auto = false) {
+  const B = S.orders[loc], o = B?.slots[i]; if (!o?.items) return false;
+  if (!orderReady(loc, o)) { if (!auto) toast(`Your ${loc === 'orchard' ? 'Orchard' : 'Home'} Bag doesn’t hold everything for this order yet`); return false; }
+  const bag = bagOf(loc); for (const it of o.items) bag[it.id] -= it.n;
+  const pay = orderPay(loc, o); S.coins += pay; S.spins++;
+  S.stats.orders = (S.stats.orders || 0) + 1; S.stats.orderEarned = (S.stats.orderEarned || 0) + pay;
+  B.slots[i] = { wait: now() + V8.orders[loc].refillMs };
+  if (!auto) { sfx('coin'); toast(`📋 Order filled · +${fmtC(pay)} <i data-icon="coin"></i> · +1 bonus spin`); }
+  v8Tick(); save(); hud(); if (panel) renderPanel(); return true;
+}
+function skipOrder(loc, i) {
+  const B = S.orders[loc], o = B?.slots[i]; if (!o?.items) return false;
+  const free = now() >= (B.skipAt || 0);
+  if (!free) { if (S.jewels < V8.orders.skipJewels) { toast('Free skips come back every 10 minutes — or skip now for 1 Jewel'); return false; } S.jewels -= V8.orders.skipJewels; }
+  else B.skipAt = now() + V8.orders.skipFreeMs;
+  B.slots[i] = makeOrder(loc) || { wait: now() + V8.orders[loc].refillMs }; S.stats.orderSkips = (S.stats.orderSkips || 0) + 1;
+  save(); hud(); if (panel) renderPanel(); return true;
+}
+function orderBoardHTML(loc) {
+  if (!orderSlots(loc)) return '';
+  ordersTick();
+  const B = S.orders[loc], bag = bagOf(loc), free = now() >= (B.skipAt || 0);
+  const cards = B.slots.map((o, i) => {
+    if (!o?.items) return `<div class="ord-card empty" data-order-slot="${i}"><small>${o?.wait && o.wait > now() ? `New order in <span data-ord-wait="${loc}:${i}">${fmtTime(o.wait - now())}</span>` : 'Grow or make something here to get orders'}</small></div>`;
+    const ok = orderReady(loc, o), pay = orderPay(loc, o);
+    const items = o.items.map((it) => { const have = bag[it.id] || 0; return `<span class="ord-it${have >= it.n ? ' ok' : ''}" title="${ITEMS[it.id].name}">${itemSvg(it.id)}<b>${Math.min(have, it.n)}/${it.n}</b></span>`; }).join('');
+    return `<div class="ord-card${ok ? ' ready' : ''}" data-order="${o.id}" data-order-slot="${i}"><div class="ord-items">${items}</div>
+      <div class="ord-meta"><span class="price"><i data-icon="coin"></i>${fmtC(pay)}</span><span class="ord-spin">+1 🎡</span><small data-ord-exp="${loc}:${i}">${fmtTime(o.exp - now())}</small></div>
+      <div class="ord-acts"><button class="btn btn-gold sm" data-v8="order-fill" data-loc="${loc}" data-i="${i}" ${ok ? '' : 'disabled'}>Fill</button><button class="btn sm" data-v8="order-skip" data-loc="${loc}" data-i="${i}">${free ? 'Skip' : `Skip · ${jewelTag(1)}`}</button></div></div>`;
+  }).join('');
+  const auto = managerAt(loc) ? `<label class="ord-auto"><input type="checkbox" data-v8="order-auto" data-loc="${loc}" ${B.auto ? 'checked' : ''}/> Market Manager fills ready orders</label>` : '';
+  return `<div class="order-board" data-orders="${loc}"><div class="sec-title">📋 Order Board <small>pays 2× the stand price + 1 bonus spin</small></div><div class="ord-grid">${cards}</div>${auto}</div>`;
+}
+// ---------- Bonus Wheel ----------
+function wheelPick(rnd = Math.random) {
+  if (S.spinPity >= V8.pity - 1) return V8.wheel.findIndex((w) => w.k === 'jewel');
+  let r = rnd() * V8.wheel.reduce((a, w) => a + w.w, 0); for (let i = 0; i < V8.wheel.length; i++) { r -= V8.wheel[i].w; if (r < 0) return i; } return 0;
+}
+function wheelApply(i) {
+  const w = V8.wheel[i], m = adMult(), out = { i, k: w.k, label: w.label };
+  if (w.k === 'wood') { out.n = Math.round(w.n * m); S.wood += out.n; out.text = `+${out.n} Wood`; }
+  else if (w.k === 'coins') { out.n = Math.round(w.n * m); S.coins += out.n; out.text = `+${fmtC(out.n)} coins`; }
+  else if (w.k === 'jewel') { S.jewels += 1; out.text = '+1 Jewel'; }
+  else if (w.k === 'card' && Math.random() < V8.wheelDecoK) { const d = pickDeco(['legendary', 'rare', 'superrare', 'ultra', 'otherworld']); out.msg = grantDecoCard(d, false); out.deco = d; out.text = `${DECO8[d].name} card`; }
+  else { const ids = w.k === 'card' ? [drawOther()] : [drawPlant(), drawPlant()], seen = new Set(); out.cards = ids.map((id) => applyPackCard(id, seen)); out.text = ids.map((id) => CARDS[id]?.name || id).join(' + '); }
+  S.spinPity = w.k === 'jewel' ? 0 : S.spinPity + 1; S.spinsDone++; S.stats.spins = (S.stats.spins || 0) + 1;
+  return out;
+}
+function spinWheel(force) {   // returns the result; the overlay animates it
+  if (!(S.spins > 0)) { toast('No bonus spins yet — fill orders and level up to earn them'); return null; }
+  S.spins--; const i = force != null ? force : wheelPick(); const r = wheelApply(i); save(); hud(); return r;
+}
+function wheelSVG() {
+  const tot = V8.wheel.reduce((a, w) => a + w.w, 0), R = 120; let a0 = -90, out = '';
+  V8.wheel.forEach((w, i) => {
+    const sweep = (w.w / tot) * 360, a1 = a0 + sweep, rad = (d) => (d * Math.PI) / 180, x0 = R + R * Math.cos(rad(a0)), y0 = R + R * Math.sin(rad(a0)), x1 = R + R * Math.cos(rad(a1)), y1 = R + R * Math.sin(rad(a1));
+    const mid = rad(a0 + sweep / 2), tx = R + R * 0.66 * Math.cos(mid), ty = R + R * 0.66 * Math.sin(mid);
+    out += `<path d="M${R} ${R}L${x0.toFixed(1)} ${y0.toFixed(1)}A${R} ${R} 0 ${sweep > 180 ? 1 : 0} 1 ${x1.toFixed(1)} ${y1.toFixed(1)}Z" fill="${w.c}" stroke="#FFF9F0" stroke-width="2"/>`;
+    if (sweep > 9) out += `<text x="${tx.toFixed(1)}" y="${ty.toFixed(1)}" transform="rotate(${(a0 + sweep / 2 + 90).toFixed(1)} ${tx.toFixed(1)} ${ty.toFixed(1)})" text-anchor="middle" dominant-baseline="middle" font-size="${sweep > 30 ? 13 : 10}" font-weight="700" fill="#3D5A40">${w.label}</text>`;
+    else out += `<text x="${(R + R * 0.86 * Math.cos(mid)).toFixed(1)}" y="${(R + R * 0.86 * Math.sin(mid)).toFixed(1)}" text-anchor="middle" dominant-baseline="middle" font-size="12">💎</text>`;
+    w.mid = a0 + sweep / 2 + 90; a0 = a1;
+  });
+  return `<svg viewBox="0 0 240 240" class="wheel-svg">${out}<circle cx="120" cy="120" r="20" fill="#FFF9F0" stroke="#3D5A40" stroke-width="2"/><circle cx="120" cy="120" r="8" fill="#F5D07A"/></svg>`;
+}
+let wheelSpinning = false, wheelRot = 0;
+function openWheel() {
+  closeWheel(); if (panel) closePanel();
+  const o = el('div', 'wheel-ov'); o.id = 'wheel-ov';
+  o.innerHTML = `<div class="wheel-card"><button class="close-btn" data-v8="wheel-close" aria-label="Close">×</button><h2>Bonus Wheel</h2>
+    <div class="wheel-wrap"><div class="wheel-pin"></div><div class="wheel-rot" id="wheel-rot" style="transform:rotate(${wheelRot}deg)">${wheelSVG()}</div></div>
+    <p class="wheel-res" id="wheel-res">${S.spins > 0 ? `You have <b>${S.spins}</b> spin${S.spins > 1 ? 's' : ''}` : 'No spins left — fill orders and level up for more'}</p>
+    <button class="btn btn-gold" id="wheel-go" data-v8="wheel-spin" ${S.spins > 0 ? '' : 'disabled'}>Spin</button>
+    <small class="muted wheel-odds">Wood 50% · Coins 33% · Card 12% · 2 Cards 4% · Jewel 1% (a Jewel is guaranteed by your ${V8.pity}th spin without one)</small></div>`;
+  $('#ui').appendChild(o); fillIcons(o);
+}
+function closeWheel() { $('#wheel-ov')?.remove(); wheelSpinning = false; }
+function wheelSpinUI() {
+  if (wheelSpinning) return; const r = spinWheel(); if (!r) return; wheelSpinning = true;
+  const w = V8.wheel[r.i], jitter = (Math.random() - 0.5) * Math.min(24, (w.w / 100) * 300);
+  wheelRot = wheelRot - (wheelRot % 360) + 360 * 5 + (360 - w.mid) + jitter;
+  const rot = $('#wheel-rot'), res = $('#wheel-res'), go = $('#wheel-go'); if (go) go.disabled = true;
+  if (rot) { rot.style.transition = 'transform 3.2s cubic-bezier(.17,.67,.2,1)'; rot.style.transform = `rotate(${wheelRot}deg)`; }
+  setTimeout(() => {
+    wheelSpinning = false; if (!res) return; sfx(r.k === 'jewel' ? 'goal' : 'coin');
+    res.innerHTML = `<b class="wheel-win">${r.text}</b><br/>${S.spins > 0 ? `${S.spins} spin${S.spins > 1 ? 's' : ''} left` : 'That was your last spin'}`; res.dataset.result = r.k;
+    if (go) go.disabled = !(S.spins > 0); try { sparkles($('#ui'), innerWidth / 2, innerHeight * 0.4, 16); } catch (_) {}
+  }, navigator.webdriver ? 200 : 3300);
+}
+// ---------- Decorations ----------
+function pickDeco(tiers, w) {
+  const ids = DECO8_SHOP.filter((k) => tiers.includes(DECO8[k].tier)); if (!w) return ids[Math.floor(Math.random() * ids.length)];
+  const t = (() => { let r = Math.random() * tiers.reduce((a, k) => a + (w[k] || 0), 0); for (const k of tiers) { r -= w[k] || 0; if (r < 0) return k; } return tiers[0]; })();
+  const pool = ids.filter((k) => DECO8[k].tier === t); return pool[Math.floor(Math.random() * pool.length)] || ids[0];
+}
+const decoOwned = (k) => S.decor.filter((d) => d.type === k).length + (S.decorInv[k] || 0);
+const decoPlacedAt = (k, loc) => S.decor.some((d) => d.type === k && decoLocOf(d) === loc);
+const cardOnly = (k) => ['superrare', 'ultra', 'otherworld'].includes(DECO8[k].tier) || DECO8[k].special;
+function grantDecoCard(k, show = true) {
+  const D = DECO8[k]; if (!D) return null; let msg;
+  if (!cardOnly(k)) {
+    if (!S.decoCards[k]) { S.decoCards[k] = 1; msg = `🃏 ${D.name} card · unlocked in the Market (Garden decorations)`; }
+    else { const c = DECO8_DUP[D.tier] || 100; S.coins += c; msg = `🃏 ${D.name} card again · +${c} coins`; }
+  } else if (decoOwned(k) < DECO8_LOCS.length) { S.decorInv[k] = (S.decorInv[k] || 0) + 1; S.decoCards[k] = (S.decoCards[k] || 0) + 1; msg = `🃏 ${D.name} · in your Bag (Finds) — place it at Home or the Orchard`; }
+  else { const c = DECO8_DUP[D.tier] || 100; S.coins += c; msg = `🃏 ${D.name} again (one already stands at each location) · +${c} coins`; }
+  S.stats.decoCards = (S.stats.decoCards || 0) + 1;
+  if (show) toast(msg);
+  return msg;
+}
+const locHasGrowth = (loc) => (loc === 'orchard' ? Object.values(S.orchard || {}).some(Boolean) : (S.beds || []).some((b) => lotLoc(siteById(b)?.lot || 'home') === 'home'));
+function decoMarketRows(loc) {
+  return DECO8_SHOP.map((k) => {
+    const D = DECO8[k], tag = `<span class="tier-tag t-${D.tier}">${PLANT_TIERS[D.tier].label}</span>`;
+    if (decoPlacedAt(k, loc)) return '';   // one per location — it leaves the list once it stands here
+    if (S.decorInv[k] > 0) return `<div class="row deco-row" data-deco="${k}"><div class="ico">${decorIcon(k)}</div><div class="meta"><b>${D.name}</b><small>${tag} · in your Bag · +${D.atm} atmosphere here</small></div><div class="acts"><button class="btn btn-gold sm" data-place="${k}">Place</button></div></div>`;
+    if (cardOnly(k)) return '';
+    const open = ['basic', 'epic'].includes(D.tier) ? locHasGrowth(loc) : !!S.decoCards[k];
+    if (!open) return '';
+    return `<div class="row deco-row" data-deco="${k}"><div class="ico">${decorIcon(k)}</div><div class="meta"><b>${D.name}</b><small>${tag} · +${D.atm} atmosphere ${loc === 'orchard' ? 'at the Orchard' : 'at Home'} · one per location</small></div><div class="acts"><button class="btn btn-primary sm" data-v8="deco-buy" data-k="${k}" data-price="${D.price}" ${S.coins < D.price ? 'disabled' : ''}>${coin(fmtC(D.price))}</button></div></div>`;
+  }).filter(Boolean);
+}
+function buyDeco(k) {
+  const D = DECO8[k], loc = curLoc(); if (!D || cardOnly(k) || decoPlacedAt(k, loc) || S.decorInv[k] > 0) return false;
+  if (!(['basic', 'epic'].includes(D.tier) ? locHasGrowth(loc) : S.decoCards[k])) return false;
+  if (S.coins < D.price) { toast(`Need ${fmtC(D.price - S.coins)} more coins`); return false; }
+  S.coins -= D.price; S.decorInv[k] = (S.decorInv[k] || 0) + 1; S.stats.decoBuys = (S.stats.decoBuys || 0) + 1; sfx('buy'); save(); hud();
+  enterPlace('decor', k); return true;
+}
+// ---------- Referrals ----------
+let REF = null;
+const refApi = () => window.__refMock || REF || (navigator.webdriver ? null : (REF = createReferral({ endpoint: 'https://nyc.cloud.appwrite.io/v1', projectId: '6ae0a41a002ce0a48fac', game: 'petalspire' })));
+const refLink = (code) => `${location.origin}${location.pathname}?ref=${code}`;
+const canEnterCode = () => !S.ref && S.installedAt > 0 && Date.now() - S.installedAt < V8.ref.codeDays * 86400e3;
+let refBusy = false, refFriends = null, refMsg = '';
+async function refEnsureCode() {
+  const api = refApi(); if (!api) { refMsg = 'Invites need an internet connection.'; return null; }
+  const r = await api.myCode(S.myCode); if (r.ok) { S.myCode = r.code; save(); } else refMsg = 'Couldn’t reach the invite server — try again in a moment.'; return r.ok ? r.code : null;
+}
+async function refJoin(code) {
+  if (!canEnterCode()) { toast(S.ref ? 'You already joined with a friend’s code' : 'Friend codes only work on a new garden, within 7 days'); return false; }
+  const api = refApi(); if (!api) { toast('Invites need an internet connection'); return false; }
+  const c = cleanCode(code); if (!c) { toast('That doesn’t look like a Petalspire code (PETAL-XXXXXX)'); return false; }
+  if (c === S.myCode) { toast('That’s your own code — share it with a friend instead'); return false; }
+  const r = await api.join(c);
+  if (!r.ok) { if (['self', 'already', 'unknown-code'].includes(r.err)) { S.refPending = null; save(); } toast(r.err === 'self' ? 'That’s your own code — share it with a friend instead' : r.err === 'already' ? 'This player already joined with a code' : r.err === 'unknown-code' ? 'No garden has that code' : 'Couldn’t reach the invite server — try again'); return false; }
+  S.ref = { code: c, at: Date.now(), qualified: false }; S.refPending = null;
+  S.coins += V8.ref.gift.coins; S.freePacks = (S.freePacks || 0) + V8.ref.gift.packs;
+  toast(`💌 Welcome gift from your friend · +${V8.ref.gift.coins} <i data-icon="coin"></i> · +1 free Card Pack`); sfx('goal'); save(); hud(); if (panel) renderPanel(); return true;
+}
+async function refProgress() {   // friend side: report Lv3 once the server says the link is 1–14 days old
+  if (!S.ref || S.ref.qualified || S.ref.expired || S.lvl < 3) return;
+  const api = refApi(); if (!api) return; const r = await api.report(S.lvl);
+  if (r.ok && r.qualified) { S.ref.qualified = true; S.jewels += V8.ref.reward.jewels; S.spins += V8.ref.reward.spins; toast('💌 Friend bonus · you reached Level 3 · +1 <i data-icon="jewel"></i> · +1 bonus spin'); save(); hud(); }
+  else if (r.ok && r.expired) { S.ref.expired = true; save(); }
+}
+async function refClaim() {   // inviter side: rewards for qualified friends (5 a day, up to 20 friends) + milestones
+  const api = refApi(); if (!api) return 0; const r = await api.friends(); if (!r.ok) return 0;
+  refFriends = r.list; const day = new Date().toISOString().slice(0, 10); let n = 0;
+  for (const f of r.list.filter((x) => x.qualified).sort((a, b) => Date.parse(a.qualifiedAt) - Date.parse(b.qualifiedAt))) {
+    if (S.refClaimed.includes(f.id) || S.refClaimed.length >= V8.ref.maxFriends || (S.refDays[day] || 0) >= V8.ref.perDay) continue;
+    S.refClaimed.push(f.id); S.refDays[day] = (S.refDays[day] || 0) + 1; S.jewels += V8.ref.reward.jewels; S.spins += V8.ref.reward.spins; n++;
+  }
+  for (const [at, what] of V8.ref.milestones) if (S.refClaimed.length >= at && !S.refMiles[at]) {
+    S.refMiles[at] = true;
+    if (what === 'pack') { S.freePacks = (S.freePacks || 0) + 1; toast('💌 3 friends! · a free Card Pack'); }
+    if (what === 'arbor') { S.decorInv.d8_arbor = (S.decorInv.d8_arbor || 0) + 1; toast('💌 5 friends! · the Friendship Arbor is in your Bag'); }
+    if (what === 'jewels3') { S.jewels += 3; toast('💌 10 friends! · +3 <i data-icon="jewel"></i>'); }
+  }
+  for (const d of Object.keys(S.refDays)) if (d !== day) delete S.refDays[d];
+  if (n) toast(`💌 ${n} friend${n > 1 ? 's' : ''} reached Level 3 · +${n} <i data-icon="jewel"></i> · +${n} bonus spin${n > 1 ? 's' : ''}`);
+  save(); hud(); return n;
+}
+async function openInvite() {
+  openPanel('invite'); if (refBusy) return; refBusy = true; refMsg = '';
+  try { if (!S.myCode) await refEnsureCode(); await refClaim(); } finally { refBusy = false; if (panel === 'invite') renderPanel(); }
+}
+function inviteHTML() {
+  const code = S.myCode, q = (refFriends || []).filter((f) => f.qualified).length, all = (refFriends || []).length;
+  const miles = V8.ref.milestones.map(([at, w]) => `<li class="${S.refClaimed.length >= at ? 'done' : ''}"><b>${at} friends</b> · ${w === 'pack' ? 'a free Card Pack' : w === 'arbor' ? 'the Friendship Arbor decoration' : '3 Jewels'}</li>`).join('');
+  return `<div class="invite-hero">${decorIcon('d8_arbor')}<p><b>Invite a friend to Petalspire</b><br/>They get <b>100 coins + a Card Pack</b> to start. When they reach <b>Garden Level 3</b> (within 14 days), you <b>both</b> get <b>1 Jewel + 1 bonus spin</b>.</p></div>
+    <div class="invite-code" data-invite-code="${code || ''}">${code ? `<small>Your code</small><b>${code}</b>` : `<small>${refBusy ? 'Making your code…' : refMsg || 'Your code appears here'}</small>`}</div>
+    ${code ? `<div class="ts-actions"><button class="btn btn-gold" data-v8="ref-share">💌 Share invite</button><button class="btn" data-v8="ref-copy">Copy link</button></div><p class="muted invite-link">${refLink(code)}</p>` : ''}
+    <div class="sec-title">Your friends</div><p class="muted" data-ref-count>${refFriends ? `${all} joined · ${q} reached Level 3 · ${S.refClaimed.length}/${V8.ref.maxFriends} rewarded` : 'Friends who join with your code show up here.'}</p>
+    <ul class="ref-miles">${miles}</ul><p class="muted" style="font-size:12px">Up to 5 friend rewards a day and 20 in all. A code only works on a brand-new garden, and never your own.</p>`;
+}
+function levelHTML() {
+  const need = xpNeed(S.lvl), k = Math.min(1, S.xp / need), nxt = [5, 10, 15, 20, 25, 30].find((m) => m > S.lvl);
+  const next = nxt ? (nxt === 10 ? 'a free Card Pack + 1 Jewel' : nxt === 15 || nxt === 25 ? 'a Rare-or-better decoration card + 1 Jewel' : nxt === 20 ? 'a Super Rare decoration card + 1 Jewel' : nxt === 30 ? 'an Ultra Rare decoration card + 1 Jewel' : '1 Jewel') : '1 Jewel every 5 levels';
+  return `<div class="lvl-hero"><div class="lvl-big">${S.lvl}</div><div><b>Your Garden Level</b><small>${fmtC(S.xp)} / ${fmtC(need)} XP to Level ${S.lvl + 1}</small><div class="progress slim"><b style="width:${(k * 100).toFixed(1)}%"></b></div></div></div>
+    <p class="muted">Every level: <b>${fmtC(Math.round(V8.lvCoins * (S.lvl + 1) * adMult()))} coins</b> + <b>1 bonus spin</b>.${nxt ? ` At Level ${nxt}: <b>${next}</b>.` : ''}</p>
+    <div class="sec-title">How you earn XP</div><ul class="xp-list"><li>Sales: 1 XP per 10 coins</li><li>Orders: 25 XP each</li><li>Harvests &amp; fruit picks: 2 XP</li><li>Crafted goods: 3 XP</li><li>Builds: 50 XP · new plots: 150 XP</li><li>Upgrades: 30 × the new level</li><li>Card Packs: 20 XP · clearing: 5 XP</li></ul>
+    <div class="ts-actions">${S.spins > 0 ? `<button class="btn btn-gold" data-v8="wheel-open">🎡 Spin the wheel (${S.spins})</button>` : ''}<button class="btn" data-v8="invite-open">💌 Invite friends</button></div>`;
+}
+function v8SettingsHTML() {
+  const enter = canEnterCode() ? `<div class="row ref-enter"><div class="meta"><b>Have a friend’s code?</b><small>New gardens only, within 7 days · you get 100 coins + a Card Pack</small><div class="ref-in"><input id="ref-code-in" placeholder="PETAL-XXXXXX" maxlength="14" autocapitalize="characters"/><button class="btn btn-gold sm" data-v8="ref-enter">Use code</button></div></div></div>` : '';
+  return `<div class="sec-title">Friends</div><div class="list"><button class="row set-btn" data-v8="invite-open"><b>💌 Invite friends</b><small>You both get a Jewel + a bonus spin when they reach Level 3</small></button>${enter}</div>`;
+}
+V8_PANELS = { invite: () => ({ t: 'Invite friends', b: inviteHTML() }), level: () => ({ t: 'Garden Level', b: levelHTML() }) };
+// ---------- tick, UI wiring ----------
+function v8Tick() {
+  if (!S) return; const cur = statXP();
+  if (cur > S.xpSeen) gainXP(cur - S.xpSeen); S.xpSeen = cur;
+  const ch = ordersTick(); if (ch && (panel === 'stand' || panel === 'ostand')) renderPanel();
+  document.querySelectorAll('[data-ord-wait],[data-ord-exp]').forEach((e) => { const [loc, i] = (e.dataset.ordWait || e.dataset.ordExp).split(':'), o = S.orders[loc]?.slots[+i]; if (!o) return; e.textContent = fmtTime(Math.max(0, (e.dataset.ordWait ? o.wait : o.exp) - now())); });
+  v8Hud();
+}
+(function v8Boot() {
+  v8Init();
+  const wm = $('.wordmark-mini');
+  if (wm && !$('#lvl-badge')) {
+    const b = el('button', 'lvl-badge'); b.id = 'lvl-badge'; b.type = 'button';
+    b.innerHTML = `<svg viewBox="0 0 36 36" aria-hidden="true"><circle cx="18" cy="18" r="15" fill="none" stroke="rgba(61,90,64,.18)" stroke-width="3.2"/><circle class="lv-ring" cx="18" cy="18" r="15" fill="none" stroke="#F5D07A" stroke-width="3.2" stroke-linecap="round" transform="rotate(-90 18 18)" stroke-dasharray="0 95"/><path d="M18 8c6 3 7 9 3 15-2 3-5 4-6 4 0-5 1-9 4-13-4 3-6 7-6 12-3-4-2-13 5-18z" fill="#B7D4B5"/></svg><span class="lv-n">1</span>`;
+    wm.appendChild(b); b.addEventListener('click', (e) => { e.stopPropagation(); panel === 'level' ? closePanel() : openPanel('level'); });
+  }
+  if (!$('#spin-btn')) { const s = el('button', 'spin-btn hidden', '🎡<b>0</b>'); s.id = 'spin-btn'; s.type = 'button'; s.setAttribute('aria-label', 'Bonus Wheel'); $('#ui').appendChild(s); s.addEventListener('click', (e) => { e.stopPropagation(); openWheel(); }); }
+  const onV8 = (e) => {
+    const b = e.target.closest('[data-v8]'); if (!b) return; const a = b.dataset.v8, loc = b.dataset.loc, i = +b.dataset.i;
+    if (a === 'order-auto') { S.orders[loc].auto = !!b.checked; save(); return; }
+    e.stopPropagation();
+    if (a === 'order-fill') return fillOrder(loc, i);
+    if (a === 'order-skip') return skipOrder(loc, i);
+    if (a === 'deco-buy') return buyDeco(b.dataset.k);
+    if (a === 'wheel-open') return openWheel();
+    if (a === 'wheel-spin') return wheelSpinUI();
+    if (a === 'wheel-close') return closeWheel();
+    if (a === 'invite-open') return openInvite();
+    if (a === 'ref-enter') return refJoin($('#ref-code-in')?.value || '');
+    if (a === 'ref-copy' || a === 'ref-share') {
+      const url = refLink(S.myCode), text = `Come grow a garden with me in Petalspire 🌸 Use my code ${S.myCode} for 100 coins + a Card Pack:`;
+      if (a === 'ref-share' && navigator.share) { navigator.share({ title: 'Petalspire', text, url }).catch(() => {}); return; }
+      (navigator.clipboard?.writeText(`${text} ${url}`) || Promise.reject()).then(() => toast('Invite link copied'), () => toast(url));
+    }
+  };
+  $('#ui').addEventListener('click', onV8, true);
+  setInterval(v8Tick, 1000); v8Tick();
+  if (S.v8Welcome && !quiet) { S.v8Welcome = false; setTimeout(() => toast(`🌿 New in v0.8: Garden Levels — your garden starts at <b>Level ${S.lvl}</b> · +1 bonus spin`), 2500); save(); }
+  // referrals: a pending ?ref= code on a new save, the friend's Lv3 report, and the inviter's rewards (all quiet, best effort)
+  setTimeout(() => { if (S.refPending && canEnterCode()) refJoin(S.refPending); }, 4000);
+  setInterval(() => { refProgress(); if (S.myCode) refClaim(); }, 10 * 60000); setTimeout(() => { refProgress(); if (S.myCode) refClaim(); }, 15000);
+})();
+Object.defineProperties(window.__ps, Object.getOwnPropertyDescriptors({   // descriptors, so the getters stay live
+  v8Tick, statXP, xpNeed, gainXP, get lvl() { return S.lvl; }, get xp() { return S.xp; }, get spins() { return S.spins; }, set spins(v) { S.spins = v; v8Hud(); },
+  orderSlots, orderPool, makeOrder, fillOrder, skipOrder, ordersTick, orderPay, get orders() { return S.orders; }, managerAt,
+  spinWheel, wheelPick, openWheel, closeWheel, V8, DECO8, grantDecoCard, buyDeco, decoMarketRows, decoPlacedAt, atmosphereAt: (loc) => atmosphere(loc), atmosMultAt: (loc) => atmosMult(loc),
+  refJoin, refClaim, refProgress, openInvite, canEnterCode, setRefMock(m) { window.__refMock = m; }, levelUp,
+  setForcedDeco(k) { forcedDeco = k; }, BUILDING_LV, WINDMILL,
+}));

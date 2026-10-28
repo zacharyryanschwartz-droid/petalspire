@@ -770,7 +770,7 @@ export const JEWEL_BUNDLES = [
 // v0.52: customers arrive in groups. Per card level (Lv1…Lv4): parking spots on the lot, cars per arrival (each car is one
 // customer) and the multiplier on the gap between arrivals (base 15–30 s, no lot = 1 car, gap counted from when it leaves).
 export const PARKING = { spots: [2, 3, 4, 6], cars: [2, 2, 3, 3], gapMult: [1.4, 1.2, 1.25, 1.15], extraItem: 0.3 };
-export const parkLv = (lv) => Math.max(1, Math.min(4, lv || 1)) - 1;
+export const parkLv = (lv) => Math.max(1, Math.min(PARKING.spots.length, lv || 1)) - 1;   // v0.8: endless
 export const WINDMILL = { regenS: [15, 13, 11, 10] };   // v0.63: base refill is now 30 s (was 60), so the Windmill is 15/13/11/10 s (was 20/18/17/15)
 export const BILLBOARD = { boostMs: 5 * 60000, cooldownMs: 60 * 60000, mult: 2, jewels: 1 };  // Run ad: 2× traffic for 5 min · free, then a 1 h cool-off after each run (v0.65) · 1 Jewel runs another
 export const TIPS = {
@@ -891,3 +891,63 @@ export const CROSS_PROMO = { gameId: 'market_plot', firstAfterMs: 20 * 60000, mi
 // v0.7.2: coin costs ×3 (sell prices unchanged)
 for (const sp of Object.values(SPECIES)) sp.seedPrice *= 3;
 for (const f of Object.values(FEATURES)) if (f.price) f.price *= 3;
+
+// ---------- v0.8: endless upgrades ----------
+// Every ladder that used to stop at Lv4 (cards, charms, Parking, Windmill, Irrigation, Farm Stand, Drying Rack) or Lv5 (Rain
+// Barrel) keeps going. Past the authored top: coin costs × 1.85 per level, Wood/Scrap × 1.6, build time × 1.5 (max 24 h);
+// percentage bonuses add 0.75 × the last authored step each level, soft-capped at 3 × the authored max; capacities add
+// +1 slot / +15 water / +1 parking spot; card copies needed = last threshold + 4 per level. The tables are extended in place
+// (to ENDLESS_LV, far beyond anything reachable) so every existing lookup keeps working.
+export const ENDLESS = { coinK: 1.85, matK: 1.6, timeK: 1.5, timeCap: 86400, stepK: 0.75, capK: 3, copiesStep: 4, waterStep: 15 };
+export const ENDLESS_LV = 60;
+const grow = (arr, n, next) => { while (arr.length < n) arr.push(next(arr[arr.length - 1], arr[arr.length - 2], arr.length)); return arr; };
+const r4 = (v) => Math.round(v * 10000) / 10000;
+// a % bonus that rises: +0.75 × last authored step, capped at 3 × authored max
+const pctUp = (arr, n) => { const top = arr[arr.length - 1], st = ENDLESS.stepK * (top - arr[arr.length - 2]), cap = top * ENDLESS.capK; return grow(arr, n, (a) => r4(Math.min(cap, a + st))); };
+grow(CARD_LEVELS.thresholds, ENDLESS_LV - 1, (a) => a + ENDLESS.copiesStep);
+CARD_LEVELS.plantBonus = (lv, key) => {   // plant cards: sell / grow bonus at a level (Lv1 = 0)
+  const step = CARD_LEVELS.plant[key], top = 3, base = step * (Math.min(lv, top + 1) - 1);
+  return lv <= top + 1 ? base : r4(Math.min(step * top * ENDLESS.capK, base + ENDLESS.stepK * step * (lv - top - 1)));
+};
+for (const c of Object.values(CHARMS)) pctUp(c.lv, ENDLESS_LV);
+grow(PARKING.spots, ENDLESS_LV, (a) => a + 1);
+grow(PARKING.cars, ENDLESS_LV, (a, b, i) => Math.min(6, a + (i % 2)));
+grow(PARKING.gapMult, ENDLESS_LV, (a) => r4(Math.max(0.8, a - 0.0375)));
+grow(WINDMILL.regenS, ENDLESS_LV, (a) => r4(Math.max(5, a - 0.75)));
+grow(WATER.stage, ENDLESS_LV, (a) => Math.max(1, a - 1));
+grow(WATER.lotus, ENDLESS_LV, (a) => [Math.max(2, a[0] - 1), Math.max(1, a[1] - 1)]);
+grow(STAND_BUY.kinds, ENDLESS_LV, (a) => a);
+grow(STAND_BUY.upTo, ENDLESS_LV, (a, b, i) => Math.min(8, a + (i % 2)));
+{ const L = BUILDING_LV.stand; grow(L.cost, ENDLESS_LV - 1, (a) => Math.round(a * ENDLESS.coinK / 5) * 5); grow(L.space, ENDLESS_LV, (a) => a + 1); pctUp(L.sell, ENDLESS_LV); }
+{ const L = BUILDING_LV.rack; grow(L.cost, ENDLESS_LV - 1, (a) => Math.round(a * ENDLESS.coinK / 5) * 5); grow(L.slots, ENDLESS_LV, (a) => Math.min(12, a + 1)); grow(L.faster, ENDLESS_LV, (a) => r4(Math.min(0.75, a + ENDLESS.stepK * 0.1))); }
+grow(BARREL_LV, ENDLESS_LV, (a) => ({ cap: a.cap + ENDLESS.waterStep, coins: Math.round(a.coins * ENDLESS.coinK / 5) * 5, wood: Math.round(a.wood * ENDLESS.matK), scrap: Math.round(a.scrap * ENDLESS.matK) }));
+for (const k of Object.keys(CONS.upg)) grow(CONS.upg[k], ENDLESS_LV, (a) => Math.min(ENDLESS.timeCap, Math.round(a * ENDLESS.timeK)));
+
+// ---------- v0.8: garden decorations ----------
+// 14 decorations in the plant tiers. Each one can stand once at Home AND once at the Orchard; its Atmosphere only helps the
+// location where it stands. Basic + Epic: bought with coins in the Market (once that location has a bed or a tree).
+// Legendary + Rare: their card (packs, the bonus wheel) unlocks a coin purchase. Super Rare and above: card only — the card
+// IS the decoration (packs, the wheel, player-level milestones).
+export const DECO8 = {
+  d8_stones:      { name: 'Moss Stepping Stones',          tier: 'basic',      price: 80,   atm: 1 },
+  d8_pail:        { name: 'Blush Watering Pail',           tier: 'basic',      price: 120,  atm: 1 },
+  d8_birdbath:    { name: 'Sage Birdbath',                 tier: 'epic',       price: 350,  atm: 2 },
+  d8_beehotel:    { name: 'Honey Bee Hotel',               tier: 'epic',       price: 500,  atm: 2 },
+  d8_swing:       { name: 'Willow Arbor Swing',            tier: 'legendary',  price: 1200, atm: 3 },
+  d8_gate:        { name: 'Cream Picket Gate & Roses',     tier: 'legendary',  price: 1500, atm: 3 },
+  d8_cloche:      { name: 'Sky-Mist Glass Cloche',         tier: 'rare',       price: 3000, atm: 4 },
+  d8_topiary:     { name: 'Golden Pear Topiary',           tier: 'rare',       price: 3600, atm: 4 },
+  d8_hare:        { name: 'Moss-Covered Stone Hare',       tier: 'superrare',  price: 0,    atm: 5 },
+  d8_sphere:      { name: 'Honey-Gold Sun Dial Sphere',    tier: 'superrare',  price: 0,    atm: 5 },
+  d8_lanterntree: { name: 'Whispering Willow Lantern Tree', tier: 'ultra',     price: 0,    atm: 6 },
+  d8_waterfall:   { name: 'Petal Waterfall Basin',         tier: 'ultra',      price: 0,    atm: 6 },
+  d8_moongate:    { name: 'Starlit Moon Gate',             tier: 'otherworld', price: 0,    atm: 8 },
+  d8_glasshouse:  { name: 'Aurora Glasshouse',             tier: 'otherworld', price: 0,    atm: 8 },
+  d8_arbor:       { name: 'Friendship Arbor',              tier: 'legendary',  price: 0,    atm: 3, special: true },   // referral reward (5 friends)
+};
+export const DECO8_IDS = Object.keys(DECO8);
+export const DECO8_SHOP = DECO8_IDS.filter((k) => !DECO8[k].special);   // the 14 (the Friendship Arbor only comes from referrals)
+export const DECO8_LOCS = ['home', 'orchard'];
+// chance that a Card Pack ALSO holds a decoration card (a bonus 4th card — the 3 normal cards and their odds are unchanged)
+export const DECO8_PACK = { chance: 0.06, w: { legendary: 50, rare: 30, superrare: 13, ultra: 5, otherworld: 2 } };
+export const DECO8_DUP = { legendary: 150, rare: 300, superrare: 500, ultra: 800, otherworld: 1200 };   // coins for a card you can't use any more

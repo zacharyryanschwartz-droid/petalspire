@@ -1362,6 +1362,51 @@ export function createWorld(canvas) {
         g.add(M(new THREE.CylinderGeometry(0.04, 0.06, 1.7, 6), woodD, 0, 0.85), M(new THREE.BoxGeometry(0.8, 0.04, 0.04), cu, 0, 1.75, 0), M(new THREE.ConeGeometry(0.07, 0.16, 4), cu, 0.44, 1.75, 0, 0, 0, -Math.PI / 2), M(new THREE.BoxGeometry(0.04, 0.2, 0.18), cu, -0.38, 1.78, 0));
         const bird = M(new THREE.SphereGeometry(0.13, 8, 6), cu, 0, 1.92, 0); bird.scale.set(1.4, 0.9, 0.35); g.add(bird, M(new THREE.ConeGeometry(0.08, 0.2, 4), cu, -0.18, 2.0, 0, 0, 0, 0.9));
         for (const [x, z] of [[0.25, 0], [-0.25, 0], [0, 0.25], [0, -0.25]]) g.add(M(new THREE.BoxGeometry(0.03, 0.03, 0.03), cu, x, 1.55, z)); hitH = 2.1; break; }
+      // ---------- v0.8: the 14 garden decorations (soft botanical palette) ----------
+      case 'd8_stones': { for (let k = 0; k < 4; k++) { const s = M(new THREE.CylinderGeometry(0.2, 0.22, 0.06, 9), mat('#C9C3B4'), (k - 1.5) * 0.3, 0.03, Math.sin(k * 1.7) * 0.18); s.scale.set(1, 1, 0.8); g.add(s, M(new THREE.SphereGeometry(0.09, 7, 5), mat('#7FA06E'), (k - 1.5) * 0.3 + 0.08, 0.06, Math.sin(k * 1.7) * 0.18 - 0.05)); } hitH = 0.4; break; }
+      case 'd8_pail': { const pk = mat('#F7C5C5', { roughness: 0.5 }); g.add(M(new THREE.CylinderGeometry(0.2, 0.17, 0.32, 14), pk, 0, 0.16), M(new THREE.CylinderGeometry(0.03, 0.04, 0.4, 6), pk, 0.24, 0.24, 0, 0, 0, -0.9), M(new THREE.TorusGeometry(0.17, 0.018, 6, 14, Math.PI), mat('#E9A9AE'), 0, 0.34, 0));
+        for (let k = 0; k < 5; k++) g.add(M(new THREE.IcosahedronGeometry(0.055, 0), mat(['#FFF9F0', '#F5D07A', '#B7D4B5'][k % 3]), Math.cos(k * 1.3) * 0.1, 0.36 + (k % 2) * 0.05, Math.sin(k * 1.3) * 0.1)); hitH = 0.7; break; }
+      case 'd8_birdbath': { const st = mat('#B7D4B5', { roughness: 0.8 }); g.add(M(new THREE.CylinderGeometry(0.22, 0.28, 0.08, 12), st, 0, 0.04), M(new THREE.CylinderGeometry(0.08, 0.12, 0.6, 10), st, 0, 0.36), M(new THREE.CylinderGeometry(0.42, 0.22, 0.12, 16), st, 0, 0.7), M(new THREE.CylinderGeometry(0.36, 0.36, 0.02, 16), mat('#C8E0E8', { roughness: 0.1, metalness: 0.1 }), 0, 0.76));
+        const bird = M(new THREE.SphereGeometry(0.07, 8, 6), mat('#F7C5C5'), 0.3, 0.84, 0); bird.scale.set(1.3, 1, 1); g.add(bird); hitH = 1; break; }
+      case 'd8_beehotel': { g.add(M(new THREE.CylinderGeometry(0.04, 0.05, 0.6, 6), woodD, 0, 0.3), M(new THREE.BoxGeometry(0.46, 0.42, 0.26), woodL, 0, 0.8), M(new THREE.ConeGeometry(0.38, 0.22, 4), mat('#3D5A40'), 0, 1.12, 0, 0, Math.PI / 4));
+        for (let r = 0; r < 3; r++) for (let c = 0; c < 4; c++) g.add(M(new THREE.CylinderGeometry(0.04, 0.04, 0.05, 8), mat((r + c) % 2 ? '#F5D07A' : '#C79A6B'), -0.15 + c * 0.1, 0.66 + r * 0.12, 0.13, Math.PI / 2)); hitH = 1.3; break; }
+      case 'd8_swing': { const wl = mat('#8DB486'); for (const x of [-0.6, 0.6]) g.add(M(new THREE.CylinderGeometry(0.05, 0.06, 1.9, 6), woodD, x, 0.95, 0)); g.add(M(new THREE.CylinderGeometry(0.05, 0.05, 1.3, 6), woodD, 0, 1.88, 0, 0, 0, Math.PI / 2));
+        for (const x of [-0.3, 0.3]) g.add(M(new THREE.CylinderGeometry(0.008, 0.008, 1.3, 3), mat('#E9D9B8'), x, 1.22, 0)); g.add(M(new THREE.BoxGeometry(0.75, 0.05, 0.3), mat('#FFF9F0'), 0, 0.57, 0));
+        for (let k = 0; k < 16; k++) { const l = M(leafGeo, k % 4 ? wl : mat('#F7C5C5'), -0.65 + (k / 15) * 1.3, 1.6 + hash(k, 5) * 0.35, (hash(k, 6) - 0.5) * 0.2, 0, hash(k, 7) * 6, 1.4); l.scale.set(1, 1, 2.2); g.add(l); } hitH = 2; break; }
+      case 'd8_gate': { const cr = mat('#FFF9F0'); for (let k = 0; k < 7; k++) { const x = -0.6 + k * 0.2; g.add(M(new THREE.BoxGeometry(0.08, 0.8, 0.04), cr, x, 0.4), M(new THREE.ConeGeometry(0.06, 0.12, 4), cr, x, 0.86, 0, 0, Math.PI / 4)); }
+        g.add(M(new THREE.BoxGeometry(1.35, 0.06, 0.05), cr, 0, 0.25, 0.03), M(new THREE.BoxGeometry(1.35, 0.06, 0.05), cr, 0, 0.62, 0.03));
+        for (let k = 0; k < 12; k++) g.add(M(k % 3 ? leafGeo : new THREE.IcosahedronGeometry(0.075, 0), mat(k % 3 ? '#7FA06E' : '#F7C5C5'), -0.62 + hash(k, 8) * 1.24, 0.3 + hash(k, 9) * 0.6, 0.06, 0, hash(k, 3) * 6, 0)); hitH = 1; break; }
+      case 'd8_cloche': { g.add(M(new THREE.CylinderGeometry(0.34, 0.36, 0.08, 16), mat('#C9C3B4'), 0, 0.04), M(new THREE.SphereGeometry(0.33, 18, 12, 0, Math.PI * 2, 0, Math.PI / 2), mat('#C8E0E8', { transparent: true, opacity: 0.45, roughness: 0.05 }), 0, 0.08), M(new THREE.SphereGeometry(0.05, 8, 6), mat('#C8E0E8'), 0, 0.43));
+        const fern = M(canopyGeo, mat('#9DC48F'), 0, 0.2); fern.scale.set(0.16, 0.13, 0.16); g.add(fern, M(new THREE.IcosahedronGeometry(0.05, 0), mat('#F7C5C5'), 0.05, 0.32, 0)); hitH = 0.6; break; }
+      case 'd8_topiary': { g.add(M(new THREE.CylinderGeometry(0.24, 0.18, 0.3, 12), terra, 0, 0.15), M(new THREE.CylinderGeometry(0.03, 0.03, 0.5, 6), woodD, 0, 0.5));
+        const pr = M(canopyGeo, mat('#7FA06E'), 0, 0.95); pr.scale.set(0.3, 0.42, 0.3); const pr2 = M(canopyGeo, mat('#7FA06E'), 0, 0.68); pr2.scale.set(0.36, 0.3, 0.36); g.add(pr, pr2);
+        for (let k = 0; k < 6; k++) g.add(M(new THREE.SphereGeometry(0.05, 7, 5), mat('#F5D07A', { metalness: 0.2 }), Math.cos(k) * 0.3, 0.62 + (k % 3) * 0.15, Math.sin(k) * 0.3)); hitH = 1.3; break; }
+      case 'd8_hare': { const sm = mat('#9AA592', { roughness: 0.9 }), mo = mat('#6E9A5E');
+        const body = M(new THREE.SphereGeometry(0.22, 12, 9), sm, 0, 0.22); body.scale.set(1.25, 1, 0.9); const head = M(new THREE.SphereGeometry(0.13, 10, 8), sm, 0.24, 0.42); g.add(body, head);
+        for (const z of [-0.05, 0.05]) { const e = M(new THREE.SphereGeometry(0.04, 6, 5), sm, 0.2, 0.66, z, 0, 0, 0.2); e.scale.set(0.7, 3, 0.6); g.add(e); }
+        for (let k = 0; k < 8; k++) g.add(M(new THREE.SphereGeometry(0.06, 6, 4), mo, (hash(k, 1) - 0.5) * 0.4, 0.33 + hash(k, 2) * 0.08, (hash(k, 3) - 0.5) * 0.3)); hitH = 0.8; break; }
+      case 'd8_sphere': { const hg = mat('#F5D07A', { metalness: 0.55, roughness: 0.3 }); g.add(M(new THREE.CylinderGeometry(0.2, 0.26, 0.5, 8), mat('#E9E2D2'), 0, 0.25), M(new THREE.TorusGeometry(0.32, 0.025, 6, 24), hg, 0, 0.85, 0), M(new THREE.TorusGeometry(0.32, 0.025, 6, 24), hg, 0, 0.85, 0, Math.PI / 2), M(new THREE.TorusGeometry(0.32, 0.02, 6, 24), hg, 0, 0.85, 0, Math.PI / 2, 0, 0.5), M(new THREE.CylinderGeometry(0.012, 0.012, 0.75, 4), hg, 0, 0.85, 0, 0, 0, 0.5));
+        const gl = glowSprite('#FFE3A0', 0.9, 0.35); gl.position.set(0, 0.85, 0); g.add(gl); glows.push(gl); hitH = 1.3; break; }
+      case 'd8_lanterntree': { g.add(M(new THREE.CylinderGeometry(0.08, 0.14, 1.6, 7), woodD, 0, 0.8)); const wl = mat('#9DC48F');
+        const top = M(canopyGeo, wl, 0, 1.75); top.scale.set(0.6, 0.35, 0.6); g.add(top);
+        for (let k = 0; k < 14; k++) { const a = k / 14 * Math.PI * 2, l = M(new THREE.BoxGeometry(0.03, 0.8, 0.02), wl, Math.cos(a) * 0.52, 1.25, Math.sin(a) * 0.52); g.add(l); }
+        for (let k = 0; k < 5; k++) { const a = k * 1.26, x = Math.cos(a) * 0.4, z = Math.sin(a) * 0.4; g.add(M(new THREE.SphereGeometry(0.06, 8, 6), mat('#FFE1A0', { emissive: '#F5D07A', emissiveIntensity: 1.2 }), x, 1.1 + (k % 2) * 0.15, z)); const gl = glowSprite('#FFD98A', 0.5, 0.45); gl.position.set(x, 1.1 + (k % 2) * 0.15, z); g.add(gl); glows.push(gl); } hitH = 2.1; break; }
+      case 'd8_waterfall': { const st = mat('#B7D4B5', { roughness: 0.8 }), wa = mat('#C8E0E8', { transparent: true, opacity: 0.75, roughness: 0.05 });
+        g.add(M(new THREE.CylinderGeometry(0.55, 0.6, 0.22, 18), st, 0, 0.11), M(new THREE.CylinderGeometry(0.5, 0.5, 0.02, 18), wa, 0, 0.21), M(new THREE.CylinderGeometry(0.28, 0.32, 0.2, 14), st, 0, 0.62), M(new THREE.CylinderGeometry(0.08, 0.1, 0.5, 8), st, 0, 0.35), M(new THREE.CylinderGeometry(0.29, 0.1, 0.42, 14, 1, true), wa, 0, 0.42));
+        for (let k = 0; k < 10; k++) g.add(M(new THREE.IcosahedronGeometry(0.04, 0), mat(['#F7C5C5', '#FFF9F0'][k % 2]), Math.cos(k * 0.63) * 0.4, 0.23, Math.sin(k * 0.63) * 0.4)); hitH = 0.9; break; }
+      case 'd8_moongate': { const st = mat('#E9E2D2', { roughness: 0.8 }); g.add(M(new THREE.TorusGeometry(0.8, 0.13, 10, 32), st, 0, 0.85, 0), M(new THREE.BoxGeometry(2.0, 0.12, 0.34), st, 0, 0.06, 0));
+        for (let k = 0; k < 9; k++) { const a = (k / 8) * Math.PI, x = Math.cos(a) * 0.8, y = 0.85 + Math.sin(a) * 0.8; g.add(M(new THREE.OctahedronGeometry(0.05, 0), mat('#FFF6D8', { emissive: '#C8E0E8', emissiveIntensity: 1.4 }), x, y, 0.15)); }
+        const gl = glowSprite('#C8E0E8', 1.8, 0.4); gl.position.set(0, 0.85, 0); g.add(gl); glows.push(gl); hitH = 1.9; break; }
+      case 'd8_arbor': { const cr = mat('#FFF9F0'); for (const x of [-0.6, 0.6]) g.add(M(new THREE.BoxGeometry(0.08, 1.5, 0.08), cr, x, 0.75, 0)); g.add(M(new THREE.TorusGeometry(0.6, 0.05, 6, 20, Math.PI), cr, 0, 1.5, 0));
+        for (let k = 0; k < 18; k++) { const a = (k / 17) * Math.PI, x = Math.cos(a) * 0.6, y = 1.5 + Math.sin(a) * 0.6; g.add(M(k % 3 ? leafGeo : new THREE.IcosahedronGeometry(0.08, 0), mat(k % 3 ? '#8DB486' : ['#F7C5C5', '#F5D07A'][k % 2]), x, y, 0.05, 0, hash(k, 4) * 6, 0)); }
+        for (let k = 0; k < 8; k++) g.add(M(new THREE.IcosahedronGeometry(0.07, 0), mat('#F7C5C5'), (k < 4 ? -0.6 : 0.6) + (hash(k, 2) - 0.5) * 0.1, 0.3 + (k % 4) * 0.3, 0.06)); hitH = 2.2; break; }
+      case 'd8_glasshouse': { const gm = mat('#C8E0E8', { transparent: true, opacity: 0.38, roughness: 0.05 }), fr = mat('#FFF9F0');
+        g.add(M(new THREE.BoxGeometry(1.2, 0.8, 0.9), gm, 0, 0.45), M(new THREE.ConeGeometry(0.85, 0.5, 4, 1, true), gm, 0, 1.1, 0, 0, Math.PI / 4));
+        for (const x of [-0.6, 0.6]) for (const z of [-0.45, 0.45]) g.add(M(new THREE.BoxGeometry(0.04, 0.85, 0.04), fr, x, 0.45, z));
+        g.add(M(new THREE.BoxGeometry(1.24, 0.04, 0.94), fr, 0, 0.86, 0), M(new THREE.BoxGeometry(1.24, 0.06, 0.94), fr, 0, 0.03, 0));
+        const pl = M(canopyGeo, mat('#9DC48F'), 0, 0.35); pl.scale.set(0.35, 0.25, 0.3); g.add(pl);
+        const gl = glowSprite('#B7F0D0', 1.6, 0.4); gl.position.set(0, 0.7, 0); g.add(gl); glows.push(gl);
+        const gl2 = glowSprite('#F7C5E8', 1.2, 0.3); gl2.position.set(0.3, 1.1, 0); g.add(gl2); glows.push(gl2); hitH = 1.4; break; }
     }
     const hit = new THREE.Mesh(new THREE.BoxGeometry(1.0, hitH, 0.9), new THREE.MeshBasicMaterial({ visible: false })); hit.position.y = hitH / 2; g.add(hit);
     return g;
