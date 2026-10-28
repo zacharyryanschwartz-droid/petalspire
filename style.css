@@ -1215,3 +1215,54 @@ body.modal-open .wk-timer { display: none; }
 .big-pack.tin.suspense .tin-body{box-shadow:0 0 30px 8px var(--tc),0 0 70px 20px var(--tc);animation:sus-glow .7s ease-in-out infinite alternate}
 .big-pack.tin .pack-ribbon{z-index:7}
 @media (prefers-reduced-motion:reduce){.tin.opening .tin-lid,.tin.opening .tin-fan .tin-card,.tin.opening .tin-hero,.tin.opening .tin-glow{animation-duration:.01s!important;animation-delay:0s!important}}
+
+/* ---------- v0.8: Garden Level badge, Bonus Wheel, Order Board, decorations, invites ---------- */
+.wordmark-mini{position:relative}
+.lvl-badge{position:relative;width:36px;height:36px;margin-left:2px;padding:0;border:0;background:none;cursor:pointer;pointer-events:auto;flex:none}
+.lvl-badge svg{position:absolute;inset:0;width:36px;height:36px}
+.lvl-badge .lv-n{position:relative;z-index:1;display:flex;align-items:center;justify-content:center;width:36px;height:36px;font:800 13px/1 'Nunito',system-ui,sans-serif;color:#3D5A40;text-shadow:0 0 3px #FFF9F0,0 0 2px #FFF9F0}
+.spin-btn{position:absolute;right:10px;top:calc(env(safe-area-inset-top,0px) + 62px);z-index:6;pointer-events:auto;display:flex;align-items:center;gap:4px;padding:5px 10px 5px 8px;border-radius:999px;border:1.5px solid #F5D07A;background:rgba(255,249,240,.94);font-size:18px;box-shadow:0 3px 10px rgba(61,90,64,.18);animation:spinPulse 2.4s ease-in-out infinite}
+.spin-btn b{font:800 14px 'Nunito',system-ui,sans-serif;color:#3D5A40}
+.spin-btn.hidden{display:none}
+@keyframes spinPulse{0%,100%{box-shadow:0 3px 10px rgba(61,90,64,.18),0 0 0 0 rgba(245,208,122,.0)}50%{box-shadow:0 3px 10px rgba(61,90,64,.18),0 0 0 6px rgba(245,208,122,.45)}}
+.lvl-toast{position:absolute;left:50%;top:22%;transform:translateX(-50%);z-index:60;display:flex;gap:12px;align-items:center;padding:12px 18px 12px 12px;border-radius:20px;background:linear-gradient(135deg,#FFF9F0,#F2F8EF);border:2px solid #B7D4B5;box-shadow:0 10px 30px rgba(61,90,64,.25);pointer-events:none;animation:lvlIn .5s cubic-bezier(.2,1.4,.4,1);overflow:visible;max-width:88vw}
+.lvl-toast b{display:block;font-family:'Fraunces',serif;font-size:19px;color:#3D5A40}.lvl-toast small{color:#5E6B5F;font-size:12.5px}
+.lvl-leaf,.lvl-big{flex:none;width:46px;height:46px;border-radius:50% 4px 50% 4px;background:linear-gradient(135deg,#B7D4B5,#8DB486);color:#FFF9F0;font:800 20px 'Nunito',system-ui,sans-serif;display:flex;align-items:center;justify-content:center;border:2px solid #F5D07A}
+@keyframes lvlIn{from{opacity:0;transform:translate(-50%,-16px) scale(.85)}to{opacity:1;transform:translate(-50%,0) scale(1)}}
+.lvl-hero{display:flex;gap:14px;align-items:center;padding:12px;border-radius:16px;background:#F2F8EF;border:1.5px solid #B7D4B5;margin-bottom:10px}
+.lvl-hero>div:last-child{flex:1}.lvl-hero b{display:block;font-family:'Fraunces',serif;font-size:18px;color:#3D5A40}.lvl-hero small{color:#5E6B5F}
+.lvl-big{width:58px;height:58px;font-size:24px}
+.xp-list,.ref-miles{margin:4px 0 10px;padding-left:20px;color:#4A5A4C;font-size:13.5px;line-height:1.6}
+.ref-miles li.done{color:#5E825F;text-decoration:line-through}
+.wheel-ov{position:absolute;inset:0;z-index:70;display:flex;align-items:center;justify-content:center;background:rgba(40,52,42,.45);pointer-events:auto}
+.wheel-card{position:relative;width:min(92vw,360px);padding:18px 16px 14px;border-radius:24px;background:#FFF9F0;border:2px solid #B7D4B5;text-align:center;box-shadow:0 18px 40px rgba(0,0,0,.25)}
+.wheel-card h2{margin:0 0 8px;font-family:'Fraunces',serif;color:#3D5A40}
+.wheel-card .close-btn{position:absolute;right:10px;top:10px}
+.wheel-wrap{position:relative;width:250px;height:250px;margin:0 auto 8px}
+.wheel-rot{width:250px;height:250px;border-radius:50%;box-shadow:0 0 0 6px #F5D07A,0 6px 18px rgba(61,90,64,.25)}
+.wheel-svg{width:250px;height:250px;display:block}
+.wheel-pin{position:absolute;left:50%;top:-10px;z-index:2;transform:translateX(-50%);width:0;height:0;border-left:13px solid transparent;border-right:13px solid transparent;border-top:24px solid #3D5A40;filter:drop-shadow(0 2px 2px rgba(0,0,0,.25))}
+.wheel-res{min-height:42px;margin:6px 0 8px;color:#3D5A40}.wheel-win{font-size:18px;color:#9A6A12}
+.wheel-odds{display:block;margin-top:8px;font-size:11px}
+.order-board{margin:0 0 12px;padding:10px;border-radius:16px;background:linear-gradient(180deg,#FBF6EA,#F2F8EF);border:1.5px solid #E5D7B5}
+.order-board .sec-title{margin-top:0}.order-board .sec-title small{font-weight:600;color:#7A8A7C;font-size:11px;margin-left:4px}
+.ord-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.ord-card{display:flex;flex-direction:column;gap:6px;padding:8px;border-radius:12px;background:#FFF9F0;border:1.5px dashed #D8CBA8;min-height:96px}
+.ord-card.ready{border:1.5px solid #8DB486;box-shadow:0 0 0 2px rgba(183,212,181,.5)}
+.ord-card.empty{align-items:center;justify-content:center;text-align:center;color:#8A8474;font-size:12px}
+.ord-items{display:flex;flex-wrap:wrap;gap:4px}
+.ord-it{display:flex;align-items:center;gap:2px;padding:2px 5px 2px 2px;border-radius:9px;background:#F3EEE2;font-size:11.5px;color:#9A4B4B}
+.ord-it.ok{background:#E6F1E3;color:#3D5A40}.ord-it svg{width:24px;height:24px}
+.ord-meta{display:flex;align-items:center;gap:6px;font-size:12px}.ord-meta small{margin-left:auto;color:#8A8474}
+.ord-spin{font-size:11.5px;color:#9A6A12;font-weight:700}
+.ord-acts{display:flex;gap:6px}.ord-acts .btn{flex:1;padding-left:4px;padding-right:4px}
+.ord-auto{display:flex;align-items:center;gap:6px;margin-top:8px;font-size:12.5px;color:#4A5A4C}
+.invite-hero{display:flex;gap:12px;align-items:center;padding:10px;border-radius:16px;background:#FDF1F1;border:1.5px solid #F7C5C5}
+.invite-hero svg{width:60px;height:60px;flex:none}.invite-hero p{margin:0;font-size:13.5px;color:#4A5A4C}
+.invite-code{margin:12px 0 8px;padding:12px;border-radius:14px;border:2px dashed #F5D07A;background:#FFF9F0;text-align:center}
+.invite-code small{display:block;color:#8A8474}.invite-code b{font:800 24px 'Nunito',system-ui,sans-serif;letter-spacing:2px;color:#3D5A40}
+.invite-link{word-break:break-all;font-size:11.5px;text-align:center}
+.ref-in{display:flex;gap:6px;margin-top:6px}.ref-in input{flex:1;min-width:0;padding:7px 10px;border-radius:10px;border:1.5px solid #B7D4B5;font:700 14px 'Nunito',system-ui,sans-serif;text-transform:uppercase;background:#fff}
+.ref-enter .meta{flex:1}
+.tier-tag.t-superrare,.tier-tag.t-ultra,.tier-tag.t-otherworld,.tier-tag.t-rare,.tier-tag.t-legendary,.tier-tag.t-epic,.tier-tag.t-basic{white-space:nowrap}
+#ui .lvl-toast{pointer-events:none}

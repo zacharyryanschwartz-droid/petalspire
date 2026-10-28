@@ -1,4 +1,4 @@
-# Petalspire v0.68
+# Petalspire v0.8
 
 A cozy 3D flower-garden prototype for iPhone Safari (portrait, one thumb). Also plays on desktop with a mouse.
 This is a **prototype**: version numbers stay below 1.0 until the first official release.
@@ -20,6 +20,14 @@ This is a **prototype**: version numbers stay below 1.0 until the first official
 7. **Land for sale.** Five wooded plots, each with a floating For Sale sign: 450 → 900 → 1800 → 3000 → 4500 coins (v0.7.2; was 150 → 1500).
 
 Drag with one finger to pan, pinch to zoom, and twist with two fingers to turn. On desktop, right-drag or shift-drag turns the view.
+
+## New in v0.8: Orders, the Bonus Wheel, garden decorations, endless upgrades, Garden Levels, friend invites
+- **Order Board** (top of the Farm Stand and Orchard Stand sheets). 2 slots at Home once the Farm Stand stands (+1 with 2+ Home plots, +1 with the Tincture Table); 3 at the Orchard once its stand stands (+1 with the Orchard press). An order asks only for goods that location can make right now (1–3 kinds, 2–8 each; never seeds, and never Sunflower Oil or Sun Butter at the Orchard). **Fill** pays **2× the stand price + 1 bonus spin**. One free **Skip** every 10 minutes, otherwise 1 Jewel. Orders leave after 30 minutes. A Market Manager can fill ready orders by itself (toggle on the board).
+- **Bonus Wheel** (the 🎡 button, shown only when you have spins). Wood 40% · Big Wood 10% · Coins 25% · Big Coins 8% · Card 12% · 2 Cards 4% · Jewel 1%; a Jewel is guaranteed by your 150th spin without one. A Card can be a garden decoration card (1 in 4). Spins come from orders, level-ups and friend rewards — never from ads.
+- **14 garden decorations** in the soft botanical palette, each available at **both Home and the Orchard** (one of each per location). Their atmosphere helps only the location where they stand. Basic and Epic: Market, once that location has a bed or a tree. Legendary and Rare: their card unlocks a coin purchase. Super Rare, Ultra Rare and Otherworldly: card only (packs carry a bonus decoration card 6% of the time, the wheel, Levels 15/20/25/30). They can't be sold. Restored finds still help everywhere.
+- **Endless upgrades.** The Farm Stand, Drying Rack, barrels, plant cards, charms, parking and windmill keep levelling past their old maximum (to Lv60). Costs rise ×1.85 a level (Farm Stand Lv5 = 3,700, Lv6 = 6,845 …); bonuses rise by ¾ of the last step and stop at 3× the old maximum; times have floors.
+- **Garden Level** (the leaf badge by the wordmark; tap it). XP comes from sales (1 per 10 coins), orders (25), harvests (2), crafted goods (3), builds (50), new plots (150), upgrades and packs. Every level pays 50 × level coins + 1 bonus spin; every 5th level +1 Jewel; Level 10 a free Card Pack; Levels 15/20/25/30 a decoration card. Existing gardens are **backfilled** from what they have already done (capped at Level 25, no back-pay, one welcome spin) — nothing is lost.
+- **Invite friends** (Settings → Friends, or the Level sheet). Your code looks like PETAL-XXXXXX. A friend who enters it on a brand-new garden (within 7 days) gets 100 coins + a Card Pack; when they reach Level 3 within 14 days you **both** get 1 Jewel + 1 bonus spin. Up to 5 friend rewards a day and 20 in all; 3 friends = a free Card Pack, 5 = the Friendship Arbor decoration, 10 = 3 Jewels. Codes and links are stored in Appwrite (project tables `ref_codes` / `ref_links`, per-player row permissions; no server key in the game).
 
 ## New in v0.7.2.3: Card Packs open like the Reel
 - Opening a Card Pack now plays the same moment as the card-pack Reel: the sage Petalspire tin sits on a petal-strewn wooden table, the lid lifts on a golden glow, seven cards fan out, and the top card glows, sparkles and rises toward you before the cards are dealt.
