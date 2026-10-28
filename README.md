@@ -21,6 +21,14 @@ This is a **prototype**: version numbers stay below 1.0 until the first official
 
 Drag with one finger to pan, pinch to zoom, and twist with two fingers to turn. On desktop, right-drag or shift-drag turns the view.
 
+## New in v0.7.2.2: nothing shows until you can use it
+The Market and Build menus no longer list anything (not even greyed out) before it is usable at that location:
+- **Scrap Metal:** not in the Market, the Watch-an-ad picks or Card Pack bonuses until a Windmill exists at that location (the Windmill is Home only). You can still find Scrap any time on the road and by recycling finds from clearing trees, which is how you collect the 5 Scrap the Windmill needs.
+- **Irrigation (beds):** only while a Rain Barrel exists and a bed it can feed still needs irrigation. Its card doesn't drop from Card Packs until you own a barrel.
+- **Tree-row Irrigation (Orchard):** only while a row with a planted tree still needs it.
+- **Locked placeholders** (Parking Lot, Billboard, Orchard Oil Press, the Still with no plot for it, the Honeybee Skep when every bed plot here has one, the water truck when every barrel is full, tools where there are no beds) are hidden until they can be bought. Parking Lot and Billboard still drop out of Build once built.
+- **One-time purchases leave every list once bought**, including after a reload and in old saves. The Parking Lot no longer stays in the Market as a "buy another card" row (more Parking Lot cards still come from Card Packs), and the Rain Barrel card leaves Build once every plot you own has one.
+
 ## New in v0.7.2.1: Glycerin and Vinegar wait for the Tincture Stand
 - **Glycerin and Vinegar are not in the Market at all until the Tincture Stand is built.** They are not listed and not shown greyed out, and their cards don't drop from Card Packs. Once the stand is built they are sold at the Home Market only (never at the Orchard), as before.
 - **Old saves:** Glycerin and Vinegar you already own stay in your Bag, but the Market hides them until the stand is built. This also applies to saves that were "grandfathered" in v0.52.
