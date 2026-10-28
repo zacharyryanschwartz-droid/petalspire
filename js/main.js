@@ -15,7 +15,7 @@ import { createAudio, MUSIC_CREDITS } from './audio.js';
 
 // Save format: v0.3, v0.31 and v0.4 share one localStorage key (schema v: 3). `build` records which prototype build last wrote the save;
 // v0.3 / v0.31 saves (no `build`, no per-plot barrels) are migrated on load (migrate04 below); v0.4 saves load as-is and are re-tagged. Prototype builds stay below 1.0.
-export const BUILD = '0.7.2.2';
+export const BUILD = '0.7.2.3';
 // v0.65: anonymous player tracking (Games Backend on Appwrite; no API key in the game, nothing personal). Skipped for automated runs (navigator.webdriver).
 try { if (!navigator.webdriver) initTracker({ endpoint: 'https://nyc.cloud.appwrite.io/v1', projectId: '6ae0a41a002ce0a48fac', gameId: 'petalspire', platform: 'web', appVersion: BUILD }); } catch (_) {}
 const SAVE_KEY = 'petalspire.v03', V02_KEY = 'petalspire.v02', OLD_KEYS = ['petalspire.v01'];
@@ -4446,7 +4446,8 @@ function swapIn(k) {
 function showReveal(results, opts = {}) {
   revealCards = results; revealOpts = opts;
   const R = $('#reveal'); R.classList.remove('hidden', 'sus', 'sus-1', 'sus-2', 'sus-3'); R.dataset.stage = 'pack'; delete R.dataset.tier; delete R.dataset.hero; revealTimers.forEach(clearTimeout); revealTimers = [];
-  R.innerHTML = `<div class="rays"></div><h2>${opts.title || 'Card Pack'}</h2><p class="sub">Tap the pack to open</p><div class="big-pack" id="bigpack"><img src="assets/pack.jpg" alt=""/>${opts.title?.startsWith('Starter') ? '<span class="pack-ribbon">Starter Seeds</span>' : ''}</div><div class="reveal-actions"></div>`;
+  R.classList.add('tin-scene');   // v0.7.2.3: the pack is the sage Petalspire tin on a petal-strewn table (as in the card-pack Reel)
+  R.innerHTML = `<div class="rays"></div><div class="tin-petals"></div><h2>${opts.title || 'Card Pack'}</h2><p class="sub">Tap the tin to open</p><div class="big-pack tin" id="bigpack">${tinHTML()}${opts.title?.startsWith('Starter') ? '<span class="pack-ribbon">Starter Seeds</span>' : ''}</div><div class="reveal-actions"></div>`;
   const bp = $('#bigpack');
   // v0.52: a pack holding a Super Rare / Ultra Rare / Other World card gets a suspense moment first: it shakes harder and
   // glows in that tier's colour (Other World adds a starfield + aurora and a longer build-up). Tap anywhere to skip.
@@ -4454,12 +4455,22 @@ function showReveal(results, opts = {}) {
   const open = () => {
     bp.removeEventListener('click', open); sfx('pack');
     if (H) return suspense(R, bp, top, H, results);
-    bp.classList.add('shake');
-    setTimeout(() => { bp.classList.remove('shake'); bp.classList.add('burst'); R.appendChild(el('div', 'flash')); sparkles(R, window.innerWidth / 2, window.innerHeight * 0.45, 26); }, 850);
-    setTimeout(() => deal(results), 1250);
+    // v0.7.2.3: the Reel's tin-open — the lid lifts on a golden glow, the cards fan out, the top card glows, sparkles and rises
+    // toward you, then the cards are dealt. Pure CSS transforms/opacity (smooth on iPhone); tap again to skip.
+    $('.sub', R).textContent = ''; bp.classList.add('opening');
+    const toDeal = () => { if (R.dataset.stage !== 'pack') return; R.dataset.stage = 'dealing'; deal(results); };
+    rlater(() => { const b = bp.getBoundingClientRect(); sparkles(R, b.left + b.width / 2, b.top + b.height * 0.1, 26); }, 1350);
+    rlater(() => { bp.classList.add('burst'); R.appendChild(el('div', 'flash')); }, 2150);
+    rlater(toDeal, 2350);
+    setTimeout(() => R.addEventListener('click', function skipTin() { R.removeEventListener('click', skipTin); toDeal(); }), 250);
   };
   bp.addEventListener('click', open); R.dataset.stage = 'pack';
 }
+// v0.7.2.3: the Petalspire tin (matches /workspace/petalspire-social/videos/reel-card-pack-reveal.mp4): sage tin with an embossed
+// label, leaf wreath and gold seal; inside, a fan of seven card backs and the top card that rises.
+const TIN_FAN = [-66, -44, -22, 0, 22, 44, 66];
+const tinHTML = () => `<div class="tin-glow"></div><div class="tin-lid"><span></span></div><div class="tin-fan">${TIN_FAN.map((a, k) => `<i class="tin-card" style="--a:${a}deg;--d:${Math.abs(k - 3) * 45}ms"></i>`).join('')}</div>`
+  + `<div class="tin-body"><div class="tin-label"><b>Petalspire</b><span class="tin-wreath"></span><em class="tin-seal"></em></div></div><i class="tin-card tin-hero"></i>`;
 // ---------------- v0.52: big reveals for Super Rare, Ultra Rare and Other World ----------------
 // Pure CSS transforms/opacity + a few dozen small DOM particles (no images), so it stays smooth on iPhone Safari.
 const HERO_TIERS = {
@@ -4484,7 +4495,7 @@ function starfield(root) {
 let revealTimers = [];
 const rlater = (fn, ms) => revealTimers.push(setTimeout(fn, ms));
 function suspense(R, bp, tier, H, results) {
-  R.dataset.stage = 'suspense'; R.dataset.tier = tier; R.style.setProperty('--tc', H.glow); R.style.setProperty('--tcl', H.light); R.style.setProperty('--tcd', H.dark); R.classList.add('sus', 'sus-' + H.lvl);
+  R.dataset.stage = 'suspense'; R.classList.remove('tin-scene'); R.dataset.tier = tier; R.style.setProperty('--tc', H.glow); R.style.setProperty('--tcl', H.light); R.style.setProperty('--tcd', H.dark); R.classList.add('sus', 'sus-' + H.lvl);
   if (tier === 'otherworld') starfield(R);
   bp.classList.add('suspense'); $('.sub', R).textContent = tier === 'otherworld' ? 'Something otherworldly stirs…' : 'Something rare is inside…';
   buzz(H.buzz);
@@ -4520,7 +4531,7 @@ function heroShow(r, tier) {
   t = setTimeout(() => close(), heroHoldMs || H.hold);
 }
 function deal(results) {
-  const R = $('#reveal'); R.dataset.stage = 'deal';
+  const R = $('#reveal'); R.dataset.stage = 'deal'; R.classList.remove('tin-scene');
   const keep = [...R.querySelectorAll('.petal, .sparkle, .flash.big')];   // v0.52: let the burst's petal shower finish over the dealt cards
   R.innerHTML = `<div class="rays"></div><h2>Your new cards</h2><p class="sub">Tap each card to reveal it</p>${revealOpts.loot ? lootHTML(revealOpts.loot) : ''}<div class="deal"></div><div class="reveal-actions"><button class="btn" data-act="reveal-all">Reveal all</button></div>`;
   keep.forEach((k) => R.appendChild(k));

@@ -1162,3 +1162,56 @@ body.modal-open .wk-timer { display: none; }
 .wk-hire .worker-line b{color:#3D5A40;font-weight:800}
 .wk-hire .acts{flex:none}
 .wk-hire[data-wk-role="m"]{background:#FFF3F1;border-color:#F7C5C5}
+/* v0.7.2.3: the card pack opens like the social Reel (reel-card-pack-reveal.mp4) — a sage-green Petalspire tin on a petal-strewn
+   wooden table in warm golden light: the lid lifts on a golden glow, the cards fan out, the top card glows, sparkles and rises. */
+.reveal.tin-scene{background:
+  radial-gradient(55% 38% at 50% 46%,rgba(255,226,160,.62),rgba(255,214,140,.18) 60%,transparent 75%),
+  radial-gradient(130% 95% at 50% 48%,transparent 52%,rgba(38,20,8,.62)),
+  linear-gradient(180deg,rgba(255,236,190,.18),rgba(60,30,10,.18)),
+  repeating-linear-gradient(90deg,#A2724A 0 52px,#6E472A 52px 55px,#946541 55px 104px,#6A4428 104px 107px,#A77A51 107px 160px,#6E472A 160px 163px)}
+.reveal.tin-scene .rays{opacity:.18}
+.reveal.tin-scene>h2{color:#FFF9F0;text-shadow:0 2px 10px rgba(50,25,5,.6)}
+.reveal.tin-scene>.sub{color:#F5D07A;text-shadow:0 1px 6px rgba(50,25,5,.7)}
+.tin-petals{position:absolute;inset:0;pointer-events:none;z-index:1;opacity:.9;background:
+  radial-gradient(9px 6px at 12% 18%,#F7C5C5 60%,transparent 70%),radial-gradient(7px 5px at 84% 14%,#F3B5B8 60%,transparent 70%),
+  radial-gradient(8px 6px at 22% 72%,#F7C5C5 60%,transparent 70%),radial-gradient(10px 7px at 78% 66%,#EDA3A8 60%,transparent 70%),
+  radial-gradient(6px 4px at 66% 86%,#F7C5C5 60%,transparent 70%),radial-gradient(7px 5px at 30% 90%,#FFF9F0 55%,transparent 70%),
+  radial-gradient(9px 6px at 90% 40%,#F7C5C5 60%,transparent 70%),radial-gradient(8px 5px at 7% 48%,#EDA3A8 60%,transparent 70%),
+  radial-gradient(60px 46px at 4% 6%,rgba(247,197,197,.85) 40%,transparent 72%),radial-gradient(70px 52px at 97% 94%,rgba(247,197,197,.8) 40%,transparent 72%),
+  radial-gradient(54px 40px at 96% 4%,rgba(237,163,168,.7) 40%,transparent 72%),radial-gradient(64px 48px at 2% 96%,rgba(237,163,168,.7) 40%,transparent 72%)}
+.big-pack.tin{scale:1.2;margin:46px 0 26px;width:210px;height:250px;overflow:visible;border-radius:0;box-shadow:none;cursor:pointer;-webkit-tap-highlight-color:transparent}
+.tin-body{position:absolute;left:5px;right:5px;bottom:0;height:150px;border-radius:12px 12px 16px 16px;z-index:3;
+  background:linear-gradient(180deg,#C9E0C6 0,#B7D4B5 18%,#A4C6A2 70%,#8FB28D 100%);
+  box-shadow:inset 0 2px 0 rgba(255,255,255,.55),inset 0 -6px 12px rgba(61,90,64,.28),0 18px 30px rgba(40,20,5,.45),0 4px 0 #7FA27D}
+.tin-label{position:absolute;inset:16px 16px 18px;border-radius:10px;background:linear-gradient(180deg,#FFF9F0,#F4EBDA);
+  box-shadow:inset 0 0 0 2px #E7D7B5,inset 0 1px 6px rgba(120,90,40,.18);display:flex;flex-direction:column;align-items:center;justify-content:center}
+.tin-label b{font-family:'Fraunces',serif;font-weight:600;font-size:23px;color:#3D5A40;letter-spacing:.3px;text-shadow:0 1px 0 #fff}
+.tin-wreath{display:block;width:74px;height:30px;margin-top:3px;border-radius:0 0 40px 40px;border:3px solid #7FA27D;border-top:0;
+  -webkit-mask:linear-gradient(90deg,#000 0 44%,transparent 44% 56%,#000 56%);mask:linear-gradient(90deg,#000 0 44%,transparent 44% 56%,#000 56%)}
+.tin-seal{position:absolute;right:12px;bottom:10px;width:20px;height:20px;border-radius:50%;background:radial-gradient(circle at 35% 35%,#FCE7A8,#F5D07A 45%,#C99B3C);box-shadow:0 1px 2px rgba(80,50,10,.4)}
+.tin-label::before{content:'';position:absolute;left:50%;top:58%;width:16px;height:16px;transform:translate(-50%,-50%) rotate(45deg);border-radius:60% 0 60% 0;background:#F7C5C5;box-shadow:0 0 0 2px #fff}
+.tin-lid{position:absolute;left:0;right:0;bottom:142px;height:34px;border-radius:12px 12px 6px 6px;z-index:4;transform-origin:50% 100%;
+  background:linear-gradient(180deg,#D3E7D0,#B7D4B5 45%,#98BA96);box-shadow:inset 0 2px 0 rgba(255,255,255,.6),0 3px 0 #7FA27D,0 8px 14px rgba(40,20,5,.3)}
+.tin-lid span{position:absolute;left:50%;top:8px;width:64px;height:12px;transform:translateX(-50%);border-radius:8px;background:linear-gradient(180deg,#F5D07A,#D9AE52);opacity:.85}
+.tin-glow{position:absolute;left:50%;bottom:118px;width:260px;height:220px;transform:translateX(-50%) scale(.3);border-radius:50%;z-index:1;opacity:0;pointer-events:none;
+  background:radial-gradient(closest-side,rgba(255,244,200,.95),rgba(245,208,122,.65) 45%,rgba(245,208,122,0))}
+.tin-card{position:absolute;left:50%;bottom:112px;width:76px;height:106px;border-radius:8px;opacity:0;transform-origin:50% 135%;z-index:5;
+  background:url(assets/emblem.png) center 44%/58% no-repeat,linear-gradient(160deg,#FFF9F0,#F7EEDD);box-shadow:inset 0 0 0 3px #E9D9B8,inset 0 0 0 6px #FFF9F0,inset 0 0 0 7px #F7C5C5,0 6px 12px rgba(50,25,5,.35);
+  transform:translate(-50%,30px) rotate(0)}
+.tin-hero{z-index:6;background:url(assets/emblem.png) center 44%/62% no-repeat,linear-gradient(160deg,#FFF6E8,#F7E3EC)}
+.tin.opening .tin-lid{animation:tin-lid .65s .05s cubic-bezier(.3,1.3,.5,1) forwards}
+@keyframes tin-lid{0%{transform:none}30%{transform:translateY(-10px) rotate(2deg)}100%{transform:translateY(-96px) rotate(-7deg) scale(.94);opacity:.92}}
+.tin.opening .tin-glow{animation:tin-glow .8s .25s ease-out forwards}
+@keyframes tin-glow{to{opacity:1;transform:translateX(-50%) scale(1)}}
+.tin.opening .tin-fan .tin-card{animation:tin-fan .6s calc(.5s + var(--d) * 1.6) cubic-bezier(.2,1.25,.4,1) forwards}
+@keyframes tin-fan{from{opacity:0;transform:translate(-50%,30px) rotate(0)}to{opacity:1;transform:translate(-50%,0) rotate(var(--a))}}
+.tin.opening .tin-hero{animation:tin-hero 1.05s 1.05s cubic-bezier(.35,0,.3,1) forwards}
+@keyframes tin-hero{0%{opacity:0;transform:translate(-50%,30px)}25%{opacity:1;transform:translate(-50%,-4px);box-shadow:inset 0 0 0 3px #F5D07A,0 0 18px 6px rgba(245,208,122,.8)}
+  100%{opacity:1;transform:translate(-50%,-70px) scale(1.75);box-shadow:inset 0 0 0 3px #F5D07A,0 0 34px 14px rgba(255,236,170,.95),0 0 80px 30px rgba(245,208,122,.55)}}
+.tin.opening{animation:tin-pop .3s ease}
+@keyframes tin-pop{40%{transform:scale(1.04) rotate(-1.5deg)}}
+.big-pack.tin.burst{animation:tin-burst .25s ease forwards}
+@keyframes tin-burst{to{transform:scale(1.25);opacity:0;filter:brightness(1.6)}}
+.big-pack.tin.suspense .tin-body{box-shadow:0 0 30px 8px var(--tc),0 0 70px 20px var(--tc);animation:sus-glow .7s ease-in-out infinite alternate}
+.big-pack.tin .pack-ribbon{z-index:7}
+@media (prefers-reduced-motion:reduce){.tin.opening .tin-lid,.tin.opening .tin-fan .tin-card,.tin.opening .tin-hero,.tin.opening .tin-glow{animation-duration:.01s!important;animation-delay:0s!important}}

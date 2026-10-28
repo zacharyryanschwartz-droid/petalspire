@@ -21,6 +21,11 @@ This is a **prototype**: version numbers stay below 1.0 until the first official
 
 Drag with one finger to pan, pinch to zoom, and twist with two fingers to turn. On desktop, right-drag or shift-drag turns the view.
 
+## New in v0.7.2.3: Card Packs open like the Reel
+- Opening a Card Pack now plays the same moment as the card-pack Reel: the sage Petalspire tin sits on a petal-strewn wooden table, the lid lifts on a golden glow, seven cards fan out, and the top card glows, sparkles and rises toward you before the cards are dealt.
+- It takes about 2.3 seconds; tap anywhere to skip straight to your cards.
+- It respects Reduce Motion.
+
 ## New in v0.7.2.2: nothing shows until you can use it
 The Market and Build menus no longer list anything (not even greyed out) before it is usable at that location:
 - **Scrap Metal:** not in the Market, the Watch-an-ad picks or Card Pack bonuses until a Windmill exists at that location (the Windmill is Home only). You can still find Scrap any time on the road and by recycling finds from clearing trees, which is how you collect the 5 Scrap the Windmill needs.
