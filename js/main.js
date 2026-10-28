@@ -2135,7 +2135,7 @@ function teaHTML() {
     pred = `<div class="tea-pred${done ? '' : ' partial'}" id="tea-pred"><div class="tp-ico">${itemIcon(['tin', t.color])}</div><div class="tp-meta"><b>${done ? t.name : 'So far…'}</b>
       <span class="tp-price">${done ? '' : 'about '}${coin(t.sell)}</span>
       <small>vs ${coin(t.dried)} selling the herbs dried · ×${t.mult.toFixed(2)}${t.distinct === 3 ? ' · <em>3 different herbs +10%</em>' : ''}</small>
-      <small>Brews in ${t.s} s · ${PLANT_TIERS[t.tier].label} blend</small></div></div>`;
+      <small>Brews in ${fmtTime(t.s * 1000 * craftK())} · ${PLANT_TIERS[t.tier].label} blend</small></div></div>`;
   }
   const have = Object.keys(SPECIES).filter((sp) => (S.inv['dried_' + sp] || 0) > 0);
   const chips = have.length ? have.map((sp) => { const n = driedHave(sp), T = PLANT_TIERS[SPECIES[sp].tier];
@@ -2146,7 +2146,7 @@ function teaHTML() {
     <div class="sec-title">Your blend</div><div class="tea-cups">${cups}</div>${pred}
     <div class="ts-actions"><button class="btn btn-gold" data-act="brew-tea" ${teaPick.length === TEA.n && free ? '' : 'disabled'}>🫖 ${free ? 'Brew this tea' : 'Both teapots are busy'}</button>${teaPick.length ? '<button class="btn" data-act="tea-clear">Clear</button>' : ''}</div>
     <div class="sec-title">Dried herbs in your bag</div><div class="tea-herbs">${chips}</div>
-    <p class="muted" style="margin:10px 4px 0">Tea price = the three herbs’ dried prices × a blend multiplier that grows with their average tier (×1.4 for Basic up to ×3.5 for Other World), +10% when all three herbs differ. Brewing takes ${TEA.brewS(1)}–${TEA.brewS(7)} s.</p>`;
+    <p class="muted" style="margin:10px 4px 0">Tea price = the three herbs’ dried prices × a blend multiplier that grows with their average tier (×1.4 for Basic up to ×3.5 for Other World), +10% when all three herbs differ. Brewing takes ${TEA.brewS(1) / 60}–${TEA.brewS(7) / 60} minutes.</p>`;
 }
 function stillHTML() {
   const free = S.stills.some((t) => !t);

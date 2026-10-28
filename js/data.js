@@ -606,10 +606,10 @@ export const SELL_ORDER = Object.keys(ITEMS).sort((a, b) => kindRank(a) - kindRa
 // Any THREE dried herbs (duplicates allowed) → one tea. o = the average tier order of the three (Basic 1 … Other World 7).
 //   tea price = round( Σ dried sell × min(1.8, mult(o) × (three different plants ? 1 + distinct : 1)) ),  mult(o) = 1.2 + 0.1·(o − 1)
 //   → 3 Basic ×1.20 · Epic ×1.30 · Legendary ×1.40 · Rare ×1.50 · Super Rare ×1.60 · Ultra ×1.70 · Other World ×1.80 (v0.7; capped at 1.8)
-//   brew time = 15 + 10·(o − 1) s  → 15 s for Basic … 75 s for Other World.
+//   brew time (v0.8.1) = 10 + (50/6)·(o − 1) min, rounded to the minute → 10 min for Basic … 60 min for Other World.
 // v0.7 TEA RULE: the multiplier runs 1.2 (Basic) … 1.8 (Other World) and, with the different-herbs bonus, never exceeds 1.8×
 // the three dried herbs (was 1.4 … 3.5, +10%).
-export const TEA = { slots: 2, n: 3, distinct: 0.10, max: 1.8, mult: (o) => 1.2 + 0.1 * (o - 1), brewS: (o) => Math.round(15 + 10 * (o - 1)) };
+export const TEA = { slots: 2, n: 3, distinct: 0.10, max: 1.8, mult: (o) => 1.2 + 0.1 * (o - 1), brewS: (o) => Math.round(10 + (50 / 6) * (o - 1)) * 60 };
 export const teaId = (sps) => 'tea_' + [...sps].sort().join('-');
 export const teaSps = (id) => id.slice(4).split('-');
 export function teaInfo(sps) {
