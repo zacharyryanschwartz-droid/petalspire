@@ -15,7 +15,7 @@ import { createAudio, MUSIC_CREDITS } from './audio.js';
 
 // Save format: v0.3, v0.31 and v0.4 share one localStorage key (schema v: 3). `build` records which prototype build last wrote the save;
 // v0.3 / v0.31 saves (no `build`, no per-plot barrels) are migrated on load (migrate04 below); v0.4 saves load as-is and are re-tagged. Prototype builds stay below 1.0.
-export const BUILD = '0.7.2';
+export const BUILD = '0.7.2.1';
 // v0.65: anonymous player tracking (Games Backend on Appwrite; no API key in the game, nothing personal). Skipped for automated runs (navigator.webdriver).
 try { if (!navigator.webdriver) initTracker({ endpoint: 'https://nyc.cloud.appwrite.io/v1', projectId: '6ae0a41a002ce0a48fac', gameId: 'petalspire', platform: 'web', appVersion: BUILD }); } catch (_) {}
 const SAVE_KEY = 'petalspire.v03', V02_KEY = 'petalspire.v02', OLD_KEYS = ['petalspire.v01'];
@@ -1762,8 +1762,8 @@ function buildHive(lot, x, z) {
 // ---------------- v0.4: Tincture Stand ----------------
 // v0.52: a base is for sale once its card is found AND the Tincture Stand is open (built), or the save was grandfathered.
 const standOpenForBases = () => !!(S.tinctureBuilt || S.basesGrandfathered);
-const baseOpen = (b) => !!BASES[b];   // v0.67.1: bases are consumables — always buyable (was: card + open Tincture Stand)
-const baseNeeds = (b) => [!S.unlocked[b] && `Find the ${BASES[b].name} card`, !standOpenForBases() && 'Unlocks with Tincture Stand'].filter(Boolean);
+const baseOpen = (b) => !!BASES[b] && !!S.tinctureBuilt;   // v0.7.2.1: Glycerin / Vinegar are not in the Market at all until the Tincture Stand is built (owned stock always stays)
+const baseNeeds = (b) => [!S.tinctureBuilt && 'Build the Tincture Stand first'].filter(Boolean);
 const tincBase = () => { const b = S.tincBase === 'vinegar' ? 'vinegar' : 'glycerin', o = b === 'glycerin' ? 'vinegar' : 'glycerin'; return S.inv[b] > 0 || !(S.inv[o] > 0) ? b : o; };
 const tincCost = () => BUILDS.tincture.wood;   // v0.52: 0 — the stand is a free goal reward
 const tincLots = (what) => OWNABLE_LOTS.filter((l) => S.lots[l] && l !== 'home' && standOkAt(what, lotLoc(l)));
@@ -2312,7 +2312,7 @@ function satchelHTML() {
   const cells = res('wood', 'Wood', S.wood) + res('scrap', 'Scrap Metal', S.scrap || 0) + (S.inv.sapling ? res('sapling', 'Tree sapling', S.inv.sapling) : '') +
     byValue(ids.filter((id) => S.inv[id] > 0)).map((id) => `<div class="inv">${itemSvg(id)}<b>${ITEMS[id].name}</b><small>×${S.inv[id]}</small>${locTagCell(id)}</div>`).join('') +
     // v0.65: rain barrels are installed fixtures — never in the Bag (tap one in the garden to see its water and upgrade it with coins)
-    byValue(['glycerin', 'vinegar'].filter((id) => S.inv[id] > 0 || (S.owned.tincture && S.inv === bagOf('home')))).map((id) => `<div class="inv">${itemSvg(id)}<b>${BASES[id].name}</b><small>×${S.inv[id]}</small></div>`).join('') +
+    byValue(['glycerin', 'vinegar'].filter((id) => S.inv[id] > 0 || (S.tinctureBuilt && S.inv === bagOf('home')))).map((id) => `<div class="inv">${itemSvg(id)}<b>${BASES[id].name}</b><small>×${S.inv[id]}</small></div>`).join('') +
     byValue(SELL_ORDER.filter((id) => ['tinc_', 'oil_', 'hydro_', 'tea_', 'press_', 'jar_', 'fruit_', 'bag'].some((p) => id.startsWith(p)) && S.inv[id] > 0)).map((id) => `<div class="inv">${itemSvg(id)}<b>${ITEMS[id].name}</b><small>×${S.inv[id]}</small>${locTagCell(id)}</div>`).join('');
   // v0.65: garden features show in the bag only while they are NOT on the map (placed/built ones leave it; picked up → back in)
   // v0.66.1: the Bag lists ONLY garden features bought at the Market and not placed yet (tools live on the tool dock,
@@ -3218,7 +3218,7 @@ function marketHTML() {
       sec.build.push(S.unlocked[b] ? tRow(id) : lockedRow(FEATURE_ART[b], FEATURES[b].name)); } }
   if (atHome) for (const b of SUPPLY_CARDS) { const d = BASES[b], hb = inBag('home', () => S.inv[b]);   // v0.67.1: consumable — always buyable · v0.7: Home Market only (Tincture bases are used at Home only)
     sec.supplies.push(...(baseOpen(b) ? [buyRow(b, itemSvg(b), d.name, `${d.blurb} · for the Tincture Stand · you have ${hb}${atHome ? '' : ' · goes to your Home Bag'}`, d.price), buyRow(b + '5', itemSvg(b), `${d.name} ×${d.pack.n}`, `Pack of ${d.pack.n} · save ${d.price * d.pack.n - d.pack.price} coins`, d.pack.price)]   // v0.68: two rows, so each sorts by its own price
-      : !S.unlocked[b] && !SHOW_LOCKED ? [] : [ `<div class="row locked supply-locked" data-supply-locked="${b}"><div class="ico">${itemSvg(b)}</div><div class="meta"><b>${d.name}</b><small>${baseNeeds(b).join(' · ')}${S.inv[b] ? ` · you have ${S.inv[b]}` : ''}</small></div><i data-icon="lock" style="width:22px;height:22px"></i></div>`])); }
+      : [])); }   // v0.7.2.1: not listed at all (not even greyed out) until the Tincture Stand is built
   { const d = FEATURES.beehive, need = hiveLots(), more = need.length - (S.hiveInv || 0);
     sec.garden.push(!S.unlocked.beehive ? lockedRow(FEATURE_ART.beehive, d.name)
       : S.hiveInv > 0 ? `<div class="row"><div class="ico">${FEATURE_ART.beehive}</div><div class="meta"><b>${d.name}</b><small>You have ${S.hiveInv} to place</small></div><div class="acts"><button class="btn btn-primary sm" data-act="place-hive">Place</button></div></div>`
@@ -4315,7 +4315,9 @@ function zoomCard(id) { const z = el('div', 'zoom', cardHTML(id) + `<p class="zo
 // their tier (Basic 40 · Epic 8 · Legendary 4.5 · Rare 3 · Super Rare 1.8 · Ultra Rare 0.8 · Other World 0.4).
 // v0.6: once the Orchard is bought, the 14 tree cards join the pool (PACK_W_ORCH). Each tier's total share is unchanged —
 // trees take half of their tier's plant share.
-const packW = () => (S.lots?.orchard ? PACK_W_ORCH : PACK_W);
+const packW0 = () => (S.lots?.orchard ? PACK_W_ORCH : PACK_W);
+// v0.7.2.1: no Glycerin / Vinegar cards in Card Packs until the Tincture Stand is built (the rest of the pool is renormalised)
+const packW = () => { const w = packW0(); return S.tinctureBuilt ? w : Object.fromEntries(Object.entries(w).filter(([k]) => !SUPPLY_CARDS.includes(k))); };
 const packTotal = () => Object.values(packW()).reduce((a, b) => a + b, 0);
 const featureOdds = () => Object.keys(FEATURES).reduce((a, k) => a + (packW()[k] || 0), 0) / packTotal() * 100;
 const tierOdds = (t) => Object.keys(CARDS).filter((k) => cardTier(CARDS[k]) === t).reduce((a, k) => a + (packW()[k] || 0), 0) / packTotal() * 100;

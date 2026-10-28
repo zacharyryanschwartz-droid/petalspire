@@ -21,6 +21,10 @@ This is a **prototype**: version numbers stay below 1.0 until the first official
 
 Drag with one finger to pan, pinch to zoom, and twist with two fingers to turn. On desktop, right-drag or shift-drag turns the view.
 
+## New in v0.7.2.1: Glycerin and Vinegar wait for the Tincture Stand
+- **Glycerin and Vinegar are not in the Market at all until the Tincture Stand is built.** They are not listed and not shown greyed out, and their cards don't drop from Card Packs. Once the stand is built they are sold at the Home Market only (never at the Orchard), as before.
+- **Old saves:** Glycerin and Vinegar you already own stay in your Bag, but the Market hides them until the stand is built. This also applies to saves that were "grandfathered" in v0.52.
+
 ## New in v0.7.2: economy
 - **Coin costs ×3** (sell prices unchanged): seeds, Supply Market cards (Irrigation 135, Still 450, Parking 420 …), Glycerin 24 / Vinegar 18 (packs 96 / 72), Rain Barrel 120, Home plots 450 → 900 → 1800 → 3000 → 4500 → 6000, the Orchard 9,000, Orchard plots 12,000 / 18,000 / 27,000, the Orchard Stand 900, tree-row Irrigation 450, the coin stand unlocks 3,000 / 7,500 / 15,000 / 24,000 and the Supply Market rebuild 180. Workers are the exception: 2,000 per hire (see below).
 - **Home earns less than the Orchard:** lower Home sell factors (Epic 0.525 … Other World 0.34), slower Epic/Legendary flowers (×1.35) and Chamomile (120 s). Model, coins/hour: Early 8,743 · Mid 13,027 · Late Home 15,883 · Late Orchard 22,059.
