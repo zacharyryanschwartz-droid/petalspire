@@ -16,7 +16,7 @@ import { createAudio, MUSIC_CREDITS } from './audio.js';
 
 // Save format: v0.3, v0.31 and v0.4 share one localStorage key (schema v: 3). `build` records which prototype build last wrote the save;
 // v0.3 / v0.31 saves (no `build`, no per-plot barrels) are migrated on load (migrate04 below); v0.4 saves load as-is and are re-tagged. Prototype builds stay below 1.0.
-export const BUILD = '0.8';
+export const BUILD = '0.8.3';
 // v0.65: anonymous player tracking (Games Backend on Appwrite; no API key in the game, nothing personal). Skipped for automated runs (navigator.webdriver).
 try { if (!navigator.webdriver) initTracker({ endpoint: 'https://nyc.cloud.appwrite.io/v1', projectId: '6ae0a41a002ce0a48fac', gameId: 'petalspire', platform: 'web', appVersion: BUILD }); } catch (_) {}
 const SAVE_KEY = 'petalspire.v03', V02_KEY = 'petalspire.v02', OLD_KEYS = ['petalspire.v01'];
@@ -3192,7 +3192,7 @@ function marketHTML() {
     for (const sp of [...sps].sort((a, b) => SPECIES[b].seedPrice - SPECIES[a].seedPrice || SPECIES[a].name.localeCompare(SPECIES[b].name))) { const d = SPECIES[sp]; if (S.unlocked[sp]) sec.seeds.push(buyRow('seed_' + sp, `<img src="${d.img}" alt=""/>`, `${d.name} Seeds`, `<em class="tier-tag t-${t}">${T.label}</em> · blooms in ~${fmtTime(d.growS * 1000)} · ${d.noFlower ? `${d.seedsFixed} seeds a harvest, no flowers` : `flowers sell for ${d.flowerSell}`} · you have ${inBag(mktDest('seed_' + sp, at), () => S.inv['seed_' + sp])}${seedNote}`, d.seedPrice));
       else if (t === 'basic') sec.seeds.push(lockedRow(`<img src="${d.img}" alt=""/>`, `${d.name} Seeds`)); }
     const locked = sps.filter((sp) => !S.unlocked[sp]);
-    if (SHOW_LOCKED && t !== 'basic' && locked.length) sec.seeds.push(`<div class="row locked tier-locked" data-tier-locked="${t}"><div class="ico"><span class="tier-gem t-${t}"></span></div><div class="meta"><b><em class="tier-tag t-${t}">${T.label}</em> ${locked.length === sps.length ? `${sps.length} plants` : `${locked.length} more`}</b><small>Discover ${locked.map((sp) => SPECIES[sp].name).join(', ')} in Card Packs (${T.pack}% a card)</small></div><i data-icon="lock" style="width:22px;height:22px"></i></div>`); }
+    if (SHOW_LOCKED && t !== 'basic' && locked.length) sec.seeds.push(`<div class="row locked tier-locked" data-tier-locked="${t}"><div class="ico"><span class="tier-gem t-${t}"></span></div><div class="meta"><b><em class="tier-tag t-${t}">${T.label}</em> ${locked.length === sps.length ? `${sps.length} plants` : `${locked.length} more`}</b><small>Discover ${locked.map((sp) => SPECIES[sp].name).join(', ')} in Card Packs</small></div><i data-icon="lock" style="width:22px;height:22px"></i></div>`); }
   // v0.7.1: one plain row — a price to buy (one bed per purchase), disabled with a reason when no bed needs irrigation
   if ((atHome || bedsHere) && S.unlocked.irrigation && irrigNeedBeds().some((b) => lotLoc(lotOfSite(b)) === at)) {   // v0.7.2.2: only while a bed here can use it
     { const nb = S.beds.length, ni = S.irrigBeds.length;
@@ -3404,31 +3404,75 @@ function grantBuy(id, quiet = false) {
   say(id === 'wood5' ? `+${SHOP.wood5.wood} Wood` : id === 'scrap5' ? `+${SHOP.scrap5.scrap} Scrap Metal · you have ${S.scrap}` : id.startsWith('seed_') ? `Bought 1 ${ITEMS[id].name.replace(' Seeds', ' seed')}` : `${FEATURES[id].name} added to your garden`);
 }
 const collIds = () => Object.keys(CARDS).filter((k) => !TREES[k] || S.lots.orchard || S.discovered[k]);   // tree cards show once the Orchard is yours
+// v0.8.3: drop rates are no longer printed in the regular UI. For disclosure they sit behind a very small circled "i" in a
+// corner of the Card Pack screen, the pack-opening screen and the Bonus Wheel. Every number in the popover is computed from
+// the live weights the draws actually use (catW / PACK_W, OWNED_K, PACK_MIX, DECO8_PACK, SWAP, V8.wheel) — nothing is hardcoded.
+const oddsBtn = (kind) => `<button class="odds-i" type="button" data-odds-i="${kind}" aria-label="Drop rates" aria-haspopup="dialog">i</button>`;
+const oddsPct = (v) => `${+v.toFixed(2)}%`;
+const oddsRow = (label, v, cls = '') => `<span class="${cls}"><b>${label}</b> ${oddsPct(v)}</span>`;
+function packOddsHTML() {
+  const plant = TIER_ORDER.map((t) => oddsRow(PLANT_TIERS[t].label, catTierOdds(true, t), 't-' + t)).join('');
+  const other = TIER_ORDER.filter((t) => catTierOdds(false, t) > 0).map((t) => oddsRow(PLANT_TIERS[t].label, catTierOdds(false, t), 't-' + t)).join('');
+  const allBasicPct = Math.pow(catTierOdds(true, 'basic') / 100, PACK_MIX.plants) * Math.pow(catTierOdds(false, 'basic') / 100, PACK_MIX.other) * 100;
+  const dw = DECO8_PACK.w, dt = TIER_ORDER.filter((t) => dw[t] > 0), dTot = dt.reduce((a, t) => a + dw[t], 0);
+  const ownPct = Math.round(OWNED_K * 100), boost = +(1 / OWNED_K).toFixed(2);
+  return `<h3>Card Pack drop rates</h3>
+    <p class="op-lead">Each pack holds ${PACK_MIX.plants} plant cards and ${PACK_MIX.other} feature, tool, stand or supply card. Chance per card, by tier:</p>
+    <div class="odds"><div class="odds-label" data-odds-plants>Each plant card</div>${plant}
+      <div class="odds-label" data-odds-other>The feature, tool, stand or supply card</div>${other}</div>
+    <p data-odds-deco><b>Bonus decoration card:</b> ${oddsPct(DECO8_PACK.chance * 100)} of packs also hold one (${dt.map((t) => `${PLANT_TIERS[t].label} ${oddsPct((dw[t] / dTot) * 100)}`).join(' · ')}).</p>
+    <p data-odds-owned><b>Cards you don’t have yet:</b> the rates above count every card at full weight, as if you owned none. A card you already own is drawn at ${ownPct}% of its usual weight, so a card you don’t have yet is ${boost}× as likely as it would be once you own it, and the real chances shift toward the cards you are missing as your collection grows.</p>
+    <p class="pack-guarantee" data-guarantee><b>Every pack has at least one Epic or better.</b> If all ${PACK_MIX.plants + PACK_MIX.other} cards roll Basic (${oddsPct(allBasicPct)} of packs), the feature, tool, stand or supply card is redrawn from the Epic-or-better ones with the same relative weights.</p>
+    <p data-odds-first><b>First pack:</b> your very first pack always includes Chamomile if you don’t have it yet.</p>
+    <p data-odds-dupes><b>Duplicates</b> can drop: an extra copy counts toward levelling that card up; at its top level a duplicate pays ${DUP_COINS} coins instead, and a duplicate Glycerin or Vinegar card adds ${SUPPLY_DUP} free units.</p>
+    <p class="pack-swap-odds" data-swap-odds><b>Swap · ${SWAP.jewels} Jewel</b> (on a Basic, Epic or Legendary card in a reveal) gives a random Rare-or-better plant or garden item: ${SWAP_TIERS().map((t) => `${PLANT_TIERS[t].label} ${oddsPct(swapTierOdds(true, t))}`).join(' · ')}. Cards you own count ${ownPct}% here too.</p>
+    <p class="op-foot">Packs never contain Jewels. Coins, Wood and Scrap bonuses vary in amount.</p>`;
+}
+function wheelOddsHTML() {
+  const tot = V8.wheel.reduce((a, w) => a + w.w, 0);
+  const rows = V8.wheel.map((w, i) => `<span data-wodds="${i}" class="w-${w.k}"><b>${w.k === 'wood' || w.k === 'coins' ? Math.round(w.n * adMult()) : w.n} ${w.k === 'card2' ? 'Cards' : wheelName(w)}</b> ${oddsPct((w.w / tot) * 100)}</span>`).join('');
+  return `<h3>Bonus Wheel prize odds</h3>
+    <p class="op-lead">Chance per spin:</p>
+    <div class="odds wheel-odds">${rows}</div>
+    <p data-pity><b>Jewel guarantee:</b> a Jewel is guaranteed by your ${V8.pity}th spin without one.</p>
+    <p data-wodds-cards><b>1 Card</b> is drawn like a pack’s feature, tool, stand or supply card, except ${oddsPct(V8.wheelDecoK * 100)} of the time it is a decoration card instead. <b>2 Cards</b> are two plant cards drawn like a pack’s plant cards. Cards you already own count ${Math.round(OWNED_K * 100)}% as much.</p>
+    <p class="op-foot">Wood and coin amounts grow as you buy more land.</p>`;
+}
+function closeOddsInfo() { $('#odds-ov')?.remove(); }
+function openOddsInfo(kind, anchor) {
+  closeOddsInfo();
+  const o = el('div', 'odds-ov'); o.id = 'odds-ov';
+  o.innerHTML = `<div class="odds-card" role="dialog" aria-modal="true" aria-label="${kind === 'wheel' ? 'Bonus Wheel prize odds' : 'Card Pack drop rates'}" data-odds-kind="${kind}"><button class="odds-x" type="button" data-odds-close aria-label="Close">×</button>${kind === 'wheel' ? wheelOddsHTML() : packOddsHTML()}</div>`;
+  o.addEventListener('click', (e) => { e.stopPropagation(); if (e.target === o || e.target.closest('[data-odds-close]')) closeOddsInfo(); });
+  $('#ui').appendChild(o);
+  // a popover next to its i (below it if it fits, else above, else centred), so the i stays in view; always inside the screen
+  const c = o.firstElementChild, a = anchor?.getBoundingClientRect?.(); if (!a || !a.width) return;
+  const vw = o.clientWidth, vh = o.clientHeight, m = 8, h = c.offsetHeight, below = vh - a.bottom - 6 - m, above = a.top - 6 - m;
+  const room = h <= below ? 'below' : h <= above ? 'above' : Math.max(below, above) >= 260 ? (below >= above ? 'below' : 'above') : '';
+  if (!room) return;
+  c.classList.add('anchored'); c.style.maxHeight = `${Math.floor(room === 'below' ? below : above)}px`;
+  const w = c.offsetWidth, left = Math.min(Math.max(m, a.left + a.width / 2 < vw / 2 ? a.left - 4 : a.right + 4 - w), vw - m - w);
+  c.style.left = `${Math.round(left)}px`; if (room === 'below') c.style.top = `${Math.round(a.bottom + 6)}px`; else c.style.bottom = `${Math.round(vh - a.top + 6)}px`;
+}
+// captured so the pack tin / reveal / panel tap handlers never see a tap on the i
+document.addEventListener('click', (e) => { const b = e.target.closest?.('[data-odds-i]'); if (!b) return; e.preventDefault(); e.stopPropagation(); openOddsInfo(b.dataset.oddsI, b); }, true);
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && $('#odds-ov')) closeOddsInfo(); });
+const revealOddsBtn = (R) => { if (revealOpts.swap) R.insertAdjacentHTML('beforeend', oddsBtn('pack')); };
 function packsHTML() {
   const disc = Object.keys(CARDS).filter((k) => S.discovered[k]);
-  // v0.5: odds per card, by plant tier (plus all feature cards together)
-  // v0.51: one tier system for every card. Each chip is that tier's share of a card slot (its plants + its feature cards).
-  // v0.63: 2 plant cards + 1 other card per pack — odds are shown per slot type
-  const chip = (t, v) => `<span class="t-${t}" style="border-color:${PLANT_TIERS[t].color};color:${PLANT_TIERS[t].color}">${PLANT_TIERS[t].label} ${+v.toFixed(2)}%</span>`;
-  const odds = `<div class="odds-label" data-odds-plants>2 plant cards · each</div>${TIER_ORDER.map((t) => chip(t, catTierOdds(true, t))).join('')}
-    <div class="odds-label" data-odds-other>1 feature, tool, stand or supply card</div>${TIER_ORDER.filter((t) => catTierOdds(false, t) > 0).map((t) => chip(t, catTierOdds(false, t))).join('')}`;
-  const allBasicPct = Math.pow(catTierOdds(true, 'basic') / 100, PACK_MIX.plants) * Math.pow(catTierOdds(false, 'basic') / 100, PACK_MIX.other) * 100;
-  const tierLine = (t) => { const p = catTierOdds(true, t), o = catTierOdds(false, t); return [p ? `${+p.toFixed(2)}% a plant card` : '', o ? `${+o.toFixed(2)}% the other card` : ''].filter(Boolean).join(' · '); };
+  // v0.8.3: no drop rates in the visible UI — they live behind the small circled i (packOddsHTML, built from the real weights)
   // v0.61: only cards you have discovered are shown (no '?' backs, no totals) so the rest stay a surprise
   const group = (title, ids, cls = '') => { if (!SHOW_LOCKED) { const got = ids.filter((k) => S.discovered[k]); return got.length ? `<div class="sec-title coll-tier ${cls}">${title} · ${got.length} found</div><div class="coll">${got.map(cardHTML).join('')}</div>` : ''; }
     return `<div class="sec-title coll-tier ${cls}">${title} · ${ids.filter((k) => S.discovered[k]).length}/${ids.length}</div><div class="coll">${ids.map((k) => (S.discovered[k] ? cardHTML(k) : `<div class="card"><div class="back" style="position:absolute;inset:0;border-radius:1.1em;opacity:.55"><img src="assets/emblem.png" alt=""/><span>?</span></div></div>`)).join('')}</div>`; };
-  return `<div class="pack-hero"><div class="pack-art"><img src="assets/pack.jpg" alt="Botanical card pack"/></div>
+  return `<div class="pack-hero">${oddsBtn('pack')}<div class="pack-art"><img src="assets/pack.jpg" alt="Botanical card pack"/></div>
     <div class="pack-info"><h4>Botanical Card Pack</h4><p>3 illustrated cards: <b>2 plants + 1 feature, tool, stand or supply card</b>, plus a bonus of coins${scrapUsable() ? `, wood &amp; Scrap Metal (up to ${PACK_LOOT.coins} · ${PACK_LOOT.wood} · ${PACK_LOOT.scrap})` : ` &amp; wood (up to ${PACK_LOOT.coins} · ${PACK_LOOT.wood})`}. New discoveries unlock seeds &amp; features here at the market.</p>
     ${S.freePacks > 0 ? `<button class="btn btn-gold" data-act="buy-pack" data-free-pack>Open free pack${S.freePacks > 1 ? ` (${S.freePacks})` : ''}</button>` : S.jewels >= PACK_JEWELS ? `<button class="btn btn-gold" data-act="buy-pack">Open pack · ${jewelPrice(PACK_JEWELS)}</button>`
       : `<button class="btn btn-gold need-jewels" data-act="open-jewels">Need ${PACK_JEWELS} Jewel${PACK_JEWELS > 1 ? 's' : ''} · Jewel Shop</button>`}
     <small class="pack-note">You have ${S.jewels} <i data-icon="jewel"></i> · Jewels come from the Jewel Shop or, rarely, the woods</small></div></div>
-    <div class="odds">${odds}</div>
-    <p class="pack-swap-odds" data-swap-odds><b>Swap · ${SWAP.jewels} Jewel</b> (on a Basic, Epic or Legendary card in a reveal): a random Rare-or-better plant or garden item — ${SWAP_TIERS().map((t) => `${PLANT_TIERS[t].label} ${+swapTierOdds(true, t).toFixed(1)}%`).join(' · ')}. Cards you own count ${Math.round(OWNED_K * 100)}% as much.</p>
-    <p class="pack-guarantee" data-guarantee><b>Every pack has at least one Epic or better.</b> If all 3 cards roll Basic (${+allBasicPct.toFixed(1)}% of packs), the feature card is redrawn from Epic-or-better with the same relative odds. Cards you already own are ${Math.round(OWNED_K * 100)}% as likely, so new cards turn up sooner.</p>
     ${!S.lots.orchard && !S.mapOpen && !SHOW_LOCKED ? '' : S.lots.orchard ? `<p class="pack-orchard" data-orchard-pool><b>Orchard owned:</b> the 14 fruit-tree cards are in the pack now (2 per tier).</p>` : `<p class="pack-orchard" data-orchard-pool>Buy <b>The Orchard</b> on the <b>Map</b> (after every Home plot) to add 14 fruit-tree cards to the pack.</p>`}
     <div class="sec-title">Your collection · ${SHOW_LOCKED ? `${disc.length}/${collIds().length}` : `${disc.length} discovered`}</div>
     ${TIER_ORDER.map((t) => { const pl = Object.keys(SPECIES).filter((k) => SPECIES[k].tier === t), fe = Object.keys(FEATURES).filter((k) => FEATURES[k].rarity === t && CARDS[k]), tr = collIds().filter((k) => TREES[k] && TREES[k].tier === t);
-      return group(SHOW_LOCKED ? `<em class="tier-tag t-${t}">${PLANT_TIERS[t].label}</em> ${tierLine(t)} · ${pl.length} plants${tr.length ? ` + ${tr.length} tree${tr.length > 1 ? 's' : ''}` : ''}${fe.length ? ` + ${fe.length} feature${fe.length > 1 ? 's' : ''}` : ''}` : `<em class="tier-tag t-${t}">${PLANT_TIERS[t].label}</em> ${tierLine(t)}`, [...pl, ...tr, ...fe], 't-' + t); }).join('')}
+      return group(SHOW_LOCKED ? `<em class="tier-tag t-${t}">${PLANT_TIERS[t].label}</em> ${pl.length} plants${tr.length ? ` + ${tr.length} tree${tr.length > 1 ? 's' : ''}` : ''}${fe.length ? ` + ${fe.length} feature${fe.length > 1 ? 's' : ''}` : ''}` : `<em class="tier-tag t-${t}">${PLANT_TIERS[t].label}</em>`, [...pl, ...tr, ...fe], 't-' + t); }).join('')}
     ${disc.length < collIds().length ? `<p class="muted empty-hint" data-empty-hint>${disc.length ? 'Open packs to discover more.' : 'Open packs to start your collection.'}</p>` : ''}`;
 }
 
@@ -4437,7 +4481,7 @@ function swapBtn(c, k) {   // added under a flipped card; the slot (and its list
   const b = el('button', 'swap-btn' + (S.jewels < SWAP.jewels ? ' off' : ''), S.jewels < SWAP.jewels ? `Swap · ${SWAP.jewels}<i data-icon="jewel"></i><small>Need ${SWAP.jewels} Jewel</small>` : `Swap · ${SWAP.jewels}<i data-icon="jewel"></i>`);
   b.type = 'button'; b.dataset.swap = k; if (S.jewels < SWAP.jewels) b.disabled = true; w.appendChild(b); fillIcons(b);
   b.addEventListener('click', (e) => { e.stopPropagation();
-    confirmBox(`<i data-icon="jewel" class="confirm-ico"></i><h3>Swap ${CARDS[r.id].name}?</h3><p>Spend <b>${SWAP.jewels} Jewel</b> to trade this ${PLANT_TIERS[cardTier(CARDS[r.id])].label} card for a random <b>Rare or better</b> card — a plant or a garden item (${SWAP_TIERS().map((t) => `${PLANT_TIERS[t].label} ${+swapTierOdds(true, t).toFixed(1)}%`).join(' · ')}). This card is given back. You have ${S.jewels}.</p>`, `Swap · ${SWAP.jewels} Jewel`, () => swapIn(k)); });
+    confirmBox(`<i data-icon="jewel" class="confirm-ico"></i><h3>Swap ${CARDS[r.id].name}?</h3><p>Spend <b>${SWAP.jewels} Jewel</b> to trade this ${PLANT_TIERS[cardTier(CARDS[r.id])].label} card for a random <b>Rare or better</b> card — a plant or a garden item. This card is given back. You have ${S.jewels}.</p>`, `Swap · ${SWAP.jewels} Jewel`, () => swapIn(k)); });
 }
 function swapIn(k) {
   const R = $('#reveal'), w = R?.querySelectorAll('.deal .slotw')[k]; if (!w) return;
@@ -4459,6 +4503,7 @@ function showReveal(results, opts = {}) {
   const R = $('#reveal'); R.classList.remove('hidden', 'sus', 'sus-1', 'sus-2', 'sus-3'); R.dataset.stage = 'pack'; delete R.dataset.tier; delete R.dataset.hero; revealTimers.forEach(clearTimeout); revealTimers = [];
   R.classList.add('tin-scene');   // v0.7.2.3: the pack is the sage Petalspire tin on a petal-strewn table (as in the card-pack Reel)
   R.innerHTML = `<div class="rays"></div><div class="tin-petals"></div><h2>${opts.title || 'Card Pack'}</h2><p class="sub">Tap the tin to open</p><div class="big-pack tin" id="bigpack">${tinHTML()}${opts.title?.startsWith('Starter') ? '<span class="pack-ribbon">Starter Seeds</span>' : ''}</div><div class="reveal-actions"></div>`;
+  revealOddsBtn(R);
   const bp = $('#bigpack');
   // v0.52: a pack holding a Super Rare / Ultra Rare / Other World card gets a suspense moment first: it shakes harder and
   // glows in that tier's colour (Other World adds a starfield + aurora and a longer build-up). Tap anywhere to skip.
@@ -4545,6 +4590,7 @@ function deal(results) {
   const R = $('#reveal'); R.dataset.stage = 'deal'; R.classList.remove('tin-scene');
   const keep = [...R.querySelectorAll('.petal, .sparkle, .flash.big')];   // v0.52: let the burst's petal shower finish over the dealt cards
   R.innerHTML = `<div class="rays"></div><h2>Your new cards</h2><p class="sub">Tap each card to reveal it</p>${revealOpts.loot ? lootHTML(revealOpts.loot) : ''}<div class="deal"></div><div class="reveal-actions"><button class="btn" data-act="reveal-all">Reveal all</button></div>`;
+  revealOddsBtn(R);
   keep.forEach((k) => R.appendChild(k));
   if (revealOpts.loot) { fillIcons($('.pack-loot', R)); lootCount(R); }
   const d = $('.deal', R);
@@ -4859,7 +4905,7 @@ window.__ps = {
   fillBarrels, truckQuote: () => { const q = truckQuote(); return { need: q.need, can: q.can, lots: q.list.map(([l]) => l) }; }, get truck() { return truck && { state: truck.state, x: truck.x, stopX: truck.stopX }; }, baseOpen, baseNeeds, SUPPLY_CARDS, get basesMigrated() { return basesMigrated; },
   get barrels() { return S.barrels; }, barrelText, totalWater, handSource: (i) => handSource(i)?.lot || null, buildBarrel, unhookIrrigation, BARREL, craftTincture, collectTincture, buildTincture,
   setBarrelCap(n) { BARREL.maxBeds = n; syncBarrels(); }, barrelScreen(lot) { const b = S.barrels[lot]; return W.project(V(b.x, 0.5, b.z)); }, barrelLabel(lot) { const s = W.barrels.get(lot)?.userData.info; return s && { main: s.userData.main, sub: s.userData.sub, visible: s.visible, scale: s.scale.y, opacity: s.material.opacity }; },
-  CARDS, FEATURES, zoomCard: (id) => zoomCard(id), cardPool: (r) => Object.keys(CARDS).filter((k) => CARDS[k].rarity === r), cardTier, FEATURE_TIER_FROM_OLD, RARITY, SPECIES, FANTASY_SPECIES, PLANT_TIERS, TIER_ORDER, PACK_W, DRYING, ITEMS, TINCTURE, STILL, drawCard, packOdds: () => ({ total: packTotal(), orchard: !!S.lots.orchard, tiers: Object.fromEntries(TIER_ORDER.map((t) => [t, tierOdds(t)])), features: featureOdds(), plantTiers: Object.fromEntries(TIER_ORDER.map((t) => [t, catTierOdds(true, t)])), otherTiers: Object.fromEntries(TIER_ORDER.map((t) => [t, catTierOdds(false, t)])) }), rollSeeds,
+  CARDS, FEATURES, zoomCard: (id) => zoomCard(id), cardPool: (r) => Object.keys(CARDS).filter((k) => CARDS[k].rarity === r), cardTier, FEATURE_TIER_FROM_OLD, RARITY, SPECIES, FANTASY_SPECIES, PLANT_TIERS, TIER_ORDER, PACK_W, DRYING, ITEMS, TINCTURE, STILL, drawCard, openOddsInfo, closeOddsInfo, packOddsHTML, wheelOddsHTML, packOdds: () => ({ total: packTotal(), orchard: !!S.lots.orchard, tiers: Object.fromEntries(TIER_ORDER.map((t) => [t, tierOdds(t)])), features: featureOdds(), plantTiers: Object.fromEntries(TIER_ORDER.map((t) => [t, catTierOdds(true, t)])), otherTiers: Object.fromEntries(TIER_ORDER.map((t) => [t, catTierOdds(false, t)])) }), rollSeeds,
   sickleBed, plowBed, useTool, toolLeft, lotTiles, bedTiles, get bedTargets() { return W.bedTargets.children.map((g) => ({ b: g.userData.b, ok: g.userData.ok })); }, get fxCount() { return W.fxCount(); },
   giveTool(id) { S.discovered[id] = true; S.unlocked[id] = true; S.owned[id] = true; if (isGF(id)) (S.gfBought ||= {})[id] = 1; if (!S.cards[id]) addCard(id); save(); hud(); },
   resetTool(id) { S.toolAt[id] = 0; save(); hud(); },   // kept for old tests: a no-op now (no rest)
@@ -5047,10 +5093,6 @@ const WHEEL_ICON = { wood: 'wood', coins: 'coin', card: 'pack', card2: 'pack', j
 const wheelAmt = (w) => (w.k === 'wood' || w.k === 'coins' ? String(Math.round(w.n * adMult())) : `×${w.n}`);
 const wheelName = (w) => ({ wood: 'Wood', coins: 'Coins', card: 'Card', card2: 'Cards', jewel: 'Jewel' })[w.k];
 const nestIcon = (id, x, y, sz) => (ICONS[id] || '').replace('<svg ', `<svg x="${x}" y="${y}" width="${sz}" height="${sz}" `);
-function wheelOddsText() {
-  const tot = V8.wheel.reduce((a, w) => a + w.w, 0), pc = (w) => `${Math.round((w.w / tot) * 1000) / 10}%`;
-  return V8.wheel.map((w) => `${w.k === 'wood' || w.k === 'coins' ? Math.round(w.n * adMult()) : w.n} ${w.k === 'card2' ? 'Cards' : wheelName(w)} ${pc(w)}`).join(' · ');
-}
 function wheelSVG() {
   const segs = V8.wheelSegs, n = segs.length, step = 360 / n, C = 140, R = 140, rad = (d) => ((d - 90) * Math.PI) / 180, P = (r, d) => `${(C + r * Math.cos(rad(d))).toFixed(2)} ${(C + r * Math.sin(rad(d))).toFixed(2)}`;
   let out = '';
@@ -5075,14 +5117,14 @@ const spinsLine = () => (S.spins > 0 ? `You have <b>${S.spins}</b> spin${S.spins
 function openWheel() {
   closeWheel(); if (panel) closePanel();
   const o = el('div', 'wheel-ov'); o.id = 'wheel-ov';
-  o.innerHTML = `<div class="wheel-card"><button class="close-btn" data-v8="wheel-close" aria-label="Close">×</button><h2>Bonus Wheel</h2>
+  o.innerHTML = `<div class="wheel-card">${oddsBtn('wheel')}<button class="close-btn" data-v8="wheel-close" aria-label="Close">×</button><h2>Bonus Wheel</h2>
     <div class="wheel-wrap">${wheelRimSVG()}<div class="wheel-rot" id="wheel-rot" style="transform:rotate(${wheelRot}deg)">${wheelSVG()}</div>${WHEEL_PIN}<div class="wheel-pop" id="wheel-pop"></div></div>
     <p class="wheel-res" id="wheel-res">${spinsLine()}</p>
     <button class="btn btn-gold wheel-go" id="wheel-go" data-v8="wheel-spin" ${S.spins > 0 ? '' : 'disabled'}>Spin</button>
-    <small class="muted wheel-odds">${wheelOddsText()} · a Jewel is guaranteed by your ${V8.pity}th spin without one · earn spins by filling orders and levelling up</small></div>`;
+    <small class="muted wheel-note">Earn spins by filling orders and levelling up</small></div>`;
   $('#ui').appendChild(o); fillIcons(o);
 }
-function closeWheel() { $('#wheel-ov')?.remove(); wheelSpinning = false; wheelTimers.forEach(clearTimeout); wheelTimers = []; }
+function closeWheel() { closeOddsInfo(); $('#wheel-ov')?.remove(); wheelSpinning = false; wheelTimers.forEach(clearTimeout); wheelTimers = []; }
 function wheelSegAtTop(rot) { const n = V8.wheelSegs.length, a = (((-rot) % 360) + 360) % 360; return Math.floor(a / (360 / n)) % n; }
 function wheelSpinUI() {
   if (wheelSpinning) return; const r = spinWheel(); if (!r) return; wheelSpinning = true; wheelTimers.forEach(clearTimeout); wheelTimers = [];

@@ -1,4 +1,4 @@
-# Petalspire v0.8
+# Petalspire v0.8.3
 
 A cozy 3D flower-garden prototype for iPhone Safari (portrait, one thumb). Also plays on desktop with a mouse.
 This is a **prototype**: version numbers stay below 1.0 until the first official release.
@@ -20,6 +20,10 @@ This is a **prototype**: version numbers stay below 1.0 until the first official
 7. **Land for sale.** Five wooded plots, each with a floating For Sale sign: 450 → 900 → 1800 → 3000 → 4500 coins (v0.7.2; was 150 → 1500).
 
 Drag with one finger to pan, pinch to zoom, and twist with two fingers to turn. On desktop, right-drag or shift-drag turns the view.
+
+## New in v0.8.3: drop rates behind a small "i"
+- Odds and percentages are no longer printed in the regular UI (Card Pack screen, collection tier headers, Market tier hints, the Swap confirm, the Bonus Wheel).
+- For disclosure, a very small circled **i** sits in a corner of the Card Pack screen, the pack-opening screen and the Bonus Wheel. Tapping it opens a popover with the real rates, computed from the live weights: chance per card tier for the plant and the feature/tool/stand/supply slot, the 6% bonus decoration card, the ×0.4 weight for cards you already own (so cards you don't have yet are 2.5× as likely), the at-least-one-Epic guarantee, the first-pack Chamomile, duplicates and the Swap; for the wheel, each prize's chance and the Jewel guarantee by the 150th spin. Close with × or a tap outside.
 
 ## New in v0.8: Orders, the Bonus Wheel, garden decorations, endless upgrades, Garden Levels, friend invites
 - **Order Board** (top of the Farm Stand and Orchard Stand sheets). 2 slots at Home once the Farm Stand stands (+1 with 2+ Home plots, +1 with the Tincture Table); 3 at the Orchard once its stand stands (+1 with the Orchard press). An order asks only for goods that location can make right now (1–3 kinds, 2–8 each; never seeds, and never Sunflower Oil or Sun Butter at the Orchard). **Fill** pays **2× the stand price + 1 bonus spin**. One free **Skip** every 10 minutes, otherwise 1 Jewel. Orders leave after 30 minutes. A Market Manager can fill ready orders by itself (toggle on the board).

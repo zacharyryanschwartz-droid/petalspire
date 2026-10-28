@@ -133,7 +133,7 @@ i[data-icon] svg{width:100%;height:100%}
 .ring{width:54px;height:54px}
 
 /* packs */
-.pack-hero{display:flex;gap:14px;align-items:center;padding:4px 4px 10px}
+.pack-hero{position:relative;display:flex;gap:14px;align-items:center;padding:4px 4px 10px}
 .pack-art{width:118px;flex:none;border-radius:12px;overflow:hidden;box-shadow:0 8px 20px rgba(70,50,20,.25);transform:rotate(-4deg);position:relative}
 .pack-art img{display:block;width:100%}
 .pack-art::after{content:"";position:absolute;inset:0;background:linear-gradient(115deg,transparent 35%,rgba(255,255,255,.55) 50%,transparent 65%);
@@ -1267,7 +1267,7 @@ body.modal-open .wk-timer { display: none; }
 @keyframes wpopout{0%{opacity:1;transform:translate(-50%,-50%) scale(1)}100%{opacity:0;transform:translate(-50%,-50%) scale(.85)}}
 .wheel-res{min-height:42px;margin:8px 0 8px;color:#3D5A40;font-size:15px}.wheel-win{font-family:'Fraunces',serif;font-size:19px;color:#9A6A12}
 .wheel-go{min-width:150px;font-size:17px;letter-spacing:.3px}
-.wheel-odds{display:block;margin-top:9px;font-size:10.5px;line-height:1.35;opacity:.85}
+.wheel-note{display:block;margin-top:9px;font-size:11px;line-height:1.35;opacity:.8}
 .order-board{margin:0 0 12px;padding:10px;border-radius:16px;background:linear-gradient(180deg,#FBF6EA,#F2F8EF);border:1.5px solid #E5D7B5}
 .order-board .sec-title{margin-top:0}.order-board .sec-title small{font-weight:600;color:#7A8A7C;font-size:11px;margin-left:4px}
 .ord-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
@@ -1290,3 +1290,29 @@ body.modal-open .wk-timer { display: none; }
 .ref-enter .meta{flex:1}
 .tier-tag.t-superrare,.tier-tag.t-ultra,.tier-tag.t-otherworld,.tier-tag.t-rare,.tier-tag.t-legendary,.tier-tag.t-epic,.tier-tag.t-basic{white-space:nowrap}
 #ui .lvl-toast{pointer-events:none}
+/* ---------- v0.8.3: drop rates behind a very small circled i (disclosure only, never in the regular UI) ---------- */
+.odds-i{position:absolute;top:6px;right:6px;z-index:6;width:19px;height:19px;min-width:0;min-height:0;margin:0;padding:0;border-radius:50%;
+  border:1.5px solid #B7D4B5;background:#FFF9F0;color:#3D5A40;font:800 11px/1 'Nunito',system-ui,sans-serif;font-style:normal;
+  display:grid;place-items:center;opacity:.72;cursor:pointer;box-shadow:none;-webkit-appearance:none;appearance:none;pointer-events:auto}
+.odds-i::after{content:'';position:absolute;inset:-11px;border-radius:50%}   /* comfortable thumb target, still a tiny mark */
+.odds-i:active,.odds-i:focus-visible{opacity:1;background:#B7D4B5;outline:none}
+.pack-hero>.odds-i{top:0;right:0}
+.wheel-card>.odds-i{top:12px;left:12px;right:auto}
+.reveal>.odds-i{position:absolute;top:calc(12px + var(--sat));left:calc(12px + var(--sal));right:auto;z-index:5}
+.odds-ov{position:absolute;inset:0;z-index:96;display:grid;place-items:center;padding:16px;background:rgba(40,52,42,.32);pointer-events:auto;animation:fade .15s ease}
+.odds-card{position:relative;width:min(100%,340px);max-height:min(80vh,600px);overflow-y:auto;-webkit-overflow-scrolling:touch;touch-action:pan-y;overscroll-behavior:contain;
+  padding:13px 14px 12px;border-radius:16px;background:#FFF9F0;border:1.5px solid #B7D4B5;box-shadow:0 10px 28px rgba(61,90,64,.28);
+  font-family:'Nunito',system-ui,sans-serif;color:#3D5A40;font-size:11.5px;line-height:1.4;text-align:left}
+.odds-card h3{margin:0 30px 4px 0;font:800 14px/1.25 'Nunito',system-ui,sans-serif;color:#3D5A40}
+.odds-card p{margin:7px 0 0;font-size:11.5px;font-weight:600;color:#4E6650}
+.odds-card p b{color:#3D5A40}
+.odds-card .op-lead{margin-top:2px}
+.odds-card.anchored{position:absolute;width:min(calc(100% - 16px),340px);animation:fade .15s ease}
+.odds-card .op-foot{opacity:.8}
+.odds-x{position:absolute;top:8px;right:8px;width:24px;height:24px;min-width:0;padding:0;border-radius:50%;border:none;background:#B7D4B5;color:#3D5A40;
+  font:800 15px/1 'Nunito',system-ui,sans-serif;display:grid;place-items:center;cursor:pointer}
+.odds-card .odds{display:block;margin:4px 0 0}
+.odds-card .odds .odds-label{margin:7px 0 2px;font-size:11px;font-weight:800;color:#5E7F5A}
+.odds-card .odds span{display:flex;justify-content:space-between;align-items:baseline;gap:8px;padding:2px 2px;border:none;border-bottom:1px dotted #DCE8DA;border-radius:0;background:none!important;
+  font-size:11.5px;font-weight:700;color:#3D5A40}
+.odds-card .odds span b{font-weight:700}
