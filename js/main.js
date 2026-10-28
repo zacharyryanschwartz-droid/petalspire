@@ -11,11 +11,11 @@ import { Payments } from './payments.js';
 import { createAds, gameArt } from './ads.js';
 import { initTracker } from './games-tracker.js';
 import { shadeAt, speedFor, sunLabel, rebaseStart } from './shade.js';
-import { createAudio } from './audio.js';
+import { createAudio, MUSIC_CREDITS } from './audio.js';
 
 // Save format: v0.3, v0.31 and v0.4 share one localStorage key (schema v: 3). `build` records which prototype build last wrote the save;
 // v0.3 / v0.31 saves (no `build`, no per-plot barrels) are migrated on load (migrate04 below); v0.4 saves load as-is and are re-tagged. Prototype builds stay below 1.0.
-export const BUILD = '0.7.1';
+export const BUILD = '0.7.2';
 // v0.65: anonymous player tracking (Games Backend on Appwrite; no API key in the game, nothing personal). Skipped for automated runs (navigator.webdriver).
 try { if (!navigator.webdriver) initTracker({ endpoint: 'https://nyc.cloud.appwrite.io/v1', projectId: '6ae0a41a002ce0a48fac', gameId: 'petalspire', platform: 'web', appVersion: BUILD }); } catch (_) {}
 const SAVE_KEY = 'petalspire.v03', V02_KEY = 'petalspire.v02', OLD_KEYS = ['petalspire.v01'];
@@ -434,7 +434,7 @@ function assignIrrigation(siteId) {
   // v0.52: its own plot's barrel first; otherwise the barrel of the plot in front (it reaches the plot behind it)
   const own = lotOfSite(siteId), fr = FRONT[own] && S.barrels[FRONT[own]] ? FRONT[own] : null;
   const cands = [S.barrels[own] ? own : null, fr].filter(Boolean);
-  if (!cands.length) { toast(`${lotName(own)} has no rain barrel yet — build one there from the Build menu (Rain Barrel, 40 coins)${FRONT[own] ? `, or one on ${lotName(FRONT[own])} (it reaches the plot behind it)` : ''}`); tip('plotbarrel'); return false; }
+  if (!cands.length) { toast(`${lotName(own)} has no rain barrel yet — build one there from the Build menu (Rain Barrel, ${BARREL.price} coins)${FRONT[own] ? `, or one on ${lotName(FRONT[own])} (it reaches the plot behind it)` : ''}`); tip('plotbarrel'); return false; }
   const lot = cands.find((l) => barrelBeds(l).length < BARREL.maxBeds);
   if (!lot) { toast(`This barrel already feeds ${BARREL.maxBeds} beds. Build another plot's barrel or unhook a bed`); return false; }
   S.irrigFrom = S.irrigFrom || {}; if (lot !== own) S.irrigFrom[siteId] = lot; else delete S.irrigFrom[siteId];
@@ -610,6 +610,8 @@ if (!S.ostand || typeof S.ostand !== 'object') S.ostand = {};
 S.audio = { music: 0.6, sfx: 0.8, musicMute: false, sfxMute: false, ...(S.audio && typeof S.audio === 'object' ? S.audio : {}) };
 for (const k of ['music', 'sfx']) S.audio[k] = Math.min(1, Math.max(0, +S.audio[k] || 0)); for (const k of ['musicMute', 'sfxMute']) S.audio[k] = !!S.audio[k];
 if (!S.workers || typeof S.workers !== 'object') S.workers = {};
+if (!S.managers || typeof S.managers !== 'object') S.managers = {};   // v0.7.2: Market Managers (one per location, beside the Gardener)
+migWorkerLoc();
 // v0.7: the sound player. Nothing plays until the first tap/click/key (browser autoplay rules); then the place's tune loops softly.
 Sound = createAudio({ prefs: () => S.audio }); Sound.setScene(S.loc === 'orchard' ? 'orchard' : 'home');
 { const first = () => Sound.unlock(); for (const ev of ['pointerdown', 'touchend', 'click', 'keydown']) document.addEventListener(ev, first, { capture: true, passive: true }); }
@@ -675,7 +677,7 @@ function normalizeCards(st) {
 }
 if (S.owned.beehive && !S.hivesSold && !Object.keys(S.hives).length && !(S.hiveInv > 0)) { const sp = freeSpot('home', S.barrels.home); if (sp) { S.hives.home = sp; hiveMigrated = true; } else S.hiveInv = 1; writeSave(); }
 for (const [lot, h] of Object.entries(S.hives)) W.addHive(lot, h.x, h.z, false);
-for (const [lot, w] of Object.entries(S.workers)) { W.addWorker(lot, w.x, w.z, false); W.setWorker(lot, Date.now() >= w.end ? 'pay' : 'work'); }
+for (const k of wkAll()) { const w = wkRec(k); W.addWorker(k, w.x, w.z, false); W.setWorker(k, Date.now() >= w.end ? 'pay' : 'work'); }
 setTimeout(() => { catchUpWorkers(); migWorkerHour(); syncWorkers(); }, 0);
 // v0.7: Gardeners now work 1-hour hires. Existing saves: every current worker (working or waiting for pay) gets a fresh hour, once.
 function migWorkerHour() {
@@ -683,6 +685,25 @@ function migWorkerHour() {
   for (const [lot, w] of Object.entries(S.workers || {})) { w.hired = t; w.end = t + 3600e3; w.ended = false; w.pass = false; W.setWorker(lot, 'work'); n++; }
   S.workerHour = true; save(); return n;
 }
+// v0.7.2: one Gardener + one Market Manager per LOCATION (they used to be hired per plot). Existing saves, once: if any plot
+// of a location has a Gardener still working, that location gets a Gardener AND a Market Manager for the longest remaining
+// shift (free). Off-shift hires collapse into one location hire waiting to be hired again. Shift tallies are added up.
+function migWorkerLoc() {
+  if (S.wkLoc072) return 0; let n = 0; const t = Date.now(), oldW = S.workers || {}, oldM = S.managers || {}, W2 = {}, M2 = {};
+  const sum = (recs) => { const d = {}; for (const r of recs) for (const [k, v] of Object.entries(r.done || {})) d[k] = (d[k] || 0) + (+v || 0); return d; };
+  for (const loc of ['home', 'orchard']) {
+    const ws = Object.entries(oldW).filter(([l]) => workerLoc(l) === loc).map(([, w]) => w), ms = Object.entries(oldM).filter(([l]) => workerLoc(l) === loc).map(([, w]) => w);
+    if (!ws.length && !ms.length) continue;
+    const live = ws.filter((w) => w.end > t), lead = oldW[loc] || ws[0] || ms[0];
+    const best = (a) => a.reduce((x, y) => (y.end > x.end ? y : x));
+    if (ws.length) { const b = best(live.length ? live : ws); W2[loc] = { ...lead, hired: b.hired, end: b.end, pass: !!b.pass, ended: !(b.end > t), done: sum(ws), made: [...new Set(ws.flatMap((w) => w.made || []))].slice(-40) }; n++; }
+    const mLive = ms.filter((w) => w.end > t), cand = [...live, ...mLive];
+    if (cand.length) { const b = best(cand), g = W2[loc] || lead; M2[loc] = { x: +(g.x + 0.9).toFixed(2), z: g.z, hired: b.hired || t, end: b.end, pass: !!b.pass, ended: false, done: sum(ms), made: [...new Set(ms.flatMap((w) => w.made || []))].filter((id) => !id.startsWith('flower_')).slice(-40) }; n++; }
+    else if (ms.length) { const b = best(ms), m0 = oldM[loc] || ms[0]; M2[loc] = { ...m0, hired: b.hired, end: b.end, ended: true, done: sum(ms), made: [] }; n++; }
+  }
+  S.workers = W2; S.managers = M2; S.wkLoc072 = true; S.wkSplit072 = true; return n;
+}
+function migWorkerSplit() { S.wkSplit072 = true; return 0; }   // v0.7.2 (superseded by migWorkerLoc, which also hands out the Manager)
 if (S.tinctureBuilt) W.appear(W.tincture, false);
 if (S.stillBuilt && S.stillPos) W.appear(W.still, false);
 if (S.teaBuilt && S.teaPos) W.appear(W.teastand, false);
@@ -1529,7 +1550,7 @@ function charmText(id, lv = charmLv(id)) {
     : id === 'rainchain' ? `Every rain barrel refills ${pct(v)} faster`
     : id === 'seedtin' ? `${pct(v)} chance of +1 seed per raised-bed harvest`
     : id === 'scales' ? `+${pct(v)} coins on Farm Stand and Fruit Stand sales`
-    : id === 'pocketwatch' ? `Gardener hires last +${Math.round(v * 60)} min (same cost)`
+    : id === 'pocketwatch' ? `Gardener and Market Manager hires last +${Math.round(v * 60)} min (same cost)`
     : id === 'moonfountain' ? `${pct(v)} chance of +1 flower per raised-bed harvest`
     : id === 'faelantern' ? `Drying and crafting take ${pct(v)} less time` : '';
 }
@@ -1908,7 +1929,7 @@ let teaPick = [];   // species ids picked in the blend builder (max TEA.n, dupli
 const driedHave = (sp) => (S.inv['dried_' + sp] || 0) - teaPick.filter((p) => p === sp).length;
 function teaAdd(sp) { if (teaPick.length >= TEA.n || !DRYING[sp] || driedHave(sp) <= 0) return false; teaPick.push(sp); return true; }
 function teaRemove(k) { if (k < 0 || k >= teaPick.length) return false; teaPick.splice(k, 1); return true; }
-function brewTea(sps = teaPick) { return inBag('home', () => brewTea_(sps = teaPick)); }
+function brewTea(sps = teaPick) { return inBag('home', () => brewTea_(sps)); }   // v0.7.2: honour the blend passed in (a Market Manager's)
 function brewTea_(sps = teaPick) {
   const k = S.teas.findIndex((t) => !t);
   if (!S.teaBuilt || building.teastand || k < 0 || sps.length !== TEA.n) return false;
@@ -1917,7 +1938,7 @@ function brewTea_(sps = teaPick) {
   for (const [sp, n] of Object.entries(need)) S.inv['dried_' + sp] -= n;
   const t = teaInfo(sps); registerTea(t.id);
   S.teas[k] = { id: t.id, sps: [...sps], start: now(), ms: t.s * 1000 * craftK(), color: t.color };
-  teaPick = []; save(); syncTea(); hud(); if (panel === 'teastand') renderPanel();
+  if (sps === teaPick) teaPick = []; save(); syncTea(); hud(); if (panel === 'teastand') renderPanel();
   popAt(spotV('teastand', 2.2), `Brewing ${t.name}…`); return true;
 }
 function collectTea(k) { return inBag('home', () => collectTea_(k)); }
@@ -2177,7 +2198,7 @@ function renderPanel_() {
   if (panel === 'orchardtree') { const t = S.orchard[panelArg]; title.innerHTML = t ? TREES[t.sp].name : 'Orchard'; body.innerHTML = orchardTreeHTML(panelArg); }
   if (panel === 'billboard') { title.innerHTML = 'Roadside Billboard'; body.innerHTML = billboardHTML(); }
   if (panel === 'lot') { title.innerHTML = LOTS[panelArg].name; body.innerHTML = lotHTML(panelArg); }
-  if (panel === 'worker') { title.innerHTML = `${lotName(panelArg)} · Gardener`; body.innerHTML = workerHTML(panelArg); }
+  if (panel === 'worker') { title.innerHTML = `${locLabel(workerLoc(panelArg)).replace(/^t/, 'T')} · ${wkName(panelArg)}`; body.innerHTML = workerHTML(panelArg); }
   if (panel === 'settings') { title.innerHTML = 'Settings'; body.innerHTML = settingsHTML(); }
   if (panel === 'jewels') { title.innerHTML = `Jewel Shop${Payments.isTest ? ' <span class="test-tag">Test mode</span>' : ''}`; body.innerHTML = jewelsHTML(); }
   const ck = CONS_PANEL[panel] || (CRAFT[panel] ? panel : null); if (ck && consLeft(ck) > 0) body.innerHTML = consHTML(ck);   // v0.63
@@ -2204,7 +2225,7 @@ function soundSetHTML() {
     const v = Math.round((A[k] || 0) * 100), m = !!A[k + 'Mute'];
     return `<div class="row vol-row${m ? ' muted' : ''}" data-vol-row="${k}"><b>${name} · <span data-vol-pct="${k}">${m ? 'Muted' : v + '%'}</span></b><input class="vol" type="range" min="0" max="100" step="5" value="${v}" data-vol="${k}" aria-label="${name} volume"><button class="btn mute-btn${m ? ' on' : ''}" data-act="mute-${k}">${m ? 'Unmute' : 'Mute'}</button></div>`;
   };
-  return `<div class="sec-title" id="sound-settings">Sound</div><div class="list sound-set">${row('music', 'Music')}${row('sfx', 'Sound Effects')}</div>`;
+  return `<div class="sec-title" id="sound-settings">Sound</div><div class="list sound-set">${row('music', 'Music')}${row('sfx', 'Sound Effects')}</div><p class="muted music-credits" style="margin:6px 4px 0;font-size:12px">${MUSIC_CREDITS}</p>`;
 }
 function setVolume(k, v, commit) {
   if (k !== 'music' && k !== 'sfx') return;
@@ -2616,7 +2637,7 @@ function buildHTML() {
   const projects = cards.sort((a, b) => b[1] - a[1] || a[2].localeCompare(b[2])).map((c) => c[0] ?? bed).join('');   // v0.65: highest value first
   // v0.65: each location has its own Build menu — only what can be built HERE (no raised beds at the Orchard, no Home-only buildings there)
   return `<div class="build-list" data-build-loc="${loc}">${projects}</div>${here.map((id) => (id === 'treeirrig' ? treeIrrigCard() : id === 'ostand' ? ostandProjectCard() : projectCard(id))).join('').trim() ? '' : `<p class="muted empty-hint" data-empty-hint>Open Card Packs to discover more to build.</p>`}
-    <div class="sec-title">Your land</div><div class="list">${(loc === 'orchard' ? ORCH_LOTS : LOT_FOR_SALE.concat(['home'])).filter((l) => S.lots[l]).map((l) => `<div class="row"><div class="ico"><i data-icon="sign" style="width:30px;height:30px"></i></div><div class="meta"><b>${LOTS[l].name}</b><small>${loc === 'orchard' ? '' : `${SITES.filter((s) => s.lot === l && S.beds.includes(s.id)).length}/${SITES.filter((s) => s.lot === l).length} beds · `}${S.barrels[l] ? `barrel ${S.barrels[l].w}/${regenMax(S.barrels[l])}` : 'no barrel'} · ${OBSTACLES.filter((o) => o.lot === l && obsState(o.id) !== 'gone').length} trees &amp; stumps left</small>${workersOn() ? workerRowLine(l) : ''}</div>${workersOn() ? workerRowAct(l) : ''}</div>`).join('')}</div>
+    ${workersSection(loc)}<div class="sec-title">Your land</div><div class="list">${(loc === 'orchard' ? ORCH_LOTS : LOT_FOR_SALE.concat(['home'])).filter((l) => S.lots[l]).map((l) => `<div class="row"><div class="ico"><i data-icon="sign" style="width:30px;height:30px"></i></div><div class="meta"><b>${LOTS[l].name}</b><small>${loc === 'orchard' ? '' : `${SITES.filter((s) => s.lot === l && S.beds.includes(s.id)).length}/${SITES.filter((s) => s.lot === l).length} beds · `}${S.barrels[l] ? `barrel ${S.barrels[l].w}/${regenMax(S.barrels[l])}` : 'no barrel'} · ${OBSTACLES.filter((o) => o.lot === l && obsState(o.id) !== 'gone').length} trees &amp; stumps left</small></div></div>`).join('')}</div>
     <p class="muted" style="margin:10px 4px 0">More land: tap a <b>For Sale</b> sign ${loc === 'orchard' ? 'in the meadow around the Orchard' : 'in the woods around you'}.</p>`;
 }
 function bedSvg() { return `<svg viewBox="0 0 64 44"><path d="M4 22h56v14H4z" fill="#C99A6B" stroke="#7C5634" stroke-width="2"/><path d="M8 22l4-8h40l4 8z" fill="#8C6545" stroke="#7C5634" stroke-width="2" stroke-linejoin="round"/><path d="M4 29h56" stroke="#B07D52" stroke-width="2"/><path d="M22 16c0-5 2-8 5-9M38 16c0-6 3-9 6-10" stroke="#5E825F" stroke-width="2.2" fill="none" stroke-linecap="round"/><path d="M27 7c-3.5 0-5-2.6-5-5 3 0 5 2 5 5zM44 6c.5-3 2.4-4.6 5-4.6-.3 3-2.2 4.5-5 4.6z" fill="#B7D4B5" stroke="#3D5A40" stroke-width="1.4"/></svg>`; }
@@ -3431,15 +3452,32 @@ const SHIFT_MS = () => shiftH() * 3600000;
 // v0.7: '1 hour' / '1 h 15 min' / '24 hours'
 const shiftTxt = (h = shiftH()) => { const mn = Math.round(h * 60), hh = Math.floor(mn / 60), r = mn % 60; return r ? (hh ? `${hh} h ${r} min` : `${r} min`) : `${hh} hour${hh === 1 ? '' : 's'}`; };
 function workersOn() { return !!S.mapOpen; }
-function workerLoc(lot) { return ORCH_LOTS.includes(lot) ? 'orchard' : 'home'; }
+function workerLoc(lot) { lot = wkLotOf(lot); return ORCH_LOTS.includes(lot) ? 'orchard' : 'home'; }
+// v0.7.2: ONE Gardener and ONE Market Manager per location (Home, the Orchard), not per plot. Keys: 'home' / 'orchard' for the
+// Gardener, 'home~m' / 'orchard~m' for the Manager. The Gardener tends every bed and tree on that location's plots; the Manager
+// runs every stand there and fills the location's selling stand. Each works 1 real-time hour per hire (WORKER.hire).
+// Pacing: a worker has a time budget (the real time since its last pass) and every task it does costs the same time the
+// walking worker spends on it (WK_MS: a bed tended, a tree picked, a stand run, a stock trip), so one worker covering many
+// plots is not instant. Both pick their next task at random: no favouring the priciest seed, recipe or product.
+function locLots(loc) { return loc === 'orchard' ? ORCH_LOTS.filter((l) => S.lots[l]) : ['home', ...LOT_FOR_SALE].filter((l) => l === 'home' || S.lots[l]); }
+function locLabel(loc) { return loc === 'orchard' ? 'the Orchard' : 'Home'; }
+function wkKey(lot, r = 'g') { return r === 'm' ? lot + '~m' : lot; }   // (function declarations: boot uses these before this line runs)
+function wkLotOf(k) { return String(k).replace(/~m$/, ''); }
+function wkRoleOf(k) { return String(k).endsWith('~m') ? 'm' : 'g'; }
+function wkName(k) { return wkRoleOf(k) === 'm' ? 'Market Manager' : 'Gardener'; }
+function wkRec(k) { return (wkRoleOf(k) === 'm' ? S.managers : S.workers)[wkLotOf(k)]; }
+function wkAll() { return [...Object.keys(S.workers), ...Object.keys(S.managers || {}).map((l) => l + '~m')]; }
+const rndOf = (a) => (a.length ? a[Math.floor(Math.random() * a.length)] : undefined);
 function lotBedTiles(lot) { return S.beds.flatMap((sid, b) => (lotOfSite(sid) === lot ? bedTiles(b) : [])); }
+function locBeds(loc) { const ls = locLots(loc); return S.beds.map((sid, b) => (ls.includes(lotOfSite(sid)) ? b : -1)).filter((b) => b >= 0); }
+function locStands(loc) { return [...new Set(locLots(loc).flatMap((l) => workStands(l)))]; }
 function workStands(lot) { return workStands0(lot).filter((k) => !consLeft(k)); }   // v0.63: skip stands still being built
 function workStands0(lot) {
   const out = lotRoofs(lot).filter((r) => r !== 'stand' && r !== 'market' && r !== 'orchardshed');
   if (S.rackBuilt && SPOTS.rack && lotAt(SPOTS.rack[0], SPOTS.rack[1]) === lot) out.unshift('rack');
   return out;
 }
-function workerStatus(lot) { const w = S.workers[lot]; if (!w) return null; const left = w.end - now(); return left > 0 ? { working: true, left, txt: `Working · ${fmtTime(left)} left` } : { working: false, left: 0, txt: 'Shift over · hire again' }; }
+function workerStatus(lot) { const w = wkRec(wkKey(workerLoc(lot), wkRoleOf(lot))); if (!w) return null; const left = w.end - now(); return left > 0 ? { working: true, left, txt: `Working · ${fmtTime(left)} left` } : { working: false, left: 0, txt: 'Shift over · hire again' }; }
 function workerSpot(lot) {
   const b = S.beds.findIndex((sid) => lotOfSite(sid) === lot), near = b >= 0 ? bedCenter(b) : (([x, z]) => ({ x, z }))(lotCenter(lot));
   if (b >= 0) {   // just outside the bed's rim, behind it first (facing the camera across the bed, never hidden by a stand)
@@ -3450,97 +3488,126 @@ function workerSpot(lot) {
   }
   return freeSpot(lot) || near;
 }
-function hireWorker(lot) {
-  if (!workersOn() || !S.lots[lot] || S.workers[lot]) return false;
-  const pass = S.gardenerPasses > 0;   // v0.67: a Gardener's Pack hire — free, one 24 h shift
-  if (!pass && S.coins < WORKER.hire) { toast(`A Gardener costs ${WORKER.hire} coins`); return false; }
-  const p = workerSpot(lot); if (pass) S.gardenerPasses--; else S.coins -= WORKER.hire;
-  S.workers[lot] = { x: p.x, z: p.z, hired: now(), end: now() + (pass ? (S.gardenerPassH || 24) * 3600e3 : SHIFT_MS()), pass, done: { harvests: 0, planted: 0, watered: 0, picked: 0, made: 0, stocked: 0 }, made: [] };
+function hireWorker(lot, role = 'g') {
+  const loc = workerLoc(lot); lot = loc; const k = wkKey(loc, role), book = role === 'm' ? S.managers : S.workers, nm = wkName(k);
+  if (!workersOn() || (loc === 'orchard' && !S.lots.orchard) || book[loc]) return false;
+  const pass = role === 'g' && S.gardenerPasses > 0;   // v0.67: a Gardener's Pack hire — free, one 24 h shift (Gardener only)
+  if (!pass && S.coins < WORKER.hire) { toast(`A ${nm} costs ${WORKER.hire} coins an hour`); return false; }
+  let p = workerSpot(lot); if (role === 'm') { const g = S.workers[lot], q = g ? { x: +(g.x + 0.9).toFixed(2), z: g.z } : { x: +(p.x + 0.9).toFixed(2), z: p.z }; p = locLots(loc).includes(lotAt(q.x, q.z)) && !placeProblem(q.x, q.z) ? q : (freeSpot(lot, p) || q); }
+  if (pass) S.gardenerPasses--; else S.coins -= WORKER.hire;
+  book[lot] = { x: p.x, z: p.z, hired: now(), end: now() + (pass ? (S.gardenerPassH || 24) * 3600e3 : SHIFT_MS()), pass, done: { harvests: 0, planted: 0, watered: 0, picked: 0, made: 0, stocked: 0, tea: 0 }, made: [] };
   S.stats.workersHired = (S.stats.workersHired || 0) + 1;
-  W.addWorker(lot, p.x, p.z, true); W.setWorker(lot, 'work'); save(); hud(); renderPanel();
-  toast(`🌿 A Gardener is tending ${lotName(lot)} for ${pass ? shiftTxt(S.gardenerPassH || 24) : shiftTxt()}`); sfx('buy'); workerPass(lot); return true;
+  W.addWorker(k, p.x, p.z, true); W.setWorker(k, 'work'); save(); hud(); renderPanel();
+  toast(`${role === 'm' ? '🧺 A Market Manager is running every stand at' : '🌿 A Gardener is tending every plot at'} ${locLabel(loc)} for ${pass ? shiftTxt(S.gardenerPassH || 24) : shiftTxt()}`); sfx('buy'); workerPass(k); return true;
 }
-function payWorker(lot) {
-  const w = S.workers[lot]; if (!w || now() < w.end) return false;
-  if (S.coins < WORKER.wage) { toast(`Hiring the Gardener again costs ${WORKER.wage} coins`); return false; }
-  S.coins -= WORKER.wage; w.hired = now(); w.pass = false; w.end = now() + SHIFT_MS(); w.ended = false; w.done = { harvests: 0, planted: 0, watered: 0, picked: 0, made: 0, stocked: 0 };
+function payWorker(k) {
+  k = wkKey(workerLoc(k), wkRoleOf(k)); const w = wkRec(k), nm = wkName(k); if (!w || now() < w.end) return false;
+  if (S.coins < WORKER.wage) { toast(`Hiring the ${nm} again costs ${WORKER.wage} coins`); return false; }
+  S.coins -= WORKER.wage; w.hired = now(); w.last = now(); w.debt = 0; w.pass = false; w.end = now() + SHIFT_MS(); w.ended = false; w.done = { harvests: 0, planted: 0, watered: 0, picked: 0, made: 0, stocked: 0, tea: 0 };
   S.stats.workerPay = (S.stats.workerPay || 0) + WORKER.wage;
-  W.setWorker(lot, 'work'); save(); hud(); renderPanel(); if (selected != null) renderSheet();
-  toast(`🌿 Hired again for ${WORKER.wage} coins · ${shiftTxt()} on ${lotName(lot)}`); sfx('buy'); workerPass(lot); return true;
+  W.setWorker(k, 'work'); save(); hud(); renderPanel(); if (selected != null) renderSheet();
+  toast(`${wkRoleOf(k) === 'm' ? '🧺' : '🌿'} ${nm} hired again for ${WORKER.wage} coins · ${shiftTxt()} at ${locLabel(workerLoc(k))}`); sfx('buy'); workerPass(k); return true;
 }
-const workerKeep = (lot, sp) => lotBedTiles(lot).length;   // seeds of each kind held back for replanting
-// v0.66.1: the seed a gardener plants into an empty plot: the most valuable flower whose seeds are in this location's Bag
-const workerSeed = () => Object.keys(SPECIES).filter((sp) => S.inv['seed_' + sp] > 0 && ITEMS['flower_' + sp]).sort((a, b) => sellOf('flower_' + b) - sellOf('flower_' + a) || a.localeCompare(b))[0] || null;
-function workerPass(lot) { workerBusy++; try { return inBag(workerLoc(lot), () => workerPass_(lot)); } finally { workerBusy--; } }
+const workerKeep = (loc) => locBeds(loc).length * BED_N * BED_N;   // seeds of each kind held back for replanting
+// v0.7.2 pacing: time budget for this pass = real time since the last pass (≥ one live step, ≤ one catch-up step), minus overrun
+function wkBudget(w) { const dt = Math.min(WORKER.catchStepS * 1000, Math.max(WORKER.stepS * 1000, now() - (w.last || w.hired || now()))); return dt - (w.debt || 0); }
+// v0.7.2: the seed a Gardener plants into an empty plot: any seed in this location's Bag, picked at random (no favouring price)
+const workerSeed = () => rndOf(Object.keys(SPECIES).filter((sp) => S.inv['seed_' + sp] > 0 && ITEMS['flower_' + sp])) || null;
+function workerPass(k) { workerBusy++; try { return inBag(workerLoc(k), () => (wkRoleOf(k) === 'm' ? managerPass_(k) : workerPass_(k))); } finally { workerBusy--; } }
+// Gardener: plants, harvests, waters and picks on every plot of its location (beds and fruit trees), in random order, as far
+// as its time budget goes. It makes nothing and stocks nothing.
 function workerPass_(lot) {
   const w = S.workers[lot]; if (!w || now() >= w.end) return 0;
-  const d = w.done || (w.done = {}), made = new Set(w.made || []); let n = 0; quiet++;
+  const loc = workerLoc(lot), d = w.done || (w.done = {}), made = new Set(w.made || []); let n = 0, B = wkBudget(w); quiet++;
   const J = clockAt == null ? [] : null, job = (a, at, o = {}) => { if (J && at) J.push({ a, x: at[0], z: at[1], ...o }); };   // v0.65: visual jobs for the walking gardener (live passes only)
   try {
-    // 1) harvest ripe plants, replant the same species from Bag seeds
-    for (const i of lotBedTiles(lot)) { const p = S.tiles[i]; if (!p || stageOf(p) < 3) continue;
-      const r = harvestCore(i); if (!r) continue; n++; d.harvests = (d.harvests || 0) + 1; job('pick', tileXZ(i), { bed: bedOfTile(i), color: SPECIES[r.sp]?.color });
-      if (S.inv['seed_' + r.sp] > 0) { plant(i, r.sp); d.planted = (d.planted || 0) + 1; job('plant', tileXZ(i), { bed: bedOfTile(i) }); } else syncTile(i);
-    }
-    // 1b) v0.66.1: plant every EMPTY plot on this plot's beds from the Bag at this location (most valuable seed first;
-    // before, a gardener only replanted what it had just harvested, so empty beds stayed empty)
-    for (const i of lotBedTiles(lot)) { if (S.tiles[i]) continue; const sp = workerSeed(); if (!sp) break;
-      plant(i, sp); if (S.tiles[i]?.sp === sp) { n++; d.planted = (d.planted || 0) + 1; job('plant', tileXZ(i), { bed: bedOfTile(i), color: SPECIES[sp]?.color }); } else break; }
-    // 2) water thirsty plants from this plot's barrel (a Blue Lotus barrel needs two passes: half, then full)
-    for (const i of lotBedTiles(lot)) { let g = 40; let k = 0; while (g-- > 0 && thirsty(S.tiles[i]) && water(i, true)) { n++; k++; d.watered = (d.watered || 0) + 1; } if (k) job('water', tileXZ(i), { bed: bedOfTile(i) }); }   // v0.63: pours until the bed has its start / bud water (or the barrel is dry)
-    // 3) ripe fruit trees on this plot
-    for (const sp of ORCHARD_TREE_SPOTS) { if (sp.lot !== lot) continue; const t = S.orchard[sp.k]; if (t && orchRipe(t, now()) && pickTree(sp.k)) { n++; d.picked = (d.picked || 0) + 1; made.add(TREES[t.sp].fruit); job('pick', [sp.x, sp.z], { tree: sp.k, color: TREES[t.sp].fruitC || '#E0604A' }); } }
-    // 3b) v0.67.1: water the trees on this plot that were picked (from this plot's barrel, else any Orchard barrel)
-    for (const sp of ORCHARD_TREE_SPOTS) { if (sp.lot !== lot) continue; const t = S.orchard[sp.k]; if (t?.dry && waterTree(sp.k, true, clockAt ?? now())) { n++; d.watered = (d.watered || 0) + 1; job('water', [sp.x, sp.z], { tree: sp.k }); } }
-    // 4) stands on this plot: collect finished goods, then start new batches
-    const before = { ...S.inv }, st = workStands(lot), spare = (id) => (S.inv[id] || 0) - (id.startsWith('seed_') ? workerKeep(lot) : 0);
-    if (st.includes('rack')) S.rack.forEach((r, k) => r && now() - r.start >= r.ms && collect(k));
-    if (st.includes('tincture')) S.tinc.forEach((t, k) => t && collectTincture(k));
-    if (st.includes('still')) S.stills.forEach((t, k) => t && collectOil(k));
-    if (st.includes('teastand')) S.teas.forEach((t, k) => t && collectTea(k));
-    for (const c of Object.keys(CRAFT)) if (st.includes(c)) S[CRAFT[c].slots].forEach((t, k) => t && craftCollect(c, k));
-    const nb = n;
-    for (const [id, q] of Object.entries(S.inv)) if (q > (before[id] || 0)) { made.add(id); d.made = (d.made || 0) + q - (before[id] || 0); n++; }
-    if (st.includes('tincture')) { const best = () => Object.entries(TINCTURE.recipes).filter(([sp, r]) => recipeOpen(sp) && (S.inv['flower_' + sp] || 0) >= r.n).sort((a, b) => sellOf(tinctureId(b[0], tincBase())) - sellOf(tinctureId(a[0], tincBase())))[0];
-      for (let g = 0; g < 9 && S.tinc.includes(null); g++) { const r = best(); if (!r || !craftTincture(r[0])) break; n++; } }
-    if (st.includes('still')) { const best = () => Object.entries(STILL.recipes).filter(([sp, r]) => (r.in ? S.unlocked[sp] || S.inv[r.in] > 0 : recipeOpen(sp)) && spare(r.in || 'seed_' + sp) >= r.n).sort((a, b) => sellOf(oilId(b[0])) - sellOf(oilId(a[0])))[0];
-      for (let g = 0; g < 9 && S.stills.includes(null); g++) { const r = best(); if (!r || !distill(r[0])) break; n++; } }
-    for (const c of Object.keys(CRAFT)) { if (!st.includes(c)) continue; const C = CRAFT[c];
-      const best = () => (C.def.recipes || []).filter((r) => recipeHere(c, r) && recipeKnown(r) && spare(r.in) >= r.n).sort((a, b) => sellOf(b.item) - sellOf(a.item))[0];
-      for (let g = 0; g < 9 && S[C.slots].includes(null); g++) { const r = best(); if (!r || !craftMake(c, r.id)) break; n++; } }
-    if (st.includes('teastand')) for (let g = 0; g < 4 && S.teas.includes(null); g++) {
-      const pick = []; const have = Object.keys(DRYING).map((sp) => [sp, S.inv['dried_' + sp] || 0]).filter(([, q]) => q > 0).sort((a, b) => b[1] - a[1]);
-      for (const [sp, q] of have) for (let m = 0; m < q && pick.length < TEA.n; m++) pick.push(sp);
-      if (pick.length < TEA.n || !brewTea(pick)) break; n++; }
-    if (st.includes('rack')) for (let k = 0; k < S.rack.length; k++) if (!S.rack[k] && hang(k)) n++;
-    if (st.includes('rack')) syncRack();
-    if (J && n > nb) for (const k of st) { const at = standXZ(k); if (at) job('craft', at, { stand: k }); }
-    // 5) restock this location's selling stand with what the worker made (only goods that sell here)
-    const loc = workerLoc(lot), ok = loc === 'orchard' ? S.oshedBuilt && !consLeft('oshed') : S.standBuilt && !consLeft('stand');   // v0.63: never restock a stand that's still being built
-    if (ok) for (const id of made) { if (!(S.inv[id] > 0) || !sellsAt(id, loc)) continue; const was = S.inv[id]; stock(id, 'all', loc); if (S.inv[id] < was) { d.stocked = (d.stocked || 0) + was - S.inv[id]; n++; J && !J.some((j) => j.a === 'stock') && job('stock', standXZ(loc === 'orchard' ? 'orchardshed' : 'stand'), { carry: true }); } }
-    // anything picked is carried to the stand (or the Bulk Sell Box spot when there is no stand yet)
-    if (J && J.some((j) => j.a === 'pick') && !J.some((j) => j.a === 'stock')) { const at = ok ? standXZ(loc === 'orchard' ? 'orchardshed' : 'stand') : null; if (at) job('stock', at, { carry: true }); }
+    const ls = locLots(loc), units = [...locBeds(loc).map((b) => ({ b })), ...ORCHARD_TREE_SPOTS.filter((sp) => ls.includes(sp.lot) && S.orchard[sp.k]).map((t) => ({ t }))].sort(() => Math.random() - 0.5);
+    for (const u of units) { if (B <= 0) break; let cost = 0;
+      if (u.b != null) { const tiles = bedTiles(u.b), at = bedCenter(u.b), xz = [at.x, at.z]; let h = 0, pl = 0, wa = 0, col;
+        // harvest ripe plants, replant the same species from Bag seeds
+        for (const i of tiles) { const p = S.tiles[i]; if (!p || stageOf(p) < 3) continue; const r = harvestCore(i); if (!r) continue; h++; col = SPECIES[r.sp]?.color;
+          if (S.inv['seed_' + r.sp] > 0) { plant(i, r.sp); pl++; } else syncTile(i); }
+        // fill the bed's empty spots with random seeds from this location's Bag
+        for (const i of tiles) { if (S.tiles[i]) continue; const sp = workerSeed(); if (!sp) break; plant(i, sp); if (S.tiles[i]?.sp === sp) pl++; else break; }
+        // water thirsty plants from the barrel (a Blue Lotus barrel needs two passes: half, then full)
+        for (const i of tiles) { let g = 40; while (g-- > 0 && thirsty(S.tiles[i]) && water(i, true)) wa++; }
+        if (h) { d.harvests = (d.harvests || 0) + h; cost += WK_MS.pick; job('pick', xz, { bed: u.b, color: col }); }
+        if (pl) { d.planted = (d.planted || 0) + pl; cost += WK_MS.plant; job('plant', xz, { bed: u.b }); }
+        if (wa) { d.watered = (d.watered || 0) + wa; cost += WK_MS.water; job('water', xz, { bed: u.b }); }
+        n += h + pl + wa;
+      } else { const sp = u.t, t = S.orchard[sp.k];
+        if (t && orchRipe(t, now()) && pickTree(sp.k)) { n++; d.picked = (d.picked || 0) + 1; made.add(TREES[t.sp].fruit); cost += WK_MS.pick; job('pick', [sp.x, sp.z], { tree: sp.k, color: TREES[t.sp].fruitC || '#E0604A' }); }
+        // v0.67.1: water a tree after picking (from this plot's barrel, else any Orchard barrel)
+        if (S.orchard[sp.k]?.dry && waterTree(sp.k, true, clockAt ?? now())) { n++; d.watered = (d.watered || 0) + 1; cost += WK_MS.water; job('water', [sp.x, sp.z], { tree: sp.k }); } }
+      B -= cost; }
   } finally { quiet--; }
   if (J && J.length) wkQueue(lot, J);
-  w.made = [...made].slice(-40); w.last = now();
+  w.debt = B < 0 ? -B : 0; w.made = [...made].slice(-40); w.last = now();
+  if (n) { save(); hud(); }
+  return n;
+}
+// Market Manager: runs every stand of its location (rack, tinctures, still, tea, presses, jars …): collects what is done and
+// restarts it with a random recipe, and makes stock trips to the location's selling stand, in random order as far as its time
+// budget goes. Dried herbs go into empty Tea Stand spots first; only herbs no tea can use go to the stand.
+const teaHasRoom = () => S.teaBuilt && !consLeft('teastand') && S.teas.includes(null);
+function managerPass_(k) {
+  const lot = wkLotOf(k), w = S.managers[lot]; if (!w || now() >= w.end) return 0;
+  const loc = workerLoc(lot), d = w.done || (w.done = {}), made = new Set(w.made || []); let n = 0, B = wkBudget(w); quiet++;
+  const J = clockAt == null ? [] : null, job = (a, at, o = {}) => { if (J && at) J.push({ a, x: at[0], z: at[1], ...o }); };
+  try {
+    const st = locStands(loc), spare = (id) => (S.inv[id] || 0) - (id.startsWith('seed_') ? workerKeep(loc) : 0);
+    const run = (c) => { let m = 0; const before = { ...S.inv };
+      // collect finished goods at this stand
+      if (c === 'rack') S.rack.forEach((r, i) => r && now() - r.start >= r.ms && collect(i));
+      else if (c === 'tincture') S.tinc.forEach((t, i) => t && collectTincture(i));
+      else if (c === 'still') S.stills.forEach((t, i) => t && collectOil(i));
+      else if (c === 'teastand') S.teas.forEach((t, i) => t && collectTea(i));
+      else if (CRAFT[c]) S[CRAFT[c].slots].forEach((t, i) => t && craftCollect(c, i));
+      for (const [id, q] of Object.entries(S.inv)) if (q > (before[id] || 0)) { made.add(id); d.made = (d.made || 0) + q - (before[id] || 0); m++; }
+      // dried herbs fill empty Tea Stand spots before anything else (a random blend of the herbs on hand)
+      if (c === 'teastand') for (let g = 0; g < 4 && teaHasRoom(); g++) {
+        const pool = []; for (const sp of Object.keys(DRYING)) for (let q = 0; q < (S.inv['dried_' + sp] || 0); q++) pool.push(sp);
+        if (pool.length < TEA.n) break; const pick = [];
+        for (let q = 0; q < TEA.n; q++) pick.push(pool.splice(Math.floor(Math.random() * pool.length), 1)[0]);
+        if (!brewTea(pick)) break; m++; d.tea = (d.tea || 0) + 1; }
+      // start new batches, each recipe picked at random from what the Bag can make
+      if (c === 'tincture') for (let g = 0; g < 9 && S.tinc.includes(null); g++) { const r = rndOf(Object.entries(TINCTURE.recipes).filter(([sp, x]) => recipeOpen(sp) && (S.inv['flower_' + sp] || 0) >= x.n)); if (!r || !craftTincture(r[0])) break; m++; }
+      if (c === 'still') for (let g = 0; g < 9 && S.stills.includes(null); g++) { const r = rndOf(Object.entries(STILL.recipes).filter(([sp, x]) => (x.in ? S.unlocked[sp] || S.inv[x.in] > 0 : recipeOpen(sp)) && spare(x.in || 'seed_' + sp) >= x.n)); if (!r || !distill(r[0])) break; m++; }
+      if (CRAFT[c]) { const C = CRAFT[c]; for (let g = 0; g < 9 && S[C.slots].includes(null); g++) { const r = rndOf((C.def.recipes || []).filter((x) => recipeHere(c, x) && recipeKnown(x) && spare(x.in) >= x.n)); if (!r || !craftMake(c, r.id)) break; m++; } }
+      if (c === 'rack') { for (let i = 0; i < S.rack.length; i++) { if (S.rack[i]) continue; const sp = rndOf(Object.keys(DRYING).filter((x) => S.inv['flower_' + x] > 0)); if (sp && hang(i, sp)) m++; } syncRack(); }
+      if (m) { const at = standXZ(c); if (at) job('craft', at, { stand: c }); }
+      return m; };
+    // a stock trip: fill this location's selling stand with what was made here (the Manager's goods + the Gardener's harvest),
+    // in random order; dried herbs stay in the Bag while a Tea Stand still has an empty spot
+    const stockTrip = () => { let m = 0; const g = S.workers[lot]; for (const id of g?.made || []) made.add(id);
+      const ok = loc === 'orchard' ? S.oshedBuilt && !consLeft('oshed') : S.standBuilt && !consLeft('stand');   // v0.63: never restock a stand that's still being built
+      if (ok) for (const id of [...made].sort(() => Math.random() - 0.5)) { if (!(S.inv[id] > 0) || !sellsAt(id, loc)) continue; if (id.startsWith('dried_') && teaHasRoom()) continue;
+        const was = S.inv[id]; stock(id, 'all', loc); if (S.inv[id] < was) { d.stocked = (d.stocked || 0) + was - S.inv[id]; m++; } }
+      if (m) job('stock', standXZ(loc === 'orchard' ? 'orchardshed' : 'stand'), { carry: true });
+      return m; };
+    for (const c of [...st, '@stock'].sort(() => Math.random() - 0.5)) { if (B <= 0) break;
+      const m = c === '@stock' ? stockTrip() : run(c); if (m) { n += m; B -= c === '@stock' ? WK_MS.stock : WK_MS.craft; } }
+  } finally { quiet--; }
+  if (J && J.length) wkQueue(k, J);
+  w.debt = B < 0 ? -B : 0; w.made = [...made].filter((id) => !id.startsWith('flower_') && !id.startsWith('fruit_')).slice(-40); w.last = now();
   if (n) { save(); hud(); }
   return n;
 }
 // offline: step a virtual clock from the last save to now (or the end of the shift), refilling barrels between passes
 function catchUpWorkers(from = bootSavedAt, to = Date.now()) {
-  const ids = Object.keys(S.workers); if (!ids.length || !from || to - from < 15000) return 0;
+  const ids = wkAll(); if (!ids.length || !from || to - from < 15000) return 0;
   const step = WORKER.catchStepS * 1000; let steps = 0;
   try {
     for (let t = from + step; ; t += step) { const at = Math.min(t, to); clockAt = at; regenBarrels(); let any = false;
-      for (const l of ids) { const w = S.workers[l]; if (w && w.end > at - step) { clockAt = Math.min(at, w.end - 1); workerPass(l); clockAt = at; any = true; } }
+      for (const l of ids) { const w = wkRec(l); if (w && w.end > at - step) { clockAt = Math.min(at, w.end - 1); workerPass(l); clockAt = at; any = true; } }
       steps++; if (!any || at >= to || steps > 2000) break; }
   } finally { clockAt = null; }
   return steps;
 }
 function syncWorkers() {
-  for (const [lot, w] of Object.entries(S.workers)) {
+  for (const lot of wkAll()) { const w = wkRec(lot);
     const done = now() >= w.end; W.setWorker(lot, done ? 'pay' : 'work');
-    if (done && !w.ended) { w.ended = true; save(); toast(`🌿 The Gardener on ${lotName(lot)} finished their ${w.pass ? shiftTxt(S.gardenerPassH || 24) : shiftTxt()} shift · hire again for ${WORKER.wage} coins`); if (panel === 'worker' && panelArg === lot) renderPanel(); }
+    if (done && !w.ended) { w.ended = true; save(); toast(`${wkRoleOf(lot) === 'm' ? '🧺' : '🌿'} The ${wkName(lot)} at ${locLabel(workerLoc(lot))} finished their ${w.pass ? shiftTxt(S.gardenerPassH || 24) : shiftTxt()} shift · hire again for ${WORKER.wage} coins`); if (panel === 'worker' && panelArg === lot) renderPanel(); }
   }
 }
 
@@ -3606,7 +3673,7 @@ function wkQueue(lot, jobs) {
 }
 function wkDispatch() {
   if (!worldReady || !workersOn()) return; const here = curLoc();
-  for (const [lot, w] of Object.entries(S.workers)) {
+  for (const lot of wkAll()) { const w = wkRec(lot);
     if (workerLoc(lot) !== here || !W.workerIdle(lot)) continue;
     const v = wkVis[lot] || (wkVis[lot] = { q: [] }), p = W.workerPose(lot); if (!p) continue;
     const working = now() < w.end; let j = working ? v.q.shift() : null;
@@ -3625,32 +3692,46 @@ setInterval(wkDispatch, 350);
 let workerStep = 0;
 setInterval(() => {
   if (!worldReady) return; syncWorkers();
-  if (++workerStep % WORKER.stepS === 0) { let any = 0; for (const lot of Object.keys(S.workers)) any += workerPass(lot); if (any && panel && panel !== 'worker') renderPanel(); }
+  if (++workerStep % WORKER.stepS === 0) { let any = 0; for (const lot of wkAll()) any += workerPass(lot); if (any && panel && panel !== 'worker') renderPanel(); }
   if (panel === 'worker') { const n = $('#worker-status'); const s = workerStatus(panelArg); if (n && s) n.textContent = s.txt; }
-  if (selected != null) { const n = $('#sheet-worker'); const l = lotOfSite(bedOfTile(selected)), s = workerStatus(l); if (n && s) n.textContent = s.txt; }
+  if (selected != null) { const n = $('#sheet-worker'); const l = workerLoc(lotOfSite(bedOfTile(selected))), s = workerStatus(l); if (n && s) n.textContent = s.txt; }
 }, 1000);
 const GARDENER_SVG = `<svg viewBox="0 0 64 64" width="54" height="54"><ellipse cx="32" cy="60" rx="14" ry="3" fill="#000" opacity=".08"/><rect x="21" y="30" width="22" height="26" rx="10" fill="#F3E6D0"/><path d="M23 36h18v16a8 8 0 0 1-8 6h-2a8 8 0 0 1-8-6z" fill="#8FB08A"/><circle cx="32" cy="24" r="9" fill="#E8C4A0"/><circle cx="28.5" cy="24" r="1.2" fill="#3D3328"/><circle cx="35.5" cy="24" r="1.2" fill="#3D3328"/><circle cx="26.5" cy="27" r="1.6" fill="#F2A9A0" opacity=".7"/><circle cx="37.5" cy="27" r="1.6" fill="#F2A9A0" opacity=".7"/><ellipse cx="32" cy="17" rx="17" ry="3.4" fill="#E3C27A"/><path d="M24 17c0-6 16-6 16 0z" fill="#E3C27A"/><rect x="24" y="14.5" width="16" height="2.2" fill="#C2513F"/><circle cx="39" cy="14" r="2" fill="#B98BD6"/><rect x="44" y="40" width="9" height="8" rx="2" fill="#7FA6B8"/><path d="M53 42l6-4" stroke="#6C93A6" stroke-width="2" stroke-linecap="round"/></svg>`;
-function workerRowLine(lot) { const s = workerStatus(lot); return s ? `<small class="worker-line ${s.working ? '' : 'pay'}">Gardener · ${s.txt}</small>` : `<small class="worker-line">No Gardener yet</small>`; }
-function workerRowAct(lot) {
-  const s = workerStatus(lot);
-  if (!s) return `<div class="acts"><button class="btn btn-primary sm" data-act="hire-worker" data-lot="${lot}" ${S.coins >= WORKER.hire || S.gardenerPasses > 0 ? '' : 'disabled'}>${S.gardenerPasses > 0 ? `Hire · free ${S.gardenerPassH || 24} h pass` : `Hire 1 h · ${coin(WORKER.hire)}`}</button></div>`;
-  return `<div class="acts">${s.working ? `<button class="btn sm" data-act="open-worker" data-lot="${lot}">View</button>` : `<button class="btn btn-gold sm" data-act="pay-worker" data-lot="${lot}" ${S.coins >= WORKER.wage ? '' : 'disabled'}>Hire again · ${coin(WORKER.wage)}</button>`}</div>`;
+const MANAGER_SVG = `<svg viewBox="0 0 64 64" width="54" height="54"><ellipse cx="32" cy="60" rx="14" ry="3" fill="#000" opacity=".08"/><rect x="21" y="30" width="22" height="26" rx="10" fill="#FFF9F0"/><path d="M23 36h18v16a8 8 0 0 1-8 6h-2a8 8 0 0 1-8-6z" fill="#F7C5C5"/><circle cx="32" cy="24" r="9" fill="#E8C4A0"/><circle cx="28.5" cy="24" r="1.2" fill="#3D3328"/><circle cx="35.5" cy="24" r="1.2" fill="#3D3328"/><circle cx="26.5" cy="27" r="1.6" fill="#F2A9A0" opacity=".7"/><circle cx="37.5" cy="27" r="1.6" fill="#F2A9A0" opacity=".7"/><path d="M22 21c0-9 20-9 20 0z" fill="#3D5A40"/><rect x="22" y="19.5" width="20" height="2.4" rx="1" fill="#F5D07A"/><path d="M44 40h12l-2 10h-8z" fill="#C99A6B" stroke="#7C5634" stroke-width="1.4"/><path d="M46 40c0-4 8-4 8 0" stroke="#7C5634" stroke-width="1.6" fill="none"/><circle cx="48" cy="39" r="2" fill="#B98BD6"/><circle cx="52" cy="38.5" r="2" fill="#F5D07A"/></svg>`;
+const WK_DUTY = { g: 'Plants &amp; harvests', m: 'Makes products &amp; fills the stand' };
+// v0.7.2: two location-wide hire rows (Build menu › Workers), each with its own timer: Gardener and Market Manager
+function wkRowOne(lot, role) {
+  const k = wkKey(lot, role), s = workerStatus(k), nm = wkName(k), free = role === 'g' && S.gardenerPasses > 0;
+  const line = `<small class="worker-line ${s && !s.working ? 'pay' : ''}" data-wk-line="${k}"><b>${role === 'm' ? '🧺' : '👩‍🌾'} ${nm}</b> · ${s ? s.txt : WK_DUTY[role]}</small>`;
+  const btn = !s ? `<button class="btn btn-primary sm" data-act="hire-worker" data-role="${role}" data-lot="${lot}" ${S.coins >= WORKER.hire || free ? '' : 'disabled'}>${free ? `Hire · free ${S.gardenerPassH || 24} h pass` : `Hire 1 h · ${coin(WORKER.hire)}`}</button>`
+    : s.working ? `<button class="btn sm" data-act="open-worker" data-lot="${k}">View</button>` : `<button class="btn btn-gold sm" data-act="pay-worker" data-lot="${k}" ${S.coins >= WORKER.wage ? '' : 'disabled'}>Hire again · ${coin(WORKER.wage)}</button>`;
+  return `<div class="wk-hire" data-wk-role="${role}">${line}<div class="acts">${btn}</div></div>`;
 }
+function workerRowLine(lot) { const loc = workerLoc(lot); return `<div class="wk-hires" data-wk-loc="${loc}">${wkRowOne(loc, 'g')}${wkRowOne(loc, 'm')}</div>`; }
+// v0.7.2: the location-wide Workers section (Build menu, above Your land): one row per worker, each with its own timer
+function workersSection(loc) { if (!workersOn() || (loc === 'orchard' && !S.lots.orchard)) return '';
+  return `<div class="sec-title">Workers · ${loc === 'orchard' ? 'the Orchard' : 'Home'}</div><p class="muted" style="margin:2px 4px 6px">One Gardener and one Market Manager look after every plot ${loc === 'orchard' ? 'at the Orchard' : 'at Home'}. ${coin(WORKER.hire)} each for ${shiftTxt()}.</p>${workerRowLine(loc)}`; }
+function workerRowAct() { return ''; }
 function workerLine(i) {
-  const lot = lotOfSite(bedOfTile(i)), s = workerStatus(lot); if (!s) return '';
+  const lot = workerLoc(lotOfSite(bedOfTile(i))), s = workerStatus(lot); if (!s) return '';
   return `<p class="worker-sheet ${s.working ? '' : 'pay'}"><span class="wk-ico">👩‍🌾</span><span><b>Gardener</b> · <span id="sheet-worker">${s.txt}</span></span>${s.working ? `<button class="btn sm" data-act="open-worker" data-lot="${lot}">Details</button>` : `<button class="btn btn-gold sm" data-act="pay-worker" data-lot="${lot}" ${S.coins >= WORKER.wage ? '' : 'disabled'}>Hire again ${WORKER.wage}</button>`}</p>`;
 }
-function workerHTML(lot) {
-  const w = S.workers[lot], s = workerStatus(lot); if (!w) return `<p class="muted">No Gardener on this plot.</p>`;
-  const d = w.done || {}, st = workStands(lot).map((r) => ROOF_NAMES[r] || 'Drying Rack'), loc = workerLoc(lot);
-  const k = s.working ? 1 - s.left / Math.max(1, w.end - (w.hired || w.end - SHIFT_MS())) : 1;
-  return `<div class="lot-card worker-card">${GARDENER_SVG}<div><b>Gardener · ${lotName(lot)}</b><small id="worker-status" class="${s.working ? '' : 'pay'}">${s.txt}</small></div></div>
-    <div class="progress"><b style="width:${(Math.min(1, k) * 100).toFixed(1)}%"></b></div>
-    <div class="sec-title">This shift</div><p class="muted" style="margin:4px">${d.harvests || 0} harvested · ${d.planted || 0} replanted · ${d.watered || 0} watered${d.picked ? ` · ${d.picked} fruit picks` : ''} · ${d.made || 0} goods made · ${d.stocked || 0} put on the ${loc === 'orchard' ? 'Orchard Stand' : 'Farm Stand'}</p>
-    <div class="sec-title">On this plot</div><p class="muted" style="margin:4px">Harvests ripe plants and replants the same seed from your Bag (skips if none), waters from this plot’s barrel (Blue Lotus barrels get both fills), ${ORCHARD_TREE_SPOTS.some((p) => p.lot === lot) ? 'picks ripe fruit, ' : ''}${st.length ? `runs the ${st.length > 1 ? st.slice(0, -1).join(', ') + ' and the ' + st[st.length - 1] : st[0]} with your ingredients, ` : ''}and restocks the ${loc === 'orchard' ? 'Orchard Stand' : 'Farm Stand'} with what it makes${(loc === 'orchard' ? S.oshedBuilt : S.standBuilt) ? '' : ' (once it is built)'}.</p>
-    <div class="ts-actions">${s.working ? `<button class="btn" disabled>Hired · ${fmtTime(s.left)} left</button>` : `<button class="btn btn-gold" data-act="pay-worker" data-lot="${lot}" ${S.coins >= WORKER.wage ? '' : 'disabled'}>Hire again · ${coin(WORKER.wage)} · ${shiftTxt()}</button>`}</div>
+function workerHTML(k) {
+  k = wkKey(workerLoc(k), wkRoleOf(k)); const lot = wkLotOf(k), role = wkRoleOf(k), nm = wkName(k), w = wkRec(k), s = workerStatus(k), loc = workerLoc(lot); if (!w) return `<p class="muted">No ${nm} at ${locLabel(loc)} yet.</p>`;
+  const d = w.done || {}, st = locStands(loc).map((r) => ROOF_NAMES[r] || 'Drying Rack'), standNm = loc === 'orchard' ? 'Orchard Stand' : 'Farm Stand', nPlots = locLots(loc).length;
+  const pr = s.working ? 1 - s.left / Math.max(1, w.end - (w.hired || w.end - SHIFT_MS())) : 1;
+  const shift = role === 'm' ? `${d.made || 0} goods made · ${d.tea || 0} teas brewed · ${d.stocked || 0} put on the ${standNm}` : `${d.harvests || 0} harvested · ${d.planted || 0} planted · ${d.watered || 0} watered${d.picked ? ` · ${d.picked} fruit picks` : ''}`;
+  const hasTrees = ORCHARD_TREE_SPOTS.some((p) => locLots(loc).includes(p.lot));
+  const duty = role === 'm'
+    ? `Runs every stand at ${locLabel(loc)}${st.length ? ` (the ${st.length > 1 ? st.slice(0, -1).join(', ') + ' and the ' + st[st.length - 1] : st[0]})` : ''}: collects what is done and restarts it with your ingredients, choosing recipes at random. Dried herbs go into empty Tea Stand spots first. Between stands it carries what was made here to the ${standNm}${(loc === 'orchard' ? S.oshedBuilt : S.standBuilt) ? '' : ' (once it is built)'}. One Manager walks between all of them, so each stand and stock trip takes a moment. It doesn’t plant or harvest.`
+    : `Tends every bed${hasTrees ? ' and tree' : ''} on all ${nPlots} plot${nPlots === 1 ? '' : 's'} at ${locLabel(loc)}, in random order: harvests ripe plants and replants them from your Bag, fills empty bed spots with random seeds from the Bag, and waters from the barrels (Blue Lotus barrels get both fills)${hasTrees ? '. It also picks ripe fruit and waters the trees after picking' : ''}. One Gardener walks between all of them, so each bed or tree takes a moment. It doesn’t make products or stock the stand: hire a Market Manager for that.`;
+  return `<div class="lot-card worker-card">${role === 'm' ? MANAGER_SVG : GARDENER_SVG}<div><b>${nm} · ${locLabel(loc).replace(/^t/, 'T')}</b><small id="worker-status" class="${s.working ? '' : 'pay'}">${s.txt}</small></div></div>
+    <div class="progress"><b style="width:${(Math.min(1, pr) * 100).toFixed(1)}%"></b></div>
+    <div class="sec-title">This shift</div><p class="muted" style="margin:4px">${shift}</p>
+    <div class="sec-title">${loc === 'orchard' ? 'At the Orchard' : 'At Home'}</div><p class="muted" style="margin:4px">${duty}</p>
+    <div class="ts-actions">${s.working ? `<button class="btn" disabled>Hired · ${fmtTime(s.left)} left</button>` : `<button class="btn btn-gold" data-act="pay-worker" data-lot="${k}" ${S.coins >= WORKER.wage ? '' : 'disabled'}>Hire again · ${coin(WORKER.wage)} · ${shiftTxt()}</button>`}</div>
     ${!s.working && S.coins < WORKER.wage ? `<p class="muted" style="margin:8px 4px 0;text-align:center">You need ${WORKER.wage - S.coins} more coins.</p>` : ''}
-    <p class="muted" style="margin:10px 4px 0">A hire lasts ${shiftTxt()} of real time (the clock keeps running while you’re away). Then the Gardener stops and needs hiring again for ${WORKER.hire} coins.</p>`;
+    <p class="muted" style="margin:10px 4px 0">A hire lasts ${shiftTxt()} of real time (the clock keeps running while you’re away) and costs ${WORKER.hire} coins. Then the ${nm} stops until you hire them again.</p>`;
 }
 function lotHTML(id) {
   if (ORCH_FOR_SALE.includes(id)) return orchLotHTML(id);
@@ -4021,7 +4102,7 @@ $('#panel-body').addEventListener('click', (e) => {
   if (a === 'buy-treerow') return buyTreeRow();
   if (a === 'coin-unlock') return coinUnlock(b.dataset.id);
   if (a === 'coin-unlock-ask') return coinUnlockAsk(b.dataset.id);
-  if (a === 'hire-worker') return hireWorker(b.dataset.lot);
+  if (a === 'hire-worker') return hireWorker(b.dataset.lot, b.dataset.role || 'g');
   if (a === 'pay-worker') return payWorker(b.dataset.lot);
   if (a === 'open-worker') return openPanel('worker', b.dataset.lot);
   if (a === 'build-rack') return buildRack();
@@ -4202,11 +4283,11 @@ W.frameHooks.push(() => {
 
 // v0.7: a small timer pill over each hired Gardener (time left, or 'Hire again' once the hour is up)
 const wkTimers = new Map();
-function wkTimerText(lot) { const w = S.workers[lot]; if (!w) return null; const left = w.end - now(); if (left <= 0) return { t: 'Hire again', c: 'done' }; const mn = Math.ceil(left / 60000); return { t: '⏱ ' + (mn >= 60 ? `${Math.floor(mn / 60)}h ${mn % 60 ? (mn % 60) + 'm' : ''}`.trim() : mn + 'm'), c: mn <= 5 ? 'low' : '' }; }
+function wkTimerText(lot) { const w = wkRec(lot); if (!w) return null; const left = w.end - now(); if (left <= 0) return { t: (wkRoleOf(lot) === 'm' ? '🧺 ' : '') + 'Hire again', c: 'done' }; const mn = Math.ceil(left / 60000); return { t: (wkRoleOf(lot) === 'm' ? '🧺 ' : '') + '⏱ ' + (mn >= 60 ? `${Math.floor(mn / 60)}h ${mn % 60 ? (mn % 60) + 'm' : ''}`.trim() : mn + 'm'), c: mn <= 5 ? 'low' : '' }; }
 W.frameHooks.push(() => {
   const here = curLoc();
-  for (const [lot, el_] of wkTimers) if (!S.workers[lot]) { el_.remove(); wkTimers.delete(lot); }
-  for (const lot of Object.keys(S.workers)) {
+  for (const [lot, el_] of wkTimers) if (!wkRec(lot)) { el_.remove(); wkTimers.delete(lot); }
+  for (const lot of wkAll()) {
     let e = wkTimers.get(lot); if (!e) { e = document.createElement('div'); e.className = 'wk-timer'; e.dataset.lot = lot; $('#popups').appendChild(e); wkTimers.set(lot, e); }
     const p = W.workerPose(lot), tt = wkTimerText(lot); if (!p || !tt || workerLoc(lot) !== here) { e.style.display = 'none'; continue; }
     const s = W.project(new THREE.Vector3(p.x, 2.0, p.z)); e.style.display = ''; e.style.left = s.x + 'px'; e.style.top = s.y + 'px';
@@ -4693,7 +4774,7 @@ setInterval(save, 5000);
 // ---------------- Debug hooks (used by automated tests) ----------------
 const V = (x, y, z) => new THREE.Vector3(x, y, z);
 window.__ps = {
-  STAND_UNLOCK, coinUnlock, coinUnlockAsk, nextCoinStand, WORKER, hireWorker, payWorker, migWorkerHour, migBasesHome, shiftTxt, wkTimerText, get sound() { return Sound?.state; }, get audioPrefs() { return S.audio; }, setVolume, toggleMute, soundSetHTML, sfxPlay: (n) => Sound?.play(n), workerPass, catchUpWorkers, syncWorkers, workerStatus, workStands, workersOn, workerAt: (l) => W.workerAt(l), workerPose: (l) => W.workerPose(l), camAt: (x, z, zoom = 0.7) => { W.ctl.moved = true; W.glide({ target: V3(x, 0.3, z), zoom }, 0.01); }, wkPath, wkQueue, wkVis, wkGrid, standXZ, get workers() { return S.workers; },
+  STAND_UNLOCK, coinUnlock, coinUnlockAsk, nextCoinStand, WORKER, hireWorker, payWorker, migWorkerHour, migWorkerSplit, migWorkerLoc, locLots, workerPass, wkKey, wkAll, workerStatus, migBasesHome, shiftTxt, wkTimerText, musicSkip: () => Sound?.skip(), get sound() { return Sound?.state; }, get audioPrefs() { return S.audio; }, setVolume, toggleMute, soundSetHTML, sfxPlay: (n) => Sound?.play(n), workerPass, catchUpWorkers, syncWorkers, workerStatus, workStands, workersOn, workerAt: (l) => W.workerAt(l), workerPose: (l) => W.workerPose(l), camAt: (x, z, zoom = 0.7) => { W.ctl.moved = true; W.glide({ target: V3(x, 0.3, z), zoom }, 0.01); }, wkPath, wkQueue, wkVis, wkGrid, standXZ, get workers() { return S.workers; },
   setClock: (t) => { clockAt = t; },
   BUILD, adMult, adPicks, standHTML, itemVal, byValue, sortRows, rewardHTML, get fromBuild() { return fromBuild; }, get bags() { return S.bags; }, get migBags() { return migBags; }, inBag, bagOf, sendGoods, tileLoc, standLoc, splitOrchardGoods, buildHTML, marketHTML, satchelHTML, billboardHTML, bbStatusText, bbReadyIn, BILLBOARD, CHARMS, CHARM_IDS, charmV, charmLv, charmText, craftK, shiftH, standPrice, ostandPrice, custGap, harvestCore, setCharmRoll(v) { charmRoll = v; }, freeGFSpot, bulkSell, bulkAll, bulkPrice, bulkItems, bulkHTML, rollWants, STAND_BUY, BULK, GF_IDS, gfOn, gfPlaced, placeGF, storeGF, onMapOnly, charmAt, oGap, TRUCK, orderDelivery, deliverTrip, syncDeliv, inTransit, vanOn, VAN_LOT, rowOfTree, exitPlace, buyCopy, mktDest, MKT_ONE_TIME, MKT_STACK, MKT_CONSUMABLE, MKT_REPEAT, tabPanel, get deliv() { return S.deliv; }, get vanOut() { return vanOut.size; }, migGF065, get mig065() { return mig065; }, regenNow: () => regenS(), SWAP_TIERS, swapPool, get bagTab() { return bagTab; }, setBagTab(t) { bagTab = t; }, shelfMig063, rollIds, rollPackLoot, catTierOdds, drawPlant, drawOther, isPlantCard, PACK_LOOT, OWNED_K, setForcedLoot(L) { forcedLoot = L; }, consLeft, finishCons, hurryCons, startCons, plantTile: plant, syncTile, bloomTargets, instantBloom, askBloom, customerRush, askRush, rushLeft, rushReady, syncJewelDock, get rush() { return S.rush; }, get nextCustAt() { return nextCust; }, get nextOCustAt() { return nextOCust; }, swapCard, swapIn, swapPool, swapTierOdds, SWAP, setSwapForced(id) { swapForced = id; }, get revealCards() { return revealCards; }, upgLeft, finishUpg, hurryUpg, deselect, get upg() { return S.upg; }, toolLeft, get cons() { return S.cons; }, dailyStatus, claimDaily, showDaily, maybeDaily, dayKey, watchAd, playRewardAd, DAILY, upgradeBuilding, get standLv() { return S.standLv; }, cardFix063, normalizeCards,
   TIPS, JEWEL_DROP, obsState, PACKS,

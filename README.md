@@ -17,9 +17,37 @@ This is a **prototype**: version numbers stay below 1.0 until the first official
    - The Build menu lists every structure with its cost and whether it is locked.
 5. **Rebuild the Supply Market.** Once you've earned 100 coins at the stand, the boarded-up market can be rebuilt for 30 Wood + 60 coins (3 Scrap saves 20 coins). It goes boarded → scaffold (60 s, or 2 Jewels) → open. It sells seeds, a water truck that fills your rain barrels (v0.52), garden features, Card Packs (1 Jewel each), a **bundle of 5 Wood (12 coins)** and **saplings (20 coins)**.
 6. **Grow trees.** Plant a sapling on cleared ground you own (not in beds). It grows through four stages over **40 minutes of real time**, and keeps growing while the game is closed. Chop a mature tree for 6 Wood; it leaves a stump (+1) and has a 50% chance to drop a new sapling.
-7. **Land for sale.** Five wooded plots, each with a floating For Sale sign: 150 → 300 → 600 → 1000 → 1500 coins.
+7. **Land for sale.** Five wooded plots, each with a floating For Sale sign: 450 → 900 → 1800 → 3000 → 4500 coins (v0.7.2; was 150 → 1500).
 
 Drag with one finger to pan, pinch to zoom, and twist with two fingers to turn. On desktop, right-drag or shift-drag turns the view.
+
+## New in v0.7.2: economy
+- **Coin costs ×3** (sell prices unchanged): seeds, Supply Market cards (Irrigation 135, Still 450, Parking 420 …), Glycerin 24 / Vinegar 18 (packs 96 / 72), Rain Barrel 120, Home plots 450 → 900 → 1800 → 3000 → 4500 → 6000, the Orchard 9,000, Orchard plots 12,000 / 18,000 / 27,000, the Orchard Stand 900, tree-row Irrigation 450, the coin stand unlocks 3,000 / 7,500 / 15,000 / 24,000 and the Supply Market rebuild 180. Workers are the exception: 2,000 per hire (see below).
+- **Home earns less than the Orchard:** lower Home sell factors (Epic 0.525 … Other World 0.34), slower Epic/Legendary flowers (×1.35) and Chamomile (120 s). Model, coins/hour: Early 8,743 · Mid 13,027 · Late Home 15,883 · Late Orchard 22,059.
+- **Fruit (softened cut):** trees keep their v0.7 sell factors; fruit every 190 · 225 · 270 · 270 · 420 · 400 · 420 s and 5 · 4 · 3 · 4 · 3 · 2 · 2 fruit per pick.
+- **Sunflower Oil and Sun Butter are Home press only** (sunflower seeds grow at Home), like Rosehip Oil. The Orchard Oil Press no longer lists them; a batch already running there in an old save is stopped and its seeds go back to the Orchard Bag.
+- **Wood and saplings:** a felled grown tree gives 30 Wood (was 6); Market Wood ×5 costs 55 (was 12), so growing wood is the better deal. Saplings cost 90 … 3,000 by tier; a Market sapling 60; Scrap ×5 135.
+
+## New in v0.7.2: Gardener + Market Manager
+The single all-round Gardener is split into two hires, and workers are now hired **per location, not per plot**: one Gardener and one Market Manager at Home, and one of each at the Orchard.
+- **Gardener:** plants and harvests only, on **every plot of its location**. It harvests and replants every bed, fills empty bed spots, waters from the barrels, and picks and waters fruit trees. It makes no products and does not stock the stand.
+- **Market Manager (new):** runs **every crafting stand at its location** (Drying Rack, Tincture, Still, Tea Stand, presses, jars and the rest): it collects and restarts them, then fills that location's stand (Farm Stand or Orchard Stand) with what was made there.
+- **Paced work:** one worker covering many plots is not instant. Each worker walks through its location's beds, trees and stands in random order, using the existing per-task times (about 2.4 s to pick, 2.4 s to plant and 2.6 s to water a bed; 2.2 s per stand run; 2.4 s per stock trip). It works through about 5 s of tasks every 5 s and catches up at most 2 minutes at a time after the game was closed.
+- **Cost and shift:** each hire costs **2,000 coins** and lasts **1 real-time hour**, then must be re-hired for the same 2,000. There is no separate wage.
+- **Each hire has its own timer.** The Build menu has a **Workers** section for the location you are at (Home or the Orchard), above "Your land". It has one row per worker, each with its own timer. Each worker also has a timer pill in the world. The Manager wears a blush apron.
+- **Random choices:** both workers pick seeds, recipes and stock order at random. They never favour the priciest item.
+- **Dried herbs go to tea first:** the Manager puts dried herbs into empty Tea Stand spots before anything else, as a random blend of the herbs on hand. Dried herbs only go to the stand while no Tea Stand there has an empty spot.
+- **Pocket Watch and Gardener's Pack:** the Pocket Watch adds time to both hires. A Gardener's Pack free pass applies to the Gardener only.
+- **Existing saves:** per-plot workers are merged into one per location, once per save and for free. If any plot at a location had a Gardener still working, that location gets one Gardener **and** one Market Manager for the longest remaining shift. Shift tallies are added together.
+- Older notes below that say Gardeners make products, stock stands, or plant the most valuable seed describe the earlier versions.
+
+### Music: recorded tracks instead of the synthesized tunes
+- The synthesized tunes ("Home Hearth" / "Orchard Lane") are gone. The music is now **six recorded tracks**. Four are CC0 tracks from OpenGameArt: Town Theme, A Small Fire Will Do, Meadow Thoughts and A New Town. The other two are takes 1 and 2 of **Morning on the Hill**, Petalspire's own instrumental. All six are in `audio/music/`, and the CC0 credits are in `audio/music/LICENSES.md`.
+- They play as **one shuffled playlist on both Home and the Orchard**. Every track comes up once per round, never the same track twice in a row, with a **2.5 s crossfade** between tracks. Travelling doesn't restart the music.
+- Tracks are fetched and decoded **lazily**. Only the playing track and the next one, which is preloaded, are held in memory.
+- The Music slider, Mute, the first-tap unlock, and the pause while the tab is hidden all work as before. The music level factor is now 0.4 (was 0.55). Sound effects are unchanged.
+- Settings › Sound has a Music credits line.
+- **To add a track:** put the mp3 in `audio/music/` and add one line to `PLAYLIST` in `js/audio.js`. Optional fields: `gain`, `scenes: ['home']` and `weight`.
 
 ## New in v0.7.1: menu fixes (Home + Orchard)
 

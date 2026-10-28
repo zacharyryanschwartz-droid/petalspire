@@ -1,32 +1,32 @@
-// Petalspire v0.7 — music + sound effects, all synthesized in the browser with the Web Audio API (no audio files to download).
-// The two tunes ("Home Hearth" for Home, "Orchard Lane" for the Orchard) are original compositions written for Petalspire:
-// a gentle pastoral folk feel (tin whistle, fiddle, harp/guitar, a soft frame drum). They are rendered once into a loop buffer
-// with an OfflineAudioContext (low CPU while playing) and crossfade when you travel. Nothing starts until the first tap
-// (browser autoplay rules). Settings: separate Music / Sound Effects volume + mute, stored in the save (S.audio).
+// Petalspire — music + sound effects with the Web Audio API.
+// v0.7.2: the music is real recorded tracks in audio/music/: four CC0 tracks (credits in audio/music/LICENSES.md) and
+// two takes of 'Morning on the Hill', Petalspire's own instrumental, played as one shuffled
+// playlist on both Home and the Orchard: no immediate repeats, a ~2.5 s crossfade between tracks. Each track is fetched and
+// decoded lazily (only the current one and the next are held in memory; the next is preloaded while the current one plays).
+// The sound effects are still synthesized live. Nothing starts until the first tap (browser autoplay rules).
+// Settings: separate Music / Sound Effects volume + mute, stored in the save (S.audio).
+//
+// To add a track (e.g. a theme song): drop the mp3 in audio/music/ and add one line to PLAYLIST.
+//   Optional fields: gain (loudness trim, 1 = as is), scenes (['home'] or ['orchard'] to limit where it plays),
+//   weight (2 = comes up about twice as often).
+
+export const PLAYLIST = [
+  { id: 'town-theme', title: 'Town Theme', artist: 'The Cynic Project', src: 'audio/music/town-theme.mp3' },
+  { id: 'a-small-fire-will-do', title: 'A Small Fire Will Do', artist: 'Cal McEachern (Trex0n)', src: 'audio/music/a-small-fire-will-do.mp3' },
+  { id: 'meadow-thoughts', title: 'Meadow Thoughts', artist: 'Écrivain', src: 'audio/music/meadow-thoughts.mp3' },
+  { id: 'a-new-town', title: 'A New Town', artist: 'The Cynic Project', src: 'audio/music/a-new-town.mp3' },
+  // Petalspire's own instrumentals (the game owner's songs, not CC0; no credit needed)
+  { id: 'morning-on-the-hill', title: 'Morning on the Hill', artist: 'Petalspire', src: 'audio/music/morning-on-the-hill.mp3' },
+  { id: 'morning-on-the-hill-2', title: 'Morning on the Hill (take 2)', artist: 'Petalspire', src: 'audio/music/morning-on-the-hill-2.mp3' },
+];
+export const MUSIC_CREDITS = 'Music: The Cynic Project (cynicmusic.com), Écrivain, Cal McEachern (Trex0n), via OpenGameArt.org, CC0.';
+export const XFADE_S = 2.5;
 
 const N = (name) => {   // 'A4', 'F#5', 'Bb3' → Hz
   const m = /^([A-G])([#b]?)(\d)$/.exec(name); const base = { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 }[m[1]] + (m[2] === '#' ? 1 : m[2] === 'b' ? -1 : 0);
   return 440 * Math.pow(2, (base + (+m[3] + 1) * 12 - 69) / 12);
 };
-const CH = { D: ['D3', 'A3', 'D4', 'F#4', 'A4'], G: ['G2', 'D3', 'G3', 'B3', 'D4'], A: ['A2', 'E3', 'A3', 'C#4', 'E4'], Bm: ['B2', 'F#3', 'B3', 'D4', 'F#4'],
-  C: ['C3', 'G3', 'C4', 'E4', 'G4'], Em: ['E3', 'B3', 'E4', 'G4', 'B4'], D7: ['D3', 'A3', 'C4', 'F#4', 'A4'] };
-// Melodies: [note | null (rest), length in eighths]; every bar is 3/4 = 6 eighths.
-export const TUNES = {
-  home: { name: 'Home Hearth', eighth: 0.27, lead: 'whistle', second: 'fiddle', pluck: 'harp',
-    chords: ['D', 'D', 'G', 'D', 'Bm', 'G', 'A', 'A', 'D', 'D', 'G', 'D', 'G', 'A', 'D', 'D'],
-    mel: [['A4', 2], ['D5', 2], ['E5', 1], ['F#5', 1], ['A5', 3], ['F#5', 1], ['E5', 2], ['D5', 2], ['B4', 2], ['D5', 1], ['E5', 1], ['F#5', 4], ['E5', 1], ['D5', 1],
-      ['B4', 2], ['D5', 2], ['F#5', 2], ['G5', 3], ['F#5', 1], ['E5', 1], ['D5', 1], ['C#5', 2], ['E5', 2], ['A4', 2], ['E5', 4], [null, 2],
-      ['A4', 2], ['D5', 2], ['E5', 1], ['F#5', 1], ['A5', 2], ['B5', 1], ['A5', 1], ['F#5', 2], ['G5', 2], ['E5', 2], ['D5', 1], ['B4', 1], ['A4', 2], ['F#5', 2], ['E5', 2],
-      ['D5', 1], ['E5', 1], ['G5', 2], ['B5', 2], ['A5', 2], ['F#5', 1], ['E5', 1], ['C#5', 2], ['D5', 4], ['F#4', 1], ['A4', 1], ['D5', 6]] },
-  orchard: { name: 'Orchard Lane', eighth: 0.3, lead: 'fiddle', second: 'whistle', pluck: 'guitar',
-    chords: ['G', 'C', 'G', 'D', 'Em', 'C', 'D', 'D', 'G', 'C', 'G', 'D', 'C', 'D7', 'G', 'G'],
-    mel: [['D5', 2], ['G5', 2], ['A5', 1], ['B5', 1], ['C6', 2], ['B5', 1], ['A5', 1], ['G5', 2], ['B5', 3], ['A5', 1], ['G5', 2], ['A5', 4], ['F#5', 2],
-      ['E5', 2], ['G5', 2], ['B5', 2], ['C6', 2], ['E6', 1], ['D6', 1], ['C6', 2], ['B5', 2], ['A5', 2], ['F#5', 2], ['A5', 4], [null, 2],
-      ['D5', 2], ['G5', 1], ['A5', 1], ['B5', 2], ['E5', 2], ['G5', 2], ['C6', 2], ['D6', 3], ['B5', 1], ['G5', 2], ['F#5', 2], ['A5', 2], ['D5', 2],
-      ['E5', 1], ['G5', 1], ['C6', 2], ['B5', 2], ['A5', 2], ['F#5', 1], ['E5', 1], ['D5', 2], ['G5', 4], ['B4', 1], ['D5', 1], ['G5', 6]] },
-};
-
-// ---------- instruments (work on any BaseAudioContext, live or offline) ----------
+// ---------- SFX building blocks (work on any BaseAudioContext) ----------
 let noiseBuf = null;
 function noise(ctx) {
   if (noiseBuf && noiseBuf.sampleRate === ctx.sampleRate) return noiseBuf;
@@ -59,61 +59,6 @@ export function whistle(ctx, out, t, f, dur, v = 0.16) {
   n.connect(bp).connect(ng).connect(out);
   const end = t + dur + 0.2; for (const s of [o, o2, lfo]) { s.start(t); s.stop(end); } n.start(t, Math.random() * 0.5); n.stop(end);
 }
-// fiddle: two slightly detuned saws through a soft lowpass, slow bow attack, vibrato
-export function fiddle(ctx, out, t, f, dur, v = 0.06) {
-  const g = ctx.createGain(), lp = ctx.createBiquadFilter(), pk = ctx.createBiquadFilter(), lfo = ctx.createOscillator(), lg = ctx.createGain(), os = [];
-  lp.type = 'lowpass'; lp.frequency.value = 2200; lp.Q.value = 0.5; pk.type = 'peaking'; pk.frequency.value = 2800; pk.gain.value = -6;
-  lfo.frequency.value = 5.6; lg.gain.setValueAtTime(0, t); lg.gain.linearRampToValueAtTime(f * 0.007, t + Math.min(0.4, dur)); lfo.connect(lg);
-  for (const d of [-4, 4]) { const o = ctx.createOscillator(); o.type = 'sawtooth'; o.frequency.value = f; o.detune.value = d; lg.connect(o.frequency); o.connect(lp); os.push(o); }
-  lp.connect(pk).connect(g).connect(out); env(g, t, Math.min(0.14, dur * 0.4), v, dur, 0.22, v * 0.9);
-  const end = t + dur + 0.3; for (const s of [...os, lfo]) { s.start(t); s.stop(end); }
-}
-function bass(ctx, out, t, f, dur, v = 0.12) {
-  const o = ctx.createOscillator(), g = ctx.createGain(); o.type = 'triangle'; o.frequency.value = f;
-  g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(v, t + 0.02); g.gain.exponentialRampToValueAtTime(v * 0.25, t + dur * 0.8); g.gain.exponentialRampToValueAtTime(0.0001, t + dur + 0.3);
-  o.connect(g).connect(out); o.start(t); o.stop(t + dur + 0.35);
-}
-function drum(ctx, out, t, v = 0.18) {   // soft frame drum (bodhrán-like thump, felt beater)
-  const o = ctx.createOscillator(), g = ctx.createGain(); o.type = 'sine'; o.frequency.setValueAtTime(120, t); o.frequency.exponentialRampToValueAtTime(55, t + 0.18);
-  g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(v, t + 0.006); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.35); o.connect(g).connect(out); o.start(t); o.stop(t + 0.4);
-}
-function reverb(ctx, sec = 2.2) {
-  const c = ctx.createConvolver(), n = Math.floor(ctx.sampleRate * sec), b = ctx.createBuffer(2, n, ctx.sampleRate);
-  for (let ch = 0; ch < 2; ch++) { const d = b.getChannelData(ch); for (let i = 0; i < n; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / n, 3.2); }
-  c.buffer = b; return c;
-}
-const play = (ctx, out, inst, t, f, dur, v) => inst === 'whistle' ? whistle(ctx, out, t, f, dur, v) : fiddle(ctx, out, t, f, dur, v);
-
-// ---------- render one tune into a seamless loop buffer: pass 1 = lead, pass 2 = the other voice + a light counter-line ----------
-export async function renderTune(id, sampleRate = 22050) {
-  const T = TUNES[id], e = T.eighth, bar = e * 6, bars = T.chords.length, loop = bar * bars * 2, tail = 2.6;
-  const OC = window.OfflineAudioContext || window.webkitOfflineAudioContext;
-  const ctx = new OC(2, Math.ceil((loop + tail) * sampleRate), sampleRate);
-  const dry = ctx.createGain(), wet = ctx.createGain(), rv = reverb(ctx), bus = ctx.createGain(), comp = ctx.createDynamicsCompressor();
-  dry.gain.value = 0.85; wet.gain.value = 0.32; bus.connect(dry); bus.connect(rv); rv.connect(wet); dry.connect(comp); wet.connect(comp); comp.connect(ctx.destination);
-  const pan = (p) => { const s = ctx.createStereoPanner ? ctx.createStereoPanner() : ctx.createGain(); if (s.pan) s.pan.value = p; s.connect(bus); return s; };
-  const lead = pan(0.08), pl = pan(-0.25), lo = pan(0), sec2 = pan(0.3);
-  for (let pass = 0; pass < 2; pass++) {
-    const t0 = pass * bars * bar;
-    T.chords.forEach((c, b) => { const tb = t0 + b * bar, ch = CH[c];
-      bass(ctx, lo, tb, N(ch[0]) / (ch[0].endsWith('3') ? 2 : 1), bar * 0.9, 0.11);
-      const arp = [1, 2, 3, 4, 3, 2]; arp.forEach((k, j) => pluck(ctx, pl, tb + j * e + (j ? (Math.random() - 0.5) * 0.012 : 0), N(ch[k]), j ? 0.11 : 0.15, T.pluck));
-      if (b % 2 === 0) drum(ctx, lo, tb, 0.09); if (pass === 1) drum(ctx, lo, tb + 3 * e, 0.045);
-      if (pass === 1 && b % 4 === 0) fiddle(ctx, sec2, tb, N(ch[2]), bar * 3.6, 0.025);   // a long held bowed note under pass 2
-    });
-    let t = t0; const inst = pass ? T.second : T.lead;
-    for (const [n, len] of T.mel) { const d = len * e;
-      if (n) { const f = N(n) / (pass && inst === 'fiddle' ? 2 : 1); play(ctx, lead, inst, t, f, d * 0.92, inst === 'whistle' ? 0.13 : 0.07); }
-      t += d; }
-  }
-  const buf = await ctx.startRendering();
-  // fold the reverb tail back onto the start so the loop is seamless, then normalise gently
-  const L = Math.floor(loop * sampleRate), out = new (window.AudioBuffer)({ length: L, numberOfChannels: 2, sampleRate });
-  let peak = 0; for (let ch = 0; ch < 2; ch++) { const s = buf.getChannelData(ch), d = out.getChannelData(ch); d.set(s.subarray(0, L)); for (let i = L; i < s.length && i - L < L; i++) d[i - L] += s[i]; for (let i = 0; i < L; i++) peak = Math.max(peak, Math.abs(d[i])); }
-  const k = peak > 0 ? 0.8 / peak : 1; for (let ch = 0; ch < 2; ch++) { const d = out.getChannelData(ch); for (let i = 0; i < L; i++) d[i] *= k; }
-  return out;
-}
-
 // ---------- sound effects (short, soft; synthesized live) ----------
 function bell(ctx, out, t, f, v = 0.12, dec = 0.9) {
   for (const [m, a] of [[1, 1], [2.76, 0.35], [5.4, 0.12]]) { const o = ctx.createOscillator(), g = ctx.createGain(); o.type = 'sine'; o.frequency.value = f * m;
@@ -145,32 +90,61 @@ export const SFX = {
 };
 
 // ---------- the player ----------
-export function createAudio({ prefs }) {
-  let ctx = null, music = null, sfx = null, scene = null, cur = null, unlocked = false; const bufs = {}, rendering = {};
+export function createAudio({ prefs, playlist = PLAYLIST }) {
+  let ctx = null, music = null, sfx = null, scene = null, cur = null, nextT = null, unlocked = false, bag = [], tick = null, plays = 0;
+  const bufs = {}, loading = {}, failed = new Set();
   const DEF = { music: 0.6, sfx: 0.8, musicMute: false, sfxMute: false }, P = () => prefs() || DEF;
-  const mv = () => (P().musicMute ? 0 : P().music) * 0.55, sv = () => (P().sfxMute ? 0 : P().sfx) * 0.9;
+  const mv = () => (P().musicMute ? 0 : P().music) * 0.4, sv = () => (P().sfxMute ? 0 : P().sfx) * 0.9;   // v0.7.2: 0.4 (was 0.55) for the recorded tracks
   function apply() { if (!ctx) return; const t = ctx.currentTime; music.gain.setTargetAtTime(mv(), t, 0.08); sfx.gain.setTargetAtTime(sv(), t, 0.03); }
-  async function ensure(id) { if (bufs[id]) return bufs[id]; if (!rendering[id]) rendering[id] = renderTune(id).then((b) => (bufs[id] = b)).catch(() => null); return rendering[id]; }
-  async function start(id) {
-    if (!ctx || !id) return; const b = await ensure(id); if (!b || scene !== id || (cur && cur.id === id)) return;
-    const t = ctx.currentTime, g = ctx.createGain(), s = ctx.createBufferSource(); s.buffer = b; s.loop = true; g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(1, t + 2.5);
-    s.connect(g).connect(music); s.start(t + 0.05);
-    if (cur) { const old = cur; old.g.gain.cancelScheduledValues(t); old.g.gain.setValueAtTime(old.g.gain.value || 1, t); old.g.gain.exponentialRampToValueAtTime(0.0001, t + 2); old.s.stop(t + 2.1); }
-    cur = { id, s, g };
-    for (const k of Object.keys(TUNES)) if (k !== id) setTimeout(() => ensure(k), 4000);   // pre-render the other place's tune quietly
+  const pool = () => { const p = playlist.filter((t) => !failed.has(t.id) && (!t.scenes || t.scenes.includes(scene))); return p.length ? p : playlist.filter((t) => !failed.has(t.id)); };
+  // shuffled bag: every track once per round (weight = copies), and never the same track twice in a row
+  function pick() {
+    const p = pool(); if (!p.length) return null;
+    bag = bag.filter((t) => p.includes(t));
+    if (!bag.length) { for (const t of p) for (let k = 0; k < (t.weight || 1); k++) bag.push(t); for (let i = bag.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [bag[i], bag[j]] = [bag[j], bag[i]]; } }
+    let i = bag.findIndex((t) => t.id !== cur?.id); if (i < 0) i = 0;
+    return bag.splice(i, 1)[0];
   }
+  function load(t) {
+    if (!t || !ctx) return Promise.resolve(null); if (bufs[t.id]) return Promise.resolve(bufs[t.id]);
+    if (!loading[t.id]) loading[t.id] = fetch(t.src).then((r) => { if (!r.ok) throw new Error(r.status); return r.arrayBuffer(); })
+      .then((a) => new Promise((res, rej) => { const p = ctx.decodeAudioData(a, res, rej); if (p?.then) p.then(res, rej); }))
+      .then((b) => { bufs[t.id] = b; return b; }).catch(() => { failed.add(t.id); return null; }).finally(() => { delete loading[t.id]; });
+    return loading[t.id];
+  }
+  // keep only the playing track and the preloaded next one decoded (a decoded minute of stereo audio is ~20 MB)
+  const trim = () => { for (const id of Object.keys(bufs)) if (id !== cur?.id && id !== nextT?.id) delete bufs[id]; };
+  let starting = false;
+  async function playNext() {
+    if (!ctx || starting) return; starting = true;
+    try {
+      let t = nextT || pick(), b = null;
+      for (let k = 0; k < playlist.length + 1 && t; k++) { b = await load(t); if (b) break; nextT = null; t = pick(); }
+      if (!b || !ctx) return;
+      const now = ctx.currentTime, g = ctx.createGain(), s = ctx.createBufferSource(), lv = t.gain ?? 1;
+      s.buffer = b; g.gain.setValueAtTime(0, now); g.gain.linearRampToValueAtTime(lv, now + XFADE_S); s.connect(g).connect(music); s.start(now + 0.02);
+      if (cur) { const o = cur; o.g.gain.cancelScheduledValues(now); o.g.gain.setValueAtTime(o.g.gain.value, now); o.g.gain.linearRampToValueAtTime(0, now + XFADE_S); try { o.s.stop(now + XFADE_S + 0.1); } catch (_) {} }
+      cur = { id: t.id, title: t.title, s, g, start: now + 0.02, end: now + 0.02 + b.duration }; plays++;
+      nextT = pick(); trim(); setTimeout(() => load(nextT), 3000);   // preload the next track quietly
+    } finally { starting = false; }
+  }
+  // the crossfade is driven by the AudioContext clock, so a paused (hidden) tab never skips ahead
+  function loop() { if (!ctx || ctx.state !== 'running' || mv() <= 0 && !cur) return; if (!cur) return void playNext(); if (ctx.currentTime >= cur.end - XFADE_S) playNext(); }
   function unlock() {
     if (unlocked) { if (ctx?.state === 'suspended' && !document.hidden) ctx.resume(); return; }
     const AC = window.AudioContext || window.webkitAudioContext; if (!AC) return;
     try { ctx = new AC({ latencyHint: 'playback' }); } catch (_) { ctx = new AC(); }
     unlocked = true; music = ctx.createGain(); sfx = ctx.createGain(); music.gain.value = 0; sfx.gain.value = sv(); music.connect(ctx.destination); sfx.connect(ctx.destination);
-    ctx.resume?.(); apply(); start(scene);
+    ctx.resume?.(); apply(); playNext(); tick = setInterval(loop, 500);
   }
   document.addEventListener('visibilitychange', () => { if (!ctx) return; if (document.hidden) ctx.suspend?.(); else if (unlocked) ctx.resume?.(); });
   return {
     unlock, apply,
-    setScene(id) { scene = TUNES[id] ? id : 'home'; if (ctx) start(scene); },
+    // one playlist everywhere: travelling keeps the current track going (scene only matters for tracks limited by `scenes`)
+    setScene(id) { scene = id === 'orchard' ? 'orchard' : 'home'; if (nextT?.scenes && !nextT.scenes.includes(scene)) nextT = null; },
+    skip() { return playNext(); },   // tests / a future "next track" button
     play(name) { if (!ctx || !SFX[name] || sv() <= 0 || ctx.state !== 'running') return false; try { SFX[name](ctx, sfx, ctx.currentTime + 0.01); } catch (_) {} return true; },
-    get state() { return { unlocked, ctx: ctx?.state || 'none', scene, playing: cur?.id || null, music: +mv().toFixed(3), sfx: +sv().toFixed(3), musicGain: music ? +music.gain.value.toFixed(3) : null, rendered: Object.keys(bufs) }; },
+    get state() { return { unlocked, ctx: ctx?.state || 'none', scene, playing: cur?.id || null, title: cur?.title || null, next: nextT?.id || null, pos: cur && ctx ? +(ctx.currentTime - cur.start).toFixed(1) : 0, dur: cur ? +(cur.end - cur.start).toFixed(1) : 0, plays, tracks: playlist.length,
+      music: +mv().toFixed(3), sfx: +sv().toFixed(3), musicGain: music ? +music.gain.value.toFixed(3) : null, rendered: Object.keys(bufs), failed: [...failed] }; },
   };
 }

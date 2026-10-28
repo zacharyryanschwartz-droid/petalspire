@@ -37,7 +37,7 @@ export const SPECIES = {
     growS: 50, seedPrice: 10, flowerSell: 9, seedSell: 5, yieldF: [2, 3], color: '#F0A33A', icon: 'daisy', img: 'assets/card-calendula.jpg', packShare: 0.2,
     stats: st(3, 4, 3, 3), blurb: 'Cheerful orange-gold, daisy-like blooms. A classic for soothing glycerites and salves.' },
   chamomile: { id: 'chamomile', tier: 'basic', name: 'Chamomile', rarity: 'basic', type: 'Plant · Tea herb',
-    growS: 80, seedPrice: 18, flowerSell: 24, seedSell: 9, yieldF: [1, 2], color: '#FFFFFF', icon: 'daisy', img: 'assets/card-chamomile.jpg', packShare: 0.1,
+    growS: 120, seedPrice: 18, flowerSell: 24, seedSell: 9, yieldF: [1, 2], color: '#FFFFFF', icon: 'daisy', img: 'assets/card-chamomile.jpg', packShare: 0.1,
     stats: st(2, 4, 2, 5), blurb: 'Tiny white daisies with sunny yellow centres and feathery leaves. Prized for calming tea.' },
   // ---- Epic ----
   peppermint: P('peppermint', 'epic', 'Peppermint', 'Plant · Cooling mint', [285, 24, 28, [2, 3]], '#8FC48A', 'leaf', st(4, 3, 4, 4),
@@ -101,10 +101,10 @@ for (const t of Object.keys(PLANT_TIERS)) { const ps = Object.values(SPECIES).fi
 // Tree cards join the pack pool only once The Orchard (bought on the Map after every Home plot) is owned. A tree is planted from a sapling (bought at
 // the Market once its card is found) on a tree spot in the Orchard, grows slowly by tier, then fruits again and again on a
 // long cycle — no replanting. Card levels work like plants: +10% fruit price and −5% grow/cycle time per level.
-//   by tier order o (1 Basic … 7 Other World): grow 300 · 420 · 540 · 660 · 840 · 1020 · 1200 s; fruit every 150 … 360 s;
-//   fruit per pick 6 · 5 · 5 · 4 · 4 · 3 · 3; sapling 30 · 70 · 140 · 240 · 400 · 650 · 1000 coins.
+//   by tier order o (1 Basic … 7 Other World): grow 300 · 420 · 540 · 660 · 840 · 1020 · 1200 s;
+//   v0.7.2: fruit every 190 · 225 · 270 · 270 · 420 · 400 · 420 s; fruit per pick 5 · 4 · 3 · 4 · 3 · 2 · 2; sapling 90 · 210 · 420 · 720 · 1200 · 1950 · 3000 coins.
 export const TREE_TIER = {
-  growS: [300, 420, 540, 660, 840, 1020, 1200], cycleS: [150, 180, 210, 240, 280, 320, 360], yield: [6, 5, 5, 4, 4, 3, 3], sapling: [30, 70, 140, 240, 400, 650, 1000],
+  growS: [300, 420, 540, 660, 840, 1020, 1200], cycleS: [190, 225, 270, 270, 420, 400, 420], yield: [5, 4, 3, 4, 3, 2, 2], sapling: [90, 210, 420, 720, 1200, 1950, 3000],
   packShare: 0.5,   // a tree card's raw weight = half an average plant of its tier (then the tier is renormalised to the plan)
 };
 const T_ = (id, tier, name, fruit, fruitName, fruitSell, use, shape, leaf, fruitC, trunk, blurb, extra = {}) => {
@@ -137,7 +137,7 @@ export const FEATURES = {
   rainbarrel: {
     id: 'rainbarrel', name: 'Rain Barrel', rarity: 'basic', type: 'Feature · Water',
     stats: { Growth: 3, Beauty: 2, Yield: 3, Atmosphere: 3 },
-    blurb: 'Unlocks the Rain Barrel in the Build menu (40 coins): place it in a plot you bought to give that plot its own water — 1 every 30 s, up to 12 (upgrade it to hold up to 60), feeding up to 8 irrigated beds (its plot and the plot behind it).',
+    blurb: 'Unlocks the Rain Barrel in the Build menu (120 coins): place it in a plot you bought to give that plot its own water — 1 every 30 s, up to 12 (upgrade it to hold up to 60), feeding up to 8 irrigated beds (its plot and the plot behind it).',
   },
   beehive: {
     id: 'beehive', name: 'Honeybee Skep', rarity: 'legendary', type: 'Feature · Pollinators',
@@ -241,7 +241,7 @@ export const FEATURES = {
   pocketwatch: {
     id: 'pocketwatch', name: "Gardener's Pocket Watch", rarity: 'ultra', type: 'Charm · Helpers', packW: 0.27,
     price: 300, stats: { Growth: 4, Beauty: 3, Yield: 4, Atmosphere: 4 },
-    blurb: 'Once bought and placed, every Gardener hire lasts 10 minutes longer for the same cost (Lv4: +30 minutes).',
+    blurb: 'Once bought and placed, every Gardener and Market Manager hire lasts 10 minutes longer for the same cost (Lv4: +30 minutes).',
   },
   moonfountain: {
     id: 'moonfountain', name: 'Moonlit Fountain', rarity: 'otherworld', type: 'Charm · Otherworldly', packW: 0.13,
@@ -400,13 +400,13 @@ export const DRY_S = 40;
 // ---------- v0.4: one rain barrel per plot ----------
 // Each owned plot gets ONE barrel (the home lot's arrives with your first bed; other plots: Build → Rain Barrel).
 // A barrel feeds at most maxBeds irrigated beds: its own plot's beds plus (v0.52) the beds of the owned plot directly behind it.
-export const BARREL = { price: 40, maxBeds: 8 };   // v0.52: 8 (was 4) — own plot + the plot behind   // v0.52: built from the Build menu for 40 coins (water itself is only sold by the truck load)
+export const BARREL = { price: 120, maxBeds: 8 };   // v0.52: 8 (was 4) — own plot + the plot behind   // v0.52: built from the Build menu (v0.7.2: 120 coins) (water itself is only sold by the truck load)
 
 // ---------- v0.4: Tincture Stand ----------
 // Bases are bought at the Supply Market. Every craft uses 1 base (Glycerin OR Vinegar) + flowers.
 export const BASES = {
-  glycerin: { name: 'Glycerin', price: 8, pack: { n: 5, price: 32 }, color: '#F3E7B5', blurb: 'Sweet, gentle base · makes Glycerites' },
-  vinegar:  { name: 'Vinegar',  price: 6, pack: { n: 5, price: 24 }, color: '#E3BF8C', blurb: 'Tangy base · makes Vinegar Tinctures' },
+  glycerin: { name: 'Glycerin', price: 24, pack: { n: 5, price: 96 }, color: '#F3E7B5', blurb: 'Sweet, gentle base · makes Glycerites' },
+  vinegar:  { name: 'Vinegar',  price: 18, pack: { n: 5, price: 72 }, color: '#E3BF8C', blurb: 'Tangy base · makes Vinegar Tinctures' },
 };
 export const TINCTURE = {
   slots: 2,
@@ -458,14 +458,15 @@ export const DRYING = {
 // raw inputs: a tincture is worth at least ECON.margin × (its flowers + its base), an essential oil at least ECON.margin × the
 // seeds (or leaves) it takes, and press/jar/tea multipliers stay above 1.
 export const ECON = {
-  tier: { basic: 0.9, epic: 0.7, legendary: 0.6, rare: 0.6, superrare: 0.55, ultra: 0.5, otherworld: 0.45 },
+  tier: {basic: 0.9, epic: 0.525, legendary: 0.45, rare: 0.45, superrare: 0.41, ultra: 0.375, otherworld: 0.34},
   tinc: 0.9,     // tinctures: a further cut on top of the tier factor
   margin: 1.25,
   // v0.7: shorter grow times for the top tiers (×), so a late-game bed earns more per hour than a mid-game one. Grow times still rise by tier.
-  grow: { rare: 0.83, superrare: 0.48, ultra: 0.33, otherworld: 0.24 },
+  grow: {epic: 1.35, legendary: 1.35, rare: 1.0, superrare: 0.6, ultra: 0.4455, otherworld: 0.324},
   dryRatio: 1.25,   // dried herb = 1.25× the fresh flower (was 2.45×) · = DRY_RATIO below
 };
 const econF = (tier) => ECON.tier[tier] ?? 1;
+const TREE_F = { basic: 0.9, epic: 0.7, legendary: 0.6, rare: 0.6, superrare: 0.55, ultra: 0.5, otherworld: 0.45 }, treeF = (tier) => TREE_F[tier] ?? 1;
 for (const sp of Object.values(SPECIES)) {
   const f = econF(sp.tier);
   sp.flowerSell = Math.max(1, Math.round(sp.flowerSell * f));
@@ -475,12 +476,12 @@ for (const sp of Object.values(SPECIES)) {
 { let prev = 0;   // keep tiers apart: a tier's cheapest flower still sells above the tier below's priciest (Epic vs Chamomile)
   for (const t of TIER_ORDER) { const ps = Object.values(SPECIES).filter((x) => x.tier === t && !x.noFlower);
     for (const x of ps) x.flowerSell = Math.max(x.flowerSell, prev + 1); prev = Math.max(prev, ...ps.map((x) => x.flowerSell)); } }
-for (const t of Object.values(TREES)) t.fruitSell = Math.max(1, Math.round(t.fruitSell * econF(t.tier)));
+for (const t of Object.values(TREES)) t.fruitSell = Math.max(1, Math.round(t.fruitSell * treeF(t.tier)));
 for (const [k, d] of Object.entries(DRYING)) d.sell = Math.max(SPECIES[k].flowerSell + 1, Math.round(SPECIES[k].flowerSell * ECON.dryRatio));   // v0.7: every dried herb = 1.25× its fresh flower
 for (const [k, r] of Object.entries(TINCTURE.recipes)) { const sp = SPECIES[k], f = econF(sp.tier);
   const per = Math.max(sp.flowerSell, DRYING[k]?.sell ?? Math.round(sp.flowerSell * ECON.dryRatio));   // a flower could be dried instead: beat that too
   for (const b of ['glycerin', 'vinegar']) r.sell[b] = Math.max(Math.ceil(ECON.margin * (r.n * per + BASES[b].price)), Math.round(r.sell[b] * f * ECON.tinc)); }
-for (const [k, r] of Object.entries(STILL.recipes)) { const src = SPECIES[k] || TREES[k], f = econF(src.tier);
+for (const [k, r] of Object.entries(STILL.recipes)) { const src = SPECIES[k] || TREES[k], f = SPECIES[k] ? econF(src.tier) : treeF(src.tier);
   const raw = r.n * (r.in ? src.fruitSell : src.seedSell); r.sell = Math.max(Math.ceil(ECON.margin * raw), Math.round(r.sell * f)); }
 export const DRY_TIER_S = { basic: 40, epic: 60, legendary: 75, rare: 90, superrare: 110, ultra: 130, otherworld: 150 };
 export const DRY_RATIO = ECON.dryRatio;   // v0.7: 1.25 (was 2.45)
@@ -548,8 +549,8 @@ const ordOf = (id) => PLANT_TIERS[(SPECIES[id] || TREES[id]).tier].order;
 const R_ = (id, name, src, input, n, kind, icon, color, extra = {}) => ({ id, name, src, in: input, n, kind, icon, color, ...extra });
 export const PRESS = { slots: 2, mult: (o) => 1.4 + 0.1 * (o - 1),   // v0.7: was 1.7 + 0.25·(o − 1)
   kinds: { oil: 1, butter: 1.06 }, recipes: [
-  R_('sunoil', 'Sunflower Oil', 'sunflower', 'seed_sunflower', 30, 'oil', 'oilbottle', '#F2C53D', { sell: 80, s: 60 }),
-  R_('sunbutter', 'Sun Butter', 'sunflower', 'seed_sunflower', 50, 'butter', 'butterjar', '#D9A441', { sell: 135, s: 90 }),
+  R_('sunoil', 'Sunflower Oil', 'sunflower', 'seed_sunflower', 30, 'oil', 'oilbottle', '#F2C53D', { sell: 80, s: 60, only: 'home' }),
+  R_('sunbutter', 'Sun Butter', 'sunflower', 'seed_sunflower', 50, 'butter', 'butterjar', '#D9A441', { sell: 135, s: 90, only: 'home' }),   // v0.7.2: sunflower seeds grow at Home — Sunflower Oil & Sun Butter are Home press only
   R_('rosehip', 'Rosehip Oil', 'damaskrose', 'seed_damaskrose', 3, 'oil', 'oilbottle', '#D4553A', { s: 120, only: 'home' }),   // v0.68: rose hips come from Home roses — Home press only
   R_('olive', 'Olive Oil', 'olive', 'fruit_olive', 6, 'oil', 'oilbottle', '#B5B03A', { s: 120 }),
   R_('almondoil', 'Almond Oil', 'almond', 'fruit_almond', 6, 'oil', 'oilbottle', '#EAD3A8', { s: 120, only: 'orchard' }),   // v0.68: almonds grow on Orchard trees — Orchard Oil Press only
@@ -586,15 +587,17 @@ for (const [C, pre] of [[PRESS, 'press_'], [FRUITSTAND, 'jar_']]) for (const r o
 export const itemLoc = (id) => (id.startsWith('fruit_') || id.startsWith('jar_') ? 'orchard' : id.startsWith('press_') ? 'both' : 'home');
 export const sellsAt = (id, loc) => { const w = itemLoc(id); return w === 'both' || w === loc; };
 // v0.61: the Orchard Stand — the Orchard's selling stand (like the Home Farm Stand), built on its spot by the Orchard road
-export const ORCH_STAND = { coins: 300, wood: 30, cap: 18 };   // v0.65: cap 12 → 18
+export const ORCH_STAND = { coins: 900, wood: 30, cap: 18 };   // v0.65: cap 12 → 18
 // v0.61: Garden Workers (after every Home plot is bought). One per plot; a shift is 6 real hours (offline time counts).
 // hire = the price of the last Home plot; wage = about a tenth of what a busy plot earns in 6 hours.
 // v0.61: every crafting stand can also be unlocked with coins (no real money needed). In the order players reach them;
 // only the next one on the ladder is offered. A Card Pack find (or the Tincture goal reward) is still the faster, luckier route.
-export const STAND_UNLOCK = [{ id: 'tincture', coins: 1000 }, { id: 'still', coins: 2500 }, { id: 'teastand', coins: 5000 }, { id: 'press', coins: 8000 }];
+export const STAND_UNLOCK = [{ id: 'tincture', coins: 3000 }, { id: 'still', coins: 7500 }, { id: 'teastand', coins: 15000 }, { id: 'press', coins: 24000 }];   // v0.7.2: ×3
 // v0.67.1: Orchard tree-row Irrigation — each purchase drips one more row of tree spots (next row in order), up to every row you own.
-export const TREE_IRRIG = { coins: 150 };
-// v0.7: a hire lasts 1 real-time hour, then the Gardener stops and must be hired again for the same cost (wage = hire).
+export const TREE_IRRIG = { coins: 450 };
+// v0.7: a hire lasts 1 real-time hour, then the worker stops and must be hired again for the same cost (wage = hire).
+// v0.7.2: two hires per LOCATION (Home, the Orchard) at this price each: the Gardener (plants, harvests, waters, picks fruit on every
+// plot there) and the Market Manager (runs every stand there, fills the stand). Each costs 2000 coins per 1 h shift, no extra wage.
 export const WORKER = { hire: 2000, wage: 2000, shiftH: 1, stepS: 5, catchStepS: 120 };
 const kindRank = (id) => ['oil_', 'press_', 'jar_', 'tea_', 'tinc_', 'hydro_', 'dried_', 'fruit_', 'flower_', 'bag', 'seed_'].findIndex((p) => id.startsWith(p));
 export const SELL_ORDER = Object.keys(ITEMS).sort((a, b) => kindRank(a) - kindRank(b) || ITEMS[b].sell - ITEMS[a].sell || (a.startsWith('tinc_g') ? -1 : 1));
@@ -669,7 +672,7 @@ export const BUILDS = {
   windmill: { name: 'Windmill', wood: 20, coins: 0, scrap: 5 },   // v0.52: + 5 Scrap Metal (and the 160-coin card price when bought)
   billboard: { name: 'Roadside Billboard', wood: 15, coins: 0 },
   tincture: { name: 'Tincture Stand', wood: 0, coins: 0 },   // v0.52: a free goal reward — placing it costs nothing
-  market: { name: 'Rebuild the Supply Market', wood: 30, coins: 60, s: 60, opt: { scrap: 3, save: 20, label: 'Patch the roof with 3 Scrap (save 20 coins)' }, hurryJewels: 2 },
+  market: { name: 'Rebuild the Supply Market', wood: 30, coins: 180, s: 60, opt: { scrap: 3, save: 60, label: 'Patch the roof with 3 Scrap (save 60 coins)' }, hurryJewels: 2 },
 };
 export const BUILD_ANIM_MS = 2450;
 
@@ -713,8 +716,8 @@ export const ATMOS_STEP = 0.04, ATMOS_MAX = 0.4;          // each atmosphere poi
 
 // ---------- v0.3: trees you grow ----------
 // Real time to maturity. Keep it slow: this is a long-term Wood source. Override for testing with ?treeMin=1
-export const TREE = { growMin: 40, wood: 6, stump: 1, saplingBack: 0.5, stageAt: [0, 0.25, 0.6, 1], stageNames: ['Sapling', 'Young tree', 'Growing tree', 'Mature tree'], hurryJewels: 1 };
-export const SHOP = { wood5: { wood: 5, price: 12 }, sapling: { price: 20 }, scrap5: { scrap: 5, price: 45 } };   // v0.52: Scrap Metal ×5 (recycling finds stays the cheap way)
+export const TREE = { growMin: 40, wood: 30, stump: 1, saplingBack: 0.5, stageAt: [0, 0.25, 0.6, 1], stageNames: ['Sapling', 'Young tree', 'Growing tree', 'Mature tree'], hurryJewels: 1 };
+export const SHOP = { wood5: { wood: 5, price: 55 }, sapling: { price: 60 }, scrap5: { scrap: 5, price: 135 } };   // v0.52: Scrap Metal ×5 (recycling finds stays the cheap way)
 
 // ---------- v0.3: Jewel Shop ----------
 // ONE flag: 'simulated' = prototype test purchases (no charge). Set to 'apple-iap' once a native StoreKit bridge exists (see js/payments.js).
@@ -787,10 +790,10 @@ export const TIPS = {
   harvested: 'Harvests give flowers <i>and</i> seeds. Put spares on your <b>Farm Stand</b> by the road.',
   stand: 'Your <b>Farm Stand</b> is built! Tap it to stock flowers — drivers will pull over to buy.',
   barrel: 'Each <b>rain barrel</b> refills by <b>1 water every 30 s</b> (up to 12 — tap it to upgrade its size), even while the game is closed — the badge shows when the next drop lands. Hand watering uses the bed’s own plot barrel first, then the nearest other barrel. Water only comes from rain barrels.',
-  plotbarrel: 'This plot has no rain barrel yet. Build a <b>Rain Barrel</b> from the Build menu (40 coins) and place it here: its own water for irrigation, up to <b>8 beds</b> (this plot and the one behind it). A barrel only collects rain through a gutter from a <b>stand on the same plot</b> (Tincture or Essential Oil Stand) — it connects automatically. Until then, hand watering borrows from your nearest barrel. <b>Goal reward:</b> a free <b>Tincture Stand</b> — place it on that plot and its roof feeds the barrel.',
+  plotbarrel: 'This plot has no rain barrel yet. Build a <b>Rain Barrel</b> from the Build menu (120 coins) and place it here: its own water for irrigation, up to <b>8 beds</b> (this plot and the one behind it). A barrel only collects rain through a gutter from a <b>stand on the same plot</b> (Tincture or Essential Oil Stand) — it connects automatically. Until then, hand watering borrows from your nearest barrel. <b>Goal reward:</b> a free <b>Tincture Stand</b> — place it on that plot and its roof feeds the barrel.',
   sickle: 'You own the <b>Harvest Sickle</b>! Wherever you have raised beds, tap the sickle button on the left, then tap a glowing raised bed to harvest every ripe plant in that bed at once.',
   plow: 'You own the <b>Hand Plow</b>! Wherever you have raised beds, tap the plow button on the left, pick a seed, then tap a glowing raised bed to plant every empty tile in that bed.',
-  oils: 'The <b>Essential Oil Stand</b> is an Epic card: find it in a Card Pack, buy it at the Supply Market (150 coins), then build it (25 Wood) on one of your <b>other plots</b>. It distills <b>seeds</b> into oils worth far more than the seeds.',
+  oils: 'The <b>Essential Oil Stand</b> is an Epic card: find it in a Card Pack, buy it at the Supply Market (450 coins), then build it (25 Wood) on one of your <b>other plots</b>. It distills <b>seeds</b> into oils worth far more than the seeds.',
   teastand: 'Your <b>Tea Stand</b> is ready! Tap it, pick any <b>three dried herbs</b> (duplicates allowed) and brew a tea — the predicted price shows as you pick. Rarer herbs make far pricier teas; three different herbs add 10%. Teas sell at your Farm Stand.',
   press: 'Your <b>Pressed Oil Stand</b> is ready! Tap it and pick a recipe — Sunflower seeds become <b>Sunflower Oil</b> or <b>Sun Butter</b>; Damask Rose seeds, olives, cacao and Sunpetal seeds make richer oils.',
   fruitstand: 'Your <b>Fruit Stand</b> is ready! Tap it to cook orchard fruit into <b>jellies, butters, sauces and canned fruit</b> — each sells for well above the raw fruit.',
@@ -884,3 +887,7 @@ export const STUDIO = {
 // Cross-promo card ('More from Schwarze Spiele'): always in Settings; also offered once after a session milestone
 // (all Home plots, the Orchard, every 50th harvest) — at most every minGapMs, maxShows in all, never before firstAfterMs of play.
 export const CROSS_PROMO = { gameId: 'market_plot', firstAfterMs: 20 * 60000, minGapMs: 3 * 864e5, maxShows: 3 };
+
+// v0.7.2: coin costs ×3 (sell prices unchanged)
+for (const sp of Object.values(SPECIES)) sp.seedPrice *= 3;
+for (const f of Object.values(FEATURES)) if (f.price) f.price *= 3;

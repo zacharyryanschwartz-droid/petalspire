@@ -27,16 +27,16 @@ export const LOTS = {
 };
 export const ORCH_X = 300, ORCH_Z = -3;
 export const LOCATIONS = { home: { name: 'Home', target: [-0.3, 0.3, -0.4] }, orchard: { name: 'The Orchard', target: [ORCH_X, 0.3, ORCH_Z - 0.6] } };
-export const ORCHARD_PRICE = { coins: 3000, wood: 60 };
+export const ORCHARD_PRICE = { coins: 9000, wood: 60 };   // v0.7.2: ×3 coins (was 3000)
 // v0.52: the plot directly BEHIND another = the neighbour one row further from the road (the road runs along +z, so
 // "behind" is the plot with the same x-range and the next z-range toward −z). The back row has nothing behind it.
 export const BEHIND = { home: 'north', west: 'northwest', east: 'northeast', north: 'backwoods' };
 export const FRONT = Object.fromEntries(Object.entries(BEHIND).map(([f, b]) => [b, f]));
 export const LOT_FOR_SALE = ['west', 'east', 'north', 'northwest', 'northeast', 'backwoods'];   // the Home plots (the Orchard is bought on the Map)
-export const LOT_PRICES = [150, 300, 600, 1000, 1500, 2000];
+export const LOT_PRICES = [450, 900, 1800, 3000, 4500, 6000];   // v0.7.2: ×3 (was 150 · 300 · 600 · 1000 · 1500 · 2000)
 // v0.61: Orchard plots for sale (in this order of price; any order may be bought): coins + Wood, priced above every Home plot
 export const ORCH_FOR_SALE = ['orchwest', 'orcheast', 'orchnorth'];
-export const ORCH_PLOT_PRICES = [{ coins: 4000, wood: 40 }, { coins: 6000, wood: 60 }, { coins: 9000, wood: 80 }];
+export const ORCH_PLOT_PRICES = [{ coins: 12000, wood: 40 }, { coins: 18000, wood: 60 }, { coins: 27000, wood: 80 }];   // v0.7.2: ×3 coins (was 4000 · 6000 · 9000)
 export const ORCH_LOTS = ['orchard', ...ORCH_FOR_SALE];
 export const lotLoc = (lot) => (ORCH_LOTS.includes(lot) ? 'orchard' : 'home');
 export const OWNABLE_LOTS = [...LOT_FOR_SALE, ...ORCH_LOTS];

@@ -1154,3 +1154,11 @@ body.on-title #hud, body.on-title #tabbar, body.on-title #ad-banner, body.on-tit
 .wk-timer.low { background: #F5D07A; border-color: #F5D07A; }
 .wk-timer.done { background: #F7C5C5; border-color: #F7C5C5; }
 body.modal-open .wk-timer { display: none; }
+
+/* v0.7.2 — two hires per plot: Gardener + Market Manager, each with its own timer */
+.wk-hires{display:grid;gap:6px;margin-top:6px}
+.wk-hire{display:flex;align-items:center;justify-content:space-between;gap:8px;background:#FFF9F0;border:1px solid #EFE3C4;border-radius:12px;padding:6px 8px}
+.wk-hire .worker-line{margin:0;flex:1;min-width:0;line-height:1.25}
+.wk-hire .worker-line b{color:#3D5A40;font-weight:800}
+.wk-hire .acts{flex:none}
+.wk-hire[data-wk-role="m"]{background:#FFF3F1;border-color:#F7C5C5}

@@ -686,7 +686,8 @@ export function createWorld(canvas) {
   const workers = new Map();
   function makeWorker(lot) {
     const g = new THREE.Group(); g.userData = { kind: 'worker', id: lot }; scene.add(g);
-    const skin = mat('#E8C4A0', { roughness: 0.8 }), shirt = mat('#F3E6D0', { roughness: 0.9 }), apron = mat('#8FB08A', { roughness: 0.85 }), boot = mat('#7A5A3C'), straw = mat('#E3C27A', { roughness: 0.95 }), band = mat('#C2513F');
+    const mgr = String(lot).endsWith('~m');   // v0.7.2: the Market Manager wears a blush apron, cream shirt and a moss hat band
+    const skin = mat('#E8C4A0', { roughness: 0.8 }), shirt = mat(mgr ? '#FFF9F0' : '#F3E6D0', { roughness: 0.9 }), apron = mat(mgr ? '#F7C5C5' : '#8FB08A', { roughness: 0.85 }), boot = mat('#7A5A3C'), straw = mat('#E3C27A', { roughness: 0.95 }), band = mat(mgr ? '#3D5A40' : '#C2513F');
     const body = shadowy(new THREE.Mesh(new THREE.CapsuleGeometry(0.17, 0.32, 6, 14), shirt)); body.position.y = 0.46; g.add(body);
     const ap = shadowy(new THREE.Mesh(new THREE.CylinderGeometry(0.175, 0.205, 0.36, 16, 1, true, -1.2, 2.4), apron)); ap.position.y = 0.4; g.add(ap);
     const pocket = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.08, 0.02), mat('#7C9C77')); pocket.position.set(0, 0.42, 0.2); g.add(pocket);
