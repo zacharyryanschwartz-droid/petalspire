@@ -2652,7 +2652,7 @@ function buildHTML() {
   const projects = cards.sort((a, b) => b[1] - a[1] || a[2].localeCompare(b[2])).map((c) => c[0] ?? bed).join('');   // v0.65: highest value first
   // v0.65: each location has its own Build menu — only what can be built HERE (no raised beds at the Orchard, no Home-only buildings there)
   return `<div class="build-list" data-build-loc="${loc}">${projects}</div>${here.map((id) => (id === 'treeirrig' ? treeIrrigCard() : id === 'ostand' ? ostandProjectCard() : projectCard(id))).join('').trim() ? '' : `<p class="muted empty-hint" data-empty-hint>Open Card Packs to discover more to build.</p>`}
-    ${workersSection(loc)}<div class="sec-title">Your land</div><div class="list">${(loc === 'orchard' ? ORCH_LOTS : LOT_FOR_SALE.concat(['home'])).filter((l) => S.lots[l]).map((l) => `<div class="row"><div class="ico"><i data-icon="sign" style="width:30px;height:30px"></i></div><div class="meta"><b>${LOTS[l].name}</b><small>${loc === 'orchard' ? '' : `${SITES.filter((s) => s.lot === l && S.beds.includes(s.id)).length}/${SITES.filter((s) => s.lot === l).length} beds · `}${S.barrels[l] ? `barrel ${S.barrels[l].w}/${regenMax(S.barrels[l])}` : 'no barrel'} · ${OBSTACLES.filter((o) => o.lot === l && obsState(o.id) !== 'gone').length} trees &amp; stumps left</small></div></div>`).join('')}</div>
+    <div class="sec-title">Your land</div><div class="list">${(loc === 'orchard' ? ORCH_LOTS : LOT_FOR_SALE.concat(['home'])).filter((l) => S.lots[l]).map((l) => `<div class="row"><div class="ico"><i data-icon="sign" style="width:30px;height:30px"></i></div><div class="meta"><b>${LOTS[l].name}</b><small>${loc === 'orchard' ? '' : `${SITES.filter((s) => s.lot === l && S.beds.includes(s.id)).length}/${SITES.filter((s) => s.lot === l).length} beds · `}${S.barrels[l] ? `barrel ${S.barrels[l].w}/${regenMax(S.barrels[l])}` : 'no barrel'} · ${OBSTACLES.filter((o) => o.lot === l && obsState(o.id) !== 'gone').length} trees &amp; stumps left</small></div></div>`).join('')}</div>
     <p class="muted" style="margin:10px 4px 0">More land: tap a <b>For Sale</b> sign ${loc === 'orchard' ? 'in the meadow around the Orchard' : 'in the woods around you'}.</p>`;
 }
 function bedSvg() { return `<svg viewBox="0 0 64 44"><path d="M4 22h56v14H4z" fill="#C99A6B" stroke="#7C5634" stroke-width="2"/><path d="M8 22l4-8h40l4 8z" fill="#8C6545" stroke="#7C5634" stroke-width="2" stroke-linejoin="round"/><path d="M4 29h56" stroke="#B07D52" stroke-width="2"/><path d="M22 16c0-5 2-8 5-9M38 16c0-6 3-9 6-10" stroke="#5E825F" stroke-width="2.2" fill="none" stroke-linecap="round"/><path d="M27 7c-3.5 0-5-2.6-5-5 3 0 5 2 5 5zM44 6c.5-3 2.4-4.6 5-4.6-.3 3-2.2 4.5-5 4.6z" fill="#B7D4B5" stroke="#3D5A40" stroke-width="1.4"/></svg>`; }
@@ -3164,7 +3164,7 @@ function marketHTML() {
       <p class="muted" style="margin:4px 4px 12px">The old Supply Market sold seeds, water, Wood and Card Packs. It has to be <b>rebuilt</b> before it can open again.</p>
       <div class="build-list">${projectCard('market')}</div>
       ${curLoc() === 'orchard' && S.inv.sapling ? `<div class="list" style="margin-top:12px">${saplingRow(false)}</div>` : ''}
-      <button class="jewel-strip" data-act="open-jewels" style="margin-top:12px"><i data-icon="jewel"></i><span><b>${S.jewels} Jewels</b><small>Jewel Shop</small></span><em>Shop</em></button>`;
+      <button class="jewel-strip" data-act="open-jewels" style="margin-top:12px"><i data-icon="jewel"></i><span><b>${S.jewels} Jewels</b><small>Jewel Shop</small></span><em>Shop</em></button>${workersSection(curLoc())}`;   // v0.8.2: hiring stays reachable while the Market is boarded up
   }
   let h = `<div class="hero"><img src="assets/market.jpg" alt=""/><p>Fresh seeds &amp; fair prices</p></div>${rewardHTML()}<button class="daily-strip" data-act="open-daily"><b>🌼 Daily gift</b><small>${dailyStatus().can ? 'Ready to claim!' : `Streak ${S.daily.streak} · come back tomorrow`}</small></button>
     <div class="seg"><button data-tab="buy" class="${marketTab === 'buy' ? 'on' : ''}">Supplies</button><button data-tab="packs" class="${marketTab === 'packs' ? 'on' : ''}">Card Packs</button></div>`;
@@ -3256,7 +3256,7 @@ function marketHTML() {
     : [['saplings', 'Tree saplings'], ['supplies', 'Supplies'], ['water', 'Water &amp; irrigation'], ['build', 'Buildings &amp; features'], ['garden', 'Garden charms &amp; tools'], ['decor', 'Garden decorations']];
   for (const [k, title] of SEC) { const list = sec[k].filter(Boolean); if (!list.length) continue; rows.push(`<div class="sec-title mkt-sec" data-mkt-sec="${k}">${title}</div>`, ...list); }
   if (more) rows.push(`<p class="muted empty-hint" data-empty-hint>Open Card Packs to discover more.</p>`);
-  return h + `<button class="jewel-strip" data-act="open-jewels"><i data-icon="jewel"></i><span><b>${S.jewels} Jewels</b><small>Jewel Shop</small></span><em>Shop</em></button><div class="list">${sortRows(rows).join('')}</div>`;
+  return h + `<button class="jewel-strip" data-act="open-jewels"><i data-icon="jewel"></i><span><b>${S.jewels} Jewels</b><small>Jewel Shop</small></span><em>Shop</em></button><div class="list">${sortRows(rows).join('')}</div>${workersSection(curLoc())}`;   // v0.8.1: hiring lives in the Market (Supplies tab), not the Build menu
 }
 const buyRow = (id, icon, name, sub, price) => `<div class="row"><div class="ico">${icon}</div><div class="meta"><b>${name}</b><small>${sub}</small></div><div class="acts"><button class="btn btn-primary sm" data-buy="${id}" data-price="${price}" ${S.coins < price ? 'disabled' : ''}>${coin(price)}</button></div></div>`;
 const mktTag = (id) => (STAND_IDS.has(id) ? `<em class="loc-tag sm" data-mkt-loc="${id}">${whereTag(id)}</em>` : '');
@@ -3726,7 +3726,7 @@ function wkRowOne(lot, role) {
   return `<div class="wk-hire" data-wk-role="${role}">${line}<div class="acts">${btn}</div></div>`;
 }
 function workerRowLine(lot) { const loc = workerLoc(lot); return `<div class="wk-hires" data-wk-loc="${loc}">${wkRowOne(loc, 'g')}${wkRowOne(loc, 'm')}</div>`; }
-// v0.7.2: the location-wide Workers section (Build menu, above Your land): one row per worker, each with its own timer
+// v0.7.2: the location-wide Workers section (v0.8.1: Market › Supplies, below the list): one row per worker, each with its own timer
 function workersSection(loc) { if (!workersOn() || (loc === 'orchard' && !S.lots.orchard)) return '';
   return `<div class="sec-title">Workers · ${loc === 'orchard' ? 'the Orchard' : 'Home'}</div><p class="muted" style="margin:2px 4px 6px">One Gardener and one Market Manager look after every plot ${loc === 'orchard' ? 'at the Orchard' : 'at Home'}. ${coin(WORKER.hire)} each for ${shiftTxt()}.</p>${workerRowLine(loc)}`; }
 function workerRowAct() { return ''; }
@@ -4879,10 +4879,12 @@ var V8_PANELS = null, forcedDeco = null;   // forcedDeco: test hook — the next
 const V8 = {
   orders: { home: { base: 2, plotsAt: 2, tinc: 1, refillMs: 180000 }, orchard: { base: 3, press: 1, refillMs: 240000 }, expireMs: 30 * 60000, skipFreeMs: 10 * 60000, skipJewels: 1, payK: 2, items: [1, 3], units: [2, 8], xp: 25 },
   wheel: [   // weight %, amount × adMult (coins / wood); cards: 1 = one card (pack odds, the non-plant slot), 2 = two plant cards
-    { k: 'wood', w: 40, n: 15, label: 'Wood', c: '#E9D9B8' }, { k: 'wood', w: 10, n: 40, label: 'Big Wood', c: '#D9B98A' },
-    { k: 'coins', w: 25, n: 60, label: 'Coins', c: '#F7E3A6' }, { k: 'coins', w: 8, n: 200, label: 'Big Coins', c: '#F5D07A' },
+    { k: 'wood', w: 40, n: 15, label: 'Wood', c: '#E9D9B8' }, { k: 'wood', w: 10, n: 40, label: 'Wood', c: '#D9B98A' },
+    { k: 'coins', w: 25, n: 60, label: 'Coins', c: '#F7E3A6' }, { k: 'coins', w: 8, n: 200, label: 'Coins', c: '#F5D07A' },
     { k: 'card', w: 12, n: 1, label: 'Card', c: '#B7D4B5' }, { k: 'card2', w: 4, n: 2, label: 'Card ×2', c: '#C8E0E8' }, { k: 'jewel', w: 1, n: 1, label: 'Jewel', c: '#F7C5C5' },
   ],
+  // v0.8.2: what the wheel SHOWS — 10 equal segments, each pointing at a prize above (the odds stay the weights above; a spin lands on a segment of the picked prize)
+  wheelSegs: [{ p: 0, c: '#B7D4B5' }, { p: 2, c: '#FFF9F0' }, { p: 4, c: '#C8E0E8' }, { p: 1, c: '#FFF9F0' }, { p: 3, c: '#F7C5C5' }, { p: 6, c: '#F5D07A' }, { p: 0, c: '#B7D4B5' }, { p: 4, c: '#FFF9F0' }, { p: 2, c: '#C8E0E8' }, { p: 5, c: '#FFF9F0' }],
   pity: 150, wheelDecoK: 0.25,
   xp: { sale: 0.1, order: 25, harvest: 2, craft: 3, build: 50, upg: 30, pack: 20, clear: 5, plot: 150 },
   lvCoins: 50, backfillCap: 25,
@@ -5040,41 +5042,73 @@ function spinWheel(force) {   // returns the result; the overlay animates it
   if (!(S.spins > 0)) { toast('No bonus spins yet — fill orders and level up to earn them'); return null; }
   S.spins--; const i = force != null ? force : wheelPick(); const r = wheelApply(i); save(); hud(); return r;
 }
-function wheelSVG() {
-  const tot = V8.wheel.reduce((a, w) => a + w.w, 0), R = 120; let a0 = -90, out = '';
-  V8.wheel.forEach((w, i) => {
-    const sweep = (w.w / tot) * 360, a1 = a0 + sweep, rad = (d) => (d * Math.PI) / 180, x0 = R + R * Math.cos(rad(a0)), y0 = R + R * Math.sin(rad(a0)), x1 = R + R * Math.cos(rad(a1)), y1 = R + R * Math.sin(rad(a1));
-    const mid = rad(a0 + sweep / 2), tx = R + R * 0.66 * Math.cos(mid), ty = R + R * 0.66 * Math.sin(mid);
-    out += `<path d="M${R} ${R}L${x0.toFixed(1)} ${y0.toFixed(1)}A${R} ${R} 0 ${sweep > 180 ? 1 : 0} 1 ${x1.toFixed(1)} ${y1.toFixed(1)}Z" fill="${w.c}" stroke="#FFF9F0" stroke-width="2"/>`;
-    if (sweep > 9) out += `<text x="${tx.toFixed(1)}" y="${ty.toFixed(1)}" transform="rotate(${(a0 + sweep / 2 + 90).toFixed(1)} ${tx.toFixed(1)} ${ty.toFixed(1)})" text-anchor="middle" dominant-baseline="middle" font-size="${sweep > 30 ? 13 : 10}" font-weight="700" fill="#3D5A40">${w.label}</text>`;
-    else out += `<text x="${(R + R * 0.86 * Math.cos(mid)).toFixed(1)}" y="${(R + R * 0.86 * Math.sin(mid)).toFixed(1)}" text-anchor="middle" dominant-baseline="middle" font-size="12">💎</text>`;
-    w.mid = a0 + sweep / 2 + 90; a0 = a1;
-  });
-  return `<svg viewBox="0 0 240 240" class="wheel-svg">${out}<circle cx="120" cy="120" r="20" fill="#FFF9F0" stroke="#3D5A40" stroke-width="2"/><circle cx="120" cy="120" r="8" fill="#F5D07A"/></svg>`;
+// v0.8.2: redesigned wheel — equal segments, item icons + upright amounts, honey-gold bulb rim, pointer, flower hub, win highlight + reward pop
+const WHEEL_ICON = { wood: 'wood', coins: 'coin', card: 'pack', card2: 'pack', jewel: 'jewel' };
+const wheelAmt = (w) => (w.k === 'wood' || w.k === 'coins' ? String(Math.round(w.n * adMult())) : `×${w.n}`);
+const wheelName = (w) => ({ wood: 'Wood', coins: 'Coins', card: 'Card', card2: 'Cards', jewel: 'Jewel' })[w.k];
+const nestIcon = (id, x, y, sz) => (ICONS[id] || '').replace('<svg ', `<svg x="${x}" y="${y}" width="${sz}" height="${sz}" `);
+function wheelOddsText() {
+  const tot = V8.wheel.reduce((a, w) => a + w.w, 0), pc = (w) => `${Math.round((w.w / tot) * 1000) / 10}%`;
+  return V8.wheel.map((w) => `${w.k === 'wood' || w.k === 'coins' ? Math.round(w.n * adMult()) : w.n} ${w.k === 'card2' ? 'Cards' : wheelName(w)} ${pc(w)}`).join(' · ');
 }
-let wheelSpinning = false, wheelRot = 0;
+function wheelSVG() {
+  const segs = V8.wheelSegs, n = segs.length, step = 360 / n, C = 140, R = 140, rad = (d) => ((d - 90) * Math.PI) / 180, P = (r, d) => `${(C + r * Math.cos(rad(d))).toFixed(2)} ${(C + r * Math.sin(rad(d))).toFixed(2)}`;
+  let out = '';
+  segs.forEach((g, i) => { const w = V8.wheel[g.p], a0 = i * step, a1 = a0 + step, mid = a0 + step / 2, d = `M${C} ${C}L${P(R, a0)}A${R} ${R} 0 0 1 ${P(R, a1)}Z`;
+    out += `<g class="wseg" data-seg="${i}" data-prize="${g.p}" data-k="${w.k}"><path class="wseg-bg" d="${d}" fill="${g.c}"/><path class="wseg-hi" d="${d}"/>
+      <g transform="rotate(${mid} ${C} ${C})">${nestIcon(WHEEL_ICON[w.k], C - 17, 22, 34)}<text class="wseg-amt" x="${C}" y="80" text-anchor="middle" dominant-baseline="middle">${wheelAmt(w)}</text></g></g>`; });
+  for (let i = 0; i < n; i++) out += `<path d="M${C} ${C}L${P(R, i * step)}" stroke="#FFF9F0" stroke-width="2.5" opacity=".9"/>`;
+  const petals = Array.from({ length: 6 }, (_, k) => `<ellipse cx="${C}" cy="${C - 15}" rx="8" ry="12" transform="rotate(${k * 60} ${C} ${C})" fill="#F7C5C5" stroke="#C97A80" stroke-width="1.2"/>`).join('');
+  return `<svg viewBox="0 0 280 280" class="wheel-svg" aria-hidden="true"><defs><radialGradient id="wsh" cx="50%" cy="50%" r="50%"><stop offset="62%" stop-color="#fff" stop-opacity="0"/><stop offset="100%" stop-color="#3D5A40" stop-opacity=".22"/></radialGradient>
+    <radialGradient id="whub" cx="40%" cy="35%" r="70%"><stop offset="0%" stop-color="#FFFDF7"/><stop offset="100%" stop-color="#F3E6C8"/></radialGradient></defs>
+    ${out}<circle cx="${C}" cy="${C}" r="${R}" fill="url(#wsh)" pointer-events="none"/>
+    <g class="wheel-hub"><circle cx="${C}" cy="${C}" r="33" fill="url(#whub)" stroke="#D8A93F" stroke-width="4"/>${petals}<circle cx="${C}" cy="${C}" r="8" fill="#F5D07A" stroke="#C9952E" stroke-width="1.6"/></g></svg>`;
+}
+function wheelRimSVG() {
+  const C = 160, bulbs = Array.from({ length: 20 }, (_, k) => { const a = ((k * 18 - 90) * Math.PI) / 180; return `<circle class="wbulb${k % 2 ? ' b2' : ''}" cx="${(C + 149 * Math.cos(a)).toFixed(2)}" cy="${(C + 149 * Math.sin(a)).toFixed(2)}" r="4.2"/>`; }).join('');
+  return `<svg viewBox="0 0 320 320" class="wheel-rim" aria-hidden="true"><defs><linearGradient id="wrim" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#FBE3A0"/><stop offset="55%" stop-color="#F5D07A"/><stop offset="100%" stop-color="#D9A84A"/></linearGradient></defs>
+    <circle cx="${C}" cy="${C}" r="158" fill="url(#wrim)" stroke="#B9862E" stroke-width="2"/><circle cx="${C}" cy="${C}" r="139.5" fill="#3D5A40" opacity=".35"/><circle cx="${C}" cy="${C}" r="138" fill="none" stroke="#B9862E" stroke-width="2"/>${bulbs}</svg>`;
+}
+const WHEEL_PIN = `<svg viewBox="0 0 44 56" class="wheel-pin" id="wheel-pin" aria-hidden="true"><path d="M22 54 6 22a17 17 0 1 1 32 0z" fill="#3D5A40" stroke="#FFF9F0" stroke-width="3" stroke-linejoin="round"/><circle cx="22" cy="17" r="7" fill="#F5D07A" stroke="#FFF9F0" stroke-width="2"/></svg>`;
+let wheelSpinning = false, wheelRot = 0, wheelFast = !!navigator.webdriver, wheelTimers = [];
+const spinsLine = () => (S.spins > 0 ? `You have <b>${S.spins}</b> spin${S.spins > 1 ? 's' : ''}` : 'No spins left — fill orders and level up for more');
 function openWheel() {
   closeWheel(); if (panel) closePanel();
   const o = el('div', 'wheel-ov'); o.id = 'wheel-ov';
   o.innerHTML = `<div class="wheel-card"><button class="close-btn" data-v8="wheel-close" aria-label="Close">×</button><h2>Bonus Wheel</h2>
-    <div class="wheel-wrap"><div class="wheel-pin"></div><div class="wheel-rot" id="wheel-rot" style="transform:rotate(${wheelRot}deg)">${wheelSVG()}</div></div>
-    <p class="wheel-res" id="wheel-res">${S.spins > 0 ? `You have <b>${S.spins}</b> spin${S.spins > 1 ? 's' : ''}` : 'No spins left — fill orders and level up for more'}</p>
-    <button class="btn btn-gold" id="wheel-go" data-v8="wheel-spin" ${S.spins > 0 ? '' : 'disabled'}>Spin</button>
-    <small class="muted wheel-odds">Wood 50% · Coins 33% · Card 12% · 2 Cards 4% · Jewel 1% (a Jewel is guaranteed by your ${V8.pity}th spin without one)</small></div>`;
+    <div class="wheel-wrap">${wheelRimSVG()}<div class="wheel-rot" id="wheel-rot" style="transform:rotate(${wheelRot}deg)">${wheelSVG()}</div>${WHEEL_PIN}<div class="wheel-pop" id="wheel-pop"></div></div>
+    <p class="wheel-res" id="wheel-res">${spinsLine()}</p>
+    <button class="btn btn-gold wheel-go" id="wheel-go" data-v8="wheel-spin" ${S.spins > 0 ? '' : 'disabled'}>Spin</button>
+    <small class="muted wheel-odds">${wheelOddsText()} · a Jewel is guaranteed by your ${V8.pity}th spin without one · earn spins by filling orders and levelling up</small></div>`;
   $('#ui').appendChild(o); fillIcons(o);
 }
-function closeWheel() { $('#wheel-ov')?.remove(); wheelSpinning = false; }
+function closeWheel() { $('#wheel-ov')?.remove(); wheelSpinning = false; wheelTimers.forEach(clearTimeout); wheelTimers = []; }
+function wheelSegAtTop(rot) { const n = V8.wheelSegs.length, a = (((-rot) % 360) + 360) % 360; return Math.floor(a / (360 / n)) % n; }
 function wheelSpinUI() {
-  if (wheelSpinning) return; const r = spinWheel(); if (!r) return; wheelSpinning = true;
-  const w = V8.wheel[r.i], jitter = (Math.random() - 0.5) * Math.min(24, (w.w / 100) * 300);
-  wheelRot = wheelRot - (wheelRot % 360) + 360 * 5 + (360 - w.mid) + jitter;
-  const rot = $('#wheel-rot'), res = $('#wheel-res'), go = $('#wheel-go'); if (go) go.disabled = true;
-  if (rot) { rot.style.transition = 'transform 3.2s cubic-bezier(.17,.67,.2,1)'; rot.style.transform = `rotate(${wheelRot}deg)`; }
-  setTimeout(() => {
+  if (wheelSpinning) return; const r = spinWheel(); if (!r) return; wheelSpinning = true; wheelTimers.forEach(clearTimeout); wheelTimers = [];
+  const segs = V8.wheelSegs, n = segs.length, step = 360 / n, cands = segs.map((g, i) => (g.p === r.i ? i : -1)).filter((i) => i >= 0), seg = cands[Math.floor(Math.random() * cands.length)];
+  const mid = seg * step + step / 2, jitter = (Math.random() - 0.5) * (step - 12), cur = wheelRot, d = (((-(mid + jitter) - cur) % 360) + 360) % 360;
+  r.seg = seg; wheelRot = cur + 360 * 6 + d;
+  const o = $('#wheel-ov'), rot = $('#wheel-rot'), res = $('#wheel-res'), go = $('#wheel-go'), pin = $('#wheel-pin'), pop = $('#wheel-pop');
+  if (go) go.disabled = true; o?.querySelectorAll('.wseg.win').forEach((g) => g.classList.remove('win')); o?.classList.remove('won'); if (pop) pop.className = 'wheel-pop';
+  if (res) res.innerHTML = 'Spinning…';
+  const T1 = wheelFast ? 150 : 4200, T2 = wheelFast ? 0 : 420, over = wheelFast ? 0 : 3.5;
+  if (rot) { rot.style.transition = `transform ${T1}ms cubic-bezier(.12,.7,.14,1)`; rot.style.transform = `rotate(${wheelRot + over}deg)`; }
+  if (rot && T2) wheelTimers.push(setTimeout(() => { rot.style.transition = `transform ${T2}ms cubic-bezier(.45,0,.3,1.4)`; rot.style.transform = `rotate(${wheelRot}deg)`; }, T1));
+  // pointer tick: flick the pin each time a segment edge passes under it
+  if (rot && pin && !wheelFast) { let last = wheelSegAtTop(cur), lastT = 0; const t0 = performance.now();
+    const loop = (t) => { if (!$('#wheel-rot') || t - t0 > T1 + T2 + 100) return; const m = getComputedStyle(rot).transform; if (m && m !== 'none') { const v = m.match(/matrix\(([^)]+)\)/)?.[1].split(',').map(Number); if (v) { const s2 = wheelSegAtTop((Math.atan2(v[1], v[0]) * 180) / Math.PI); if (s2 !== last) { last = s2; pin.classList.remove('tick'); void pin.getBoundingClientRect(); pin.classList.add('tick'); if (t - lastT > 90) { lastT = t; sfx('tap'); } } } } requestAnimationFrame(loop); };
+    requestAnimationFrame(loop); }
+  wheelTimers.push(setTimeout(() => {
     wheelSpinning = false; if (!res) return; sfx(r.k === 'jewel' ? 'goal' : 'coin');
-    res.innerHTML = `<b class="wheel-win">${r.text}</b><br/>${S.spins > 0 ? `${S.spins} spin${S.spins > 1 ? 's' : ''} left` : 'That was your last spin'}`; res.dataset.result = r.k;
+    const w = V8.wheel[r.i], big = r.n != null ? `+${fmtC(r.n)}` : r.k === 'jewel' ? '+1' : `×${w.n}`, sub = r.k === 'wood' ? 'Wood' : r.k === 'coins' ? 'Coins' : r.k === 'jewel' ? 'Jewel' : r.deco ? r.text : r.k === 'card2' ? 'Cards' : 'Card';
+    { const g = o?.querySelector(`.wseg[data-seg="${seg}"]`); if (g) { g.classList.add('win'); const sv = g.ownerSVGElement, hub = sv?.querySelector('.wheel-hub'); if (hub) sv.insertBefore(g, hub); } } o?.classList.add('won');
+    if (pop) { pop.innerHTML = `<i data-icon="${WHEEL_ICON[r.k]}"></i><b>${big}</b><small>${sub}</small>`; fillIcons(pop); pop.className = 'wheel-pop show'; pop.dataset.k = r.k;
+      wheelTimers.push(setTimeout(() => pop.classList.add('fade'), wheelFast ? 2600 : 2800)); }
+    res.innerHTML = `<b class="wheel-win">${r.text}</b><br/>${S.spins > 0 ? `${S.spins} spin${S.spins > 1 ? 's' : ''} left` : 'That was your last spin'}`; res.dataset.result = r.k; res.dataset.seg = seg;
     if (go) go.disabled = !(S.spins > 0); try { sparkles($('#ui'), innerWidth / 2, innerHeight * 0.4, 16); } catch (_) {}
-  }, navigator.webdriver ? 200 : 3300);
+  }, T1 + T2 + 50));
+  return r;
 }
 // ---------- Decorations ----------
 function pickDeco(tiers, w) {
@@ -5230,7 +5264,7 @@ function v8Tick() {
 Object.defineProperties(window.__ps, Object.getOwnPropertyDescriptors({   // descriptors, so the getters stay live
   v8Tick, statXP, xpNeed, gainXP, get lvl() { return S.lvl; }, get xp() { return S.xp; }, get spins() { return S.spins; }, set spins(v) { S.spins = v; v8Hud(); },
   orderSlots, orderPool, makeOrder, fillOrder, skipOrder, ordersTick, orderPay, get orders() { return S.orders; }, managerAt,
-  spinWheel, wheelPick, openWheel, closeWheel, V8, DECO8, grantDecoCard, buyDeco, decoMarketRows, decoPlacedAt, atmosphereAt: (loc) => atmosphere(loc), atmosMultAt: (loc) => atmosMult(loc),
+  spinWheel, wheelPick, openWheel, closeWheel, wheelSegAtTop, get wheelRot() { return wheelRot; }, set wheelFast(v) { wheelFast = !!v; }, V8, DECO8, grantDecoCard, buyDeco, decoMarketRows, decoPlacedAt, atmosphereAt: (loc) => atmosphere(loc), atmosMultAt: (loc) => atmosMult(loc),
   refJoin, refClaim, refProgress, openInvite, canEnterCode, setRefMock(m) { window.__refMock = m; }, levelUp,
   setForcedDeco(k) { forcedDeco = k; }, BUILDING_LV, WINDMILL,
 }));
