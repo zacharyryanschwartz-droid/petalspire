@@ -16,7 +16,7 @@ import { createAudio, MUSIC_CREDITS } from './audio.js';
 
 // Save format: v0.3, v0.31 and v0.4 share one localStorage key (schema v: 3). `build` records which prototype build last wrote the save;
 // v0.3 / v0.31 saves (no `build`, no per-plot barrels) are migrated on load (migrate04 below); v0.4 saves load as-is and are re-tagged. Prototype builds stay below 1.0.
-export const BUILD = '0.8.3';
+export const BUILD = '0.8.4';
 // v0.65: anonymous player tracking (Games Backend on Appwrite; no API key in the game, nothing personal). Skipped for automated runs (navigator.webdriver).
 try { if (!navigator.webdriver) initTracker({ endpoint: 'https://nyc.cloud.appwrite.io/v1', projectId: '6ae0a41a002ce0a48fac', gameId: 'petalspire', platform: 'web', appVersion: BUILD }); } catch (_) {}
 const SAVE_KEY = 'petalspire.v03', V02_KEY = 'petalspire.v02', OLD_KEYS = ['petalspire.v01'];
@@ -5194,7 +5194,8 @@ function buyDeco(k) {
 // ---------- Referrals ----------
 let REF = null;
 const refApi = () => window.__refMock || REF || (navigator.webdriver ? null : (REF = createReferral({ endpoint: 'https://nyc.cloud.appwrite.io/v1', projectId: '6ae0a41a002ce0a48fac', game: 'petalspire' })));
-const refLink = (code) => `${location.origin}${location.pathname}?ref=${code}`;
+const LIVE_URL = 'https://zacharyryanschwartz-droid.github.io/petalspire/';   // canonical live site: invite links always point here (also when embedded on itch.io)
+const refLink = (code) => `${LIVE_URL}?ref=${code}`;
 const canEnterCode = () => !S.ref && S.installedAt > 0 && Date.now() - S.installedAt < V8.ref.codeDays * 86400e3;
 let refBusy = false, refFriends = null, refMsg = '';
 async function refEnsureCode() {
@@ -5292,8 +5293,9 @@ function v8Tick() {
     if (a === 'ref-enter') return refJoin($('#ref-code-in')?.value || '');
     if (a === 'ref-copy' || a === 'ref-share') {
       const url = refLink(S.myCode), text = `Come grow a garden with me in Petalspire 🌸 Use my code ${S.myCode} for 100 coins + a Card Pack:`;
-      if (a === 'ref-share' && navigator.share) { navigator.share({ title: 'Petalspire', text, url }).catch(() => {}); return; }
-      (navigator.clipboard?.writeText(`${text} ${url}`) || Promise.reject()).then(() => toast('Invite link copied'), () => toast(url));
+      const copy = () => { let p; try { p = navigator.clipboard?.writeText(`${text} ${url}`); } catch (_) {} (p || Promise.reject()).then(() => toast('Invite link copied'), () => toast(url)); };   // clipboard can be refused in an iframe (itch.io): show the link instead
+      if (a === 'ref-share' && navigator.share) { navigator.share({ title: 'Petalspire', text, url }).catch((e) => { if (e?.name !== 'AbortError') copy(); }); return; }
+      copy();
     }
   };
   $('#ui').addEventListener('click', onV8, true);

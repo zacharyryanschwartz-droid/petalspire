@@ -1,4 +1,4 @@
-# Petalspire v0.8.3
+# Petalspire v0.8.4
 
 A cozy 3D flower-garden prototype for iPhone Safari (portrait, one thumb). Also plays on desktop with a mouse.
 This is a **prototype**: version numbers stay below 1.0 until the first official release.
@@ -20,6 +20,10 @@ This is a **prototype**: version numbers stay below 1.0 until the first official
 7. **Land for sale.** Five wooded plots, each with a floating For Sale sign: 450 → 900 → 1800 → 3000 → 4500 coins (v0.7.2; was 150 → 1500).
 
 Drag with one finger to pan, pinch to zoom, and twist with two fingers to turn. On desktop, right-drag or shift-drag turns the view.
+
+## New in v0.8.4: invite links for itch.io
+- Invite and share links always use the live site, https://zacharyryanschwartz-droid.github.io/petalspire/?ref=CODE, wherever the game runs (one constant, `LIVE_URL` in `js/main.js`). Inside the itch.io embed a `?ref=` never reaches the game, so friends there type the code under **Settings → Friends → Have a friend’s code?**
+- If the clipboard (or the share sheet) is refused, as it can be inside an iframe, the link is shown in a toast instead.
 
 ## New in v0.8.3: drop rates behind a small "i"
 - Odds and percentages are no longer printed in the regular UI (Card Pack screen, collection tier headers, Market tier hints, the Swap confirm, the Bonus Wheel).
