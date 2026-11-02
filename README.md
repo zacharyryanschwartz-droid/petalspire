@@ -21,6 +21,16 @@ This is a **prototype**: version numbers stay below 1.0 until the first official
 
 Drag with one finger to pan, pinch to zoom, and twist with two fingers to turn. On desktop, right-drag or shift-drag turns the view.
 
+## New in v0.8.6: a clearer guide, Sprig, orders and simpler menus
+
+- **Meet Sprig** — a little drawn sprout who talks you through the first steps, then explains each menu (Market, Card Packs, Cards, Farm Stand, Orders, Workers, Still, Tinctures, Drying Rack, Settings and more) the first time you open it. Each tip shows once; tap to close.
+- **13 clear goals** — every step reads "Goal X of 13: …" with a short reason why, a dimmed screen with a glowing cut-out and a bouncing arrow on the exact thing to tap, and a small ✓ when it's done. Only the highlighted thing can be tapped; you can still drag and zoom the view, and the camera never moves on its own. If the target is off screen, an arrow at the edge shows which way to look.
+- **Plant all your starting seeds** (7), then learn the three ways to get more: harvest, the Market and Card Packs.
+- **Orders** — now behind Farm Stand › Orders. The guide explains them (double pay plus a free Bonus Wheel spin), walks you through an easy first order and your first spin.
+- **Simpler menus** — painted card art is gone from menus and panels (Market, Bag › Cards, Card Pack panel, Jewel Shop, offers, seed pickers); it stays in pack openings and your collection.
+- **Ad bonus moved** — a small + on the coin counter (after the guide). Bonuses now grow with your level: ad rewards, Bonus Wheel Coins/Wood and Daily Gift Coins/Wood go up 10% per level (up to Level 40), with bonus Wood every 3rd ad from Level 5 and a bonus card every 5th ad from Level 10.
+- Short HUD counts (12.3k) so the top bar fits small phones.
+
 ## New in v0.8.5: first steps guide and clearer planting
 - **First steps guide** for brand-new gardens: one short line at a time, with a soft honey pulse on the button to tap or a glowing ring over the tree, patch, soil square or stand. It moves on by itself when you do the step: chop a tree → build a raised bed → plant a seed → water it → let it grow → harvest the bloom → build the Farm Stand → stock it → sell to a customer. **Skip** anytime; it never moves the camera. Existing saves don't see it. Replay it from **Settings → Help → Replay first steps**.
 - **Planting is easier to spot.** Every raised bed with empty soil shows a small **Tap to plant** tag (taps go straight through to the bed). The soil sheet says **Tap a seed to plant it here** above your seeds. With no seeds, the tag and the sheet say where seeds come from: harvests (every harvest gives seeds back), or the Supply Market once it's rebuilt.
