@@ -21,6 +21,21 @@ This is a **prototype**: version numbers stay below 1.0 until the first official
 
 Drag with one finger to pan, pinch to zoom, and twist with two fingers to turn. On desktop, right-drag or shift-drag turns the view.
 
+## New in v0.8.7.2: one set of starting goals
+
+- Sprig’s guide (Goal X of 13) is now the only set of starting goals. The older 12-goal list, its goal pill at the top of the screen and its “All goals complete” card are gone.
+- The old list’s reward, a free Tincture Stand, is now Sprig’s gift for finishing the guide. Old saves keep it (or get it) on load.
+- The Starter Pack offer now waits for the end of Sprig’s guide.
+- Water each plant on its own: tap a plant to give it 1 water and it starts growing right away (wet soil, splash, “+1 water”). Dry plants show a droplet. A full bed still takes about the same water in total, and Irrigation levels still lower the cost per plant.
+- The guide’s water step is now “Water each seedling” and points at the dry ones.
+- Planting a seed just plants it: no water panel or tip pops up. The droplet on a dry plant is the only cue.
+- Rebalanced rewards: orders pay a little extra (1.25× the stand price, was double) and ask for at least 4 items; Bonus Wheel coin and Wood prizes are halved, and they grow half as fast with your level.
+
+- **Last goal: open a Card Pack.** Sprig's final step highlights a Pack button (packs give you new plants and items) and gives a free pack if you have none. If you already opened a pack, the step is skipped and the goal count drops by one.
+- **Daily Gift on the HUD.** A small gift-box button sits beside the Bonus Wheel, shows a dot when a gift is ready, and stays hidden until the guide is done. The Market strip is gone.
+- **Upgrade badges.** A small floating up-arrow appears over the stand, rack or a barrel when you can afford its upgrade (hidden during the guide and while menus are open). Upgrade sections now sit at the bottom of each menu.
+- **Bag > Cards** shows small art thumbnails, one short line about levels, and no number walls. Red emoji pack icons were replaced with the drawn pack icon. Long formula notes (Tea, Press, Kitchen, Still) are now one plain sentence.
+
 ## New in v0.8.7.1: spin button fix
 
 - The Bonus Wheel button now stays fully on screen on narrow phones (375–430 px wide).

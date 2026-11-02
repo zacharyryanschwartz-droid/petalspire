@@ -1438,3 +1438,9 @@ body.guide-on #tab-build.glow{animation:none;box-shadow:none}
 .order-board .ord-grid{grid-template-columns:1fr}
 body.guide-on #ad-banner{display:none!important}
 body.guide-on #jd-bloom, body.guide-on #jd-rush{display:none!important}
+.stack-ico{overflow:hidden}.stack-ico img.card-thumb{width:100%;height:100%;object-fit:cover;border-radius:12px;display:block}.stack-ico .card-thumb.svg{display:grid;place-items:center;width:44px;height:44px}.stack-ico .card-thumb.svg svg{width:44px;height:44px}
+.gift-btn{position:fixed;right:calc(env(safe-area-inset-right,0px) + 10px);top:calc(env(safe-area-inset-top,0px) + 62px);z-index:6;pointer-events:auto;width:38px;height:36px;display:grid;place-items:center;padding:0;border-radius:999px;border:1.5px solid #F5D07A;background:rgba(255,249,240,.94);box-shadow:0 3px 10px rgba(61,90,64,.18)}
+.gift-btn.hidden{display:none}.gift-btn .gift-dot{position:absolute;top:-2px;right:-2px;width:11px;height:11px;border-radius:50%;background:#E0625A;border:2px solid #FFF9F0;display:none}.gift-btn.ready .gift-dot{display:block}
+.g-pack .pk-ico svg,.cu-ico svg{width:16px;height:16px;vertical-align:-3px;margin-right:2px}.pack-art.plain svg{width:64px;height:64px}
+.upg-badge{position:absolute;transform:translate(-50%,-100%);width:26px;height:26px;border-radius:50%;background:#6FA86A;border:2px solid #FFF9F0;box-shadow:0 2px 6px rgba(61,90,64,.3);display:grid;place-items:center;pointer-events:none;z-index:3;animation:upgBob 1.6s ease-in-out infinite}
+@keyframes upgBob{0%,100%{margin-top:0}50%{margin-top:-4px}}
