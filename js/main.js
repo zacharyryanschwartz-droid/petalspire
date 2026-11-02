@@ -16,7 +16,7 @@ import { createAudio, MUSIC_CREDITS } from './audio.js';
 
 // Save format: v0.3, v0.31 and v0.4 share one localStorage key (schema v: 3). `build` records which prototype build last wrote the save;
 // v0.3 / v0.31 saves (no `build`, no per-plot barrels) are migrated on load (migrate04 below); v0.4 saves load as-is and are re-tagged. Prototype builds stay below 1.0.
-export const BUILD = '0.8.7';
+export const BUILD = '0.8.7.1';
 // v0.65: anonymous player tracking (Games Backend on Appwrite; no API key in the game, nothing personal). Skipped for automated runs (navigator.webdriver).
 try { if (!navigator.webdriver) initTracker({ endpoint: 'https://nyc.cloud.appwrite.io/v1', projectId: '6ae0a41a002ce0a48fac', gameId: 'petalspire', platform: 'web', appVersion: BUILD }); } catch (_) {}
 const SAVE_KEY = 'petalspire.v03', V02_KEY = 'petalspire.v02', OLD_KEYS = ['petalspire.v01'];

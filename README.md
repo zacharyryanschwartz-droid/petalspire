@@ -21,6 +21,10 @@ This is a **prototype**: version numbers stay below 1.0 until the first official
 
 Drag with one finger to pan, pinch to zoom, and twist with two fingers to turn. On desktop, right-drag or shift-drag turns the view.
 
+## New in v0.8.7.1: spin button fix
+
+- The Bonus Wheel button now stays fully on screen on narrow phones (375–430 px wide).
+
 ## New in v0.8.7: the guide comes first, tap to water, Orders icon
 - Until every guide goal is done, the Daily Gift, wheel spins (except the spin goal), offers, promos, level-up popups, Sprig menu tips and badges wait; they show once the guide ends.
 - The guide can't be skipped any more. Replay first steps (Settings) still works and can be ended. Saves that already finished or skipped the guide play normally.
