@@ -39,7 +39,8 @@ export const speedFor = (sun, C = SHADE) => C.minSpeed + (1 - C.minSpeed) * Math
 export function sunLabel(sun, C = SHADE) {
   const pct = Math.round(sun * 100);
   const how = sun >= C.slowerBelow ? 'full speed' : sun >= C.muchSlowerBelow ? 'growing slower' : 'growing much slower';
-  return { pct, how, text: `Sun: ${pct}% · ${how}`, speed: speedFor(sun, C) };
+  const word = sun >= C.slowerBelow ? 'Sunny · fast growth' : sun >= C.muchSlowerBelow ? 'Part shade · slower growth' : 'Shady · slow growth';   // v0.8.6.1: words, no percentages
+  return { pct, how, word, text: word, speed: speedFor(sun, C) };
 }
 // Keep progress k fixed at time `at` while changing the duration: returns the new start time.
 export const rebaseStart = (start, oldMs, newMs, at) => { if (at <= start) return start; const k = Math.min(1, Math.max(0, (at - start) / oldMs)); return at - k * newMs; };
