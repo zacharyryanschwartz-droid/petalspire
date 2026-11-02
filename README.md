@@ -21,6 +21,16 @@ This is a **prototype**: version numbers stay below 1.0 until the first official
 
 Drag with one finger to pan, pinch to zoom, and twist with two fingers to turn. On desktop, right-drag or shift-drag turns the view.
 
+## New in v0.8.7: the guide comes first, tap to water, Orders icon
+- Until every guide goal is done, the Daily Gift, wheel spins (except the spin goal), offers, promos, level-up popups, Sprig menu tips and badges wait; they show once the guide ends.
+- The guide can't be skipped any more. Replay first steps (Settings) still works and can be ended. Saves that already finished or skipped the guide play normally.
+- Tap a thirsty bed to water it (1 from the barrels, with a splash and "+1 water"). Empty barrels show when more rain comes. The bed panel has no water buttons now; long-press opens bed details. A ripe plant is picked with one tap.
+- The guide's ring sits on the real target. Water and harvest steps point at the plant with no bed panel open, and the goal card moves to the side away from the target.
+- Orders have their own icon on screen (next to Bloom and Rush), with a count badge. They're no longer in the Farm Stand menu. Each order lists one row per item (icon, name, have / need, a check when met), the reward, and one Deliver button.
+- Sprig's menu tips sit above the menu, clear of its content.
+- "Tap to plant" tags only show during the guide's planting step.
+- No percentages: the sun line is in words (v0.8.6.1).
+
 ## New in v0.8.6: a clearer guide, Sprig, orders and simpler menus
 
 - **Meet Sprig** — a little drawn sprout who talks you through the first steps, then explains each menu (Market, Card Packs, Cards, Farm Stand, Orders, Workers, Still, Tinctures, Drying Rack, Settings and more) the first time you open it. Each tip shows once; tap to close.

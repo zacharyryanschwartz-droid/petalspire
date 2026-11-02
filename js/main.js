@@ -16,7 +16,7 @@ import { createAudio, MUSIC_CREDITS } from './audio.js';
 
 // Save format: v0.3, v0.31 and v0.4 share one localStorage key (schema v: 3). `build` records which prototype build last wrote the save;
 // v0.3 / v0.31 saves (no `build`, no per-plot barrels) are migrated on load (migrate04 below); v0.4 saves load as-is and are re-tagged. Prototype builds stay below 1.0.
-export const BUILD = '0.8.6.1';
+export const BUILD = '0.8.7';
 // v0.65: anonymous player tracking (Games Backend on Appwrite; no API key in the game, nothing personal). Skipped for automated runs (navigator.webdriver).
 try { if (!navigator.webdriver) initTracker({ endpoint: 'https://nyc.cloud.appwrite.io/v1', projectId: '6ae0a41a002ce0a48fac', gameId: 'petalspire', platform: 'web', appVersion: BUILD }); } catch (_) {}
 const SAVE_KEY = 'petalspire.v03', V02_KEY = 'petalspire.v02', OLD_KEYS = ['petalspire.v01'];
@@ -359,6 +359,10 @@ function applyBarrelLv(lot, to, paid) {   // v0.64: runs when the upgrade timer 
   (S.stats.barrelUps ||= {})[lot] = b.lv; writeSave(); syncBarrels(); hud(); if (focus) renderSheet(); if (panel) renderPanel();
   W.setBarrelLv?.(lot, b.lv, true); W.poof?.(V3(b.x, 1.0, b.z), '#F5D07A', 18, 1.6);
   toast(`✨ Rain Barrel upgraded to Lv${b.lv} · holds ${regenMax(b)} water`);
+}
+function dryToast() {   // v0.8.7: barrels are empty — say when the next water lands
+  const bs = Object.entries(S.barrels).filter(([l]) => barrelRoof(l)).map(([, b]) => barrelLeft(b)).filter((t) => t > 0);
+  return bs.length ? `<i data-icon="water"></i> Barrels are empty · more rain in ${fmtTime(Math.min(...bs))}` : '<i data-icon="water"></i> Barrels are empty · build a roof by a barrel to catch rain';
 }
 function takeFromBarrel(b) { if (b.w >= regenMax(b)) b.at = now(); b.w--; }
 // Hand watering (v0.4 rule): the bed's own plot barrel first, then the nearest other barrel with water.
@@ -1488,7 +1492,7 @@ function renderSheet() {
     if (thirsty(p)) { const tw = totalWater(), src = tw ? handSource(i) : null, bed = bedOfTile(i), bw = bedWater(bed, i), lv = bedLv(bed), wait = Object.entries(S.barrels).filter(([l, b]) => b.w < regenMax(b) && barrelRoof(l)).map(([, b]) => barrelLeft(b));
       const what = p.wateredAt ? 'to bud' : 'to start growing', pct = bw.needU ? Math.min(100, (bw.paidU / bw.needU) * 100) : 0;
       body += `<div class="bed-water" data-bed-water="${bw.have}/${bw.need}" data-bed-stage="${p.wateredAt ? 'bud' : 'start'}"><div class="bw-top"><i data-icon="water"></i> <b>Bed water ${bw.have}/${bw.need}</b> <small>${what}${lv > 1 ? ` · Irrigation Lv${lv}` : ''}</small></div><span class="bw-bar"><em style="width:${pct.toFixed(1)}%"></em></span></div>
-      <p class="muted">${p.wateredAt ? 'Growth has paused at the end of the sprout stage — this bed needs its bud water.' : p.sp === 'bluelotus' ? (lotusFill(p) ? 'One more watering fills the barrel — then the lotus grows.' : 'The lotus barrel needs two waterings: half, then full.') : 'This bed needs its water before the seeds can grow.'} Each pour is 1 water${lv > 1 ? '' : ` · a full bed takes ${WATER.stage[0]} to start + ${WATER.stage[0]} to bud (less with Irrigation levels)`}.${tw ? ` <small>From: the ${lotName(src.lot)} barrel</small>` : ` Rain barrels refill by 1 water every ${regenS() >= 60 ? 'minute' : regenS() + ' s'}${wait.length ? ` · next in ${clock(Math.min(...wait))}` : ''}.`}</p><div class="ts-actions"><button class="btn btn-primary" data-act="water" ${tw ? '' : 'disabled'}><i data-icon="water"></i> Pour 1 (${tw} in barrels)</button>${bw.need - bw.have > 1 ? `<button class="btn" data-act="water-bed" ${tw ? '' : 'disabled'}>Fill bed (${Math.min(tw, bw.need - bw.have)})</button>` : ''}</div>`; }
+      <p class="muted">${p.wateredAt ? 'Growth has paused at the end of the sprout stage — this bed needs its bud water.' : p.sp === 'bluelotus' ? (lotusFill(p) ? 'One more watering fills the barrel — then the lotus grows.' : 'The lotus barrel needs two waterings: half, then full.') : 'This bed needs its water before the seeds can grow.'} Each pour is 1 water${lv > 1 ? '' : ` · a full bed takes ${WATER.stage[0]} to start + ${WATER.stage[0]} to bud (less with Irrigation levels)`}.${tw ? ` <small>From: the ${lotName(src.lot)} barrel</small>` : ` Rain barrels refill by 1 water every ${regenS() >= 60 ? 'minute' : regenS() + ' s'}${wait.length ? ` · next in ${clock(Math.min(...wait))}` : ''}.`}</p><p class="ts-tapwater"><i data-icon="water"></i> Tap the bed to water it · ${tw} in barrels</p>`; }
     else if (st < 3) body += `<div class="progress"><b id="sheet-prog" style="width:${(k * 100).toFixed(1)}%"></b></div>${dots}<p class="muted" id="sheet-left" style="margin-top:6px">Blooms in ${fmtTime(p.growMs * (1 - k))}</p>`;
     else body += `${dots}<div class="ts-actions"><button class="btn btn-gold" data-act="harvest"><i data-icon="sparkle"></i> Harvest</button></div>`;
   }
@@ -1541,7 +1545,7 @@ function water(i, auto = false) {
   if (auto) { if (!quiet) { W.irrigPulse(bed); popAt(W.tileWorld(i).setY(1), `<i data-icon="water"></i>${started || budded ? msg : 'Irrigated' + prog}`); } checkGoals(); return true; }
   if (started && p.wateredAt && p.growMs - (now() - p.wateredAt) > BOOSTS.kinds.grow.minLeftS * 1000) setTimeout(() => maybeBoost('grow', { i, sp: p.sp }), 700);   // v0.66
     tip('growing'); if (p.sun < 0.85) tip('shade'); if (S.stats.watered === 3) tip('barrel');
-  popAt(W.tileWorld(i).setY(1), `<i data-icon="water"></i>${msg}`); checkGoals(); return true;
+  popAt(W.tileWorld(i).setY(1), `<i data-icon="water"></i>+1 water · ${msg}`); checkGoals(); return true;
 }
 // ---------------- v0.4: card stacks & levels ----------------
 function cardLv(id) { const v = Math.round(+S.cards[id]?.lv); return v >= 1 ? Math.min(v, CARD_LEVELS.thresholds.length + 1) : 1; }   // v0.63: always a whole number 1–4
@@ -1720,19 +1724,22 @@ function askRush() {
 function syncJewelDock() {
   const d = $('#jeweldock'); if (!d) return;
   const n = S.introDone ? bloomTargets().length : 0, rl = rushLeft(), rr = S.introDone && rushReady();
-  const bb = $('#jd-bloom'), rb = $('#jd-rush');
+  const bb = $('#jd-bloom'), rb = $('#jd-rush'), ob = $('#jd-orders'), L = curLoc(); let oShow = false; try { oShow = !!(S.introDone && ordersShown(L) && orderSlots(L) && S.orders?.[L]); } catch (_) {}
+  if (ob) { ob.classList.toggle('hidden', !oShow); const on = oShow ? S.orders[L].slots.filter((o) => o?.items).length : 0, em = ob.querySelector('em'); em.textContent = on || ''; em.classList.toggle('hidden', !on); }
   bb.classList.toggle('hidden', !n); if (n) { const j = bloomJewels(n); if (bb.dataset.j !== String(j)) { bb.dataset.j = j; bb.querySelector('em').innerHTML = `${j}<i data-icon="jewel"></i>`; fillIcons(bb); } }
   rb.classList.toggle('hidden', !(rr || rl > 0)); rb.classList.toggle('active', rl > 0);
   const em = rb.querySelector('em'), want = rl > 0 ? clock(rl) : `${RUSH.jewels}<i data-icon="jewel"></i>`; if (em.dataset.v !== want) { em.dataset.v = want; em.innerHTML = want; if (!rl) fillIcons(rb); }
-  d.classList.toggle('hidden', (!n && !(rr || rl > 0)) || !!placing || !!buildMode);   // out of the way while placing / building
+  d.classList.toggle('hidden', (!n && !(rr || rl > 0) && !oShow) || !!placing || !!buildMode);   // out of the way while placing / building
   // v0.65: Bloom / Rush sit on the LEFT edge, stacked above the tool dock (Sickle / Plow) when that is showing
   if (!d.classList.contains('hidden')) { const tb = $('#tabbar').getBoundingClientRect(), td = $('#tooldock'), th = td && !td.classList.contains('hidden') ? td.getBoundingClientRect().height + 8 : 0; if (tb.height) d.style.bottom = Math.round(innerHeight - tb.top + 56 + th) + 'px'; }
 }
 $('#jd-bloom')?.addEventListener('click', askBloom);
 $('#jd-rush')?.addEventListener('click', askRush);
+$('#jd-orders')?.addEventListener('click', () => (panel === 'orders' ? closePanel() : openPanel('orders')));
 // ---------------- Panels ----------------
 let panel = null, marketTab = 'buy', bagTab = 'satchel', panelArg = null, panelAt = 0;
 function openPanel(name, tab) {
+  if ((name === 'stand' || name === 'ostand') && tab === 'orders') { name = 'orders'; tab = undefined; }   // v0.8.7: Orders have their own screen
   if (buildMode) exitBuild(); if (placing) exitPlace();
   if (name !== panel) standView = name === 'stand' || name === 'ostand' ? (tab === 'orders' ? 'orders' : 'stand') : standView; panel = name; if (name === 'market' && tab) marketTab = tab; if (name === 'bag' && tab) bagTab = tab; if (name === 'lot' || name === 'orchardtree' || name === 'worker' || name === 'bulk') panelArg = tab;
   $('#tile-sheet').classList.add('hidden'); if (selected != null || focus) { selected = null; focus = null; W.select(null); }
@@ -2226,11 +2233,16 @@ let sprigEl = null;
 function sprigHide() { if (sprigEl) { sprigEl.remove(); sprigEl = null; } }
 function sprigMaybe() {
   if (!panel || (navigator.webdriver && !localStorage.getItem('petalspire.tipTest'))) return;
-  if (S.tut && !S.tut.done) return;   // the first-steps guide does the talking until it is finished
+  if (S.tut && !S.tut.done) return;   // the first-steps guide does the talking (v0.8.7: tips for menus opened during it show once it ends, on their next open) until it is finished
   const k = tipKey(), txt = MENU_TIPS[k]; if (!txt) return; S.seenTips ||= {}; if (S.seenTips[k]) return;
   S.seenTips[k] = 1; save(); sprigHide();
   sprigEl = el('div', 'sprig-tip', `${SPRIG_SVG}<div class="sprig-bubble"><p>${txt}</p><small>Tap to close</small></div>`); sprigEl.dataset.tip = k;
-  sprigEl.addEventListener('click', (e) => { e.stopPropagation(); sprigHide(); }); $('#ui').appendChild(sprigEl);
+  sprigEl.addEventListener('click', (e) => { e.stopPropagation(); sprigHide(); }); $('#ui').appendChild(sprigEl); sprigPlace();
+}
+function sprigPlace() {   // v0.8.7: Sprig docks at the screen edge clear of the menu (above it when there is room, else at the top over the panel header)
+  if (!sprigEl) return; const pr = $('#panel')?.getBoundingClientRect(), h = sprigEl.offsetHeight || 80, hudB = ($('#hud')?.getBoundingClientRect().bottom || 60) + 6;
+  const room = pr && pr.height ? pr.top - hudB : innerHeight; sprigEl.style.bottom = 'auto';
+  sprigEl.style.top = Math.round(room >= h + 4 ? Math.max(hudB, pr.top - h - 8) : hudB) + 'px'; sprigEl.classList.toggle('sprig-tight', room < h + 4);
 }
 function renderPanel() { const r = inBag(null, () => renderPanel_()); try { sprigMaybe(); } catch (_) {} return r; }
 function renderPanel_() {
@@ -2240,13 +2252,7 @@ function renderPanel_() {
   if (panel === 'build') { title.innerHTML = curLoc() === 'orchard' ? 'Build · Orchard' : 'Build · Home'; body.innerHTML = buildHTML(); }
   if (panel === 'stand') { title.innerHTML = 'Farm Stand'; body.innerHTML = standHTML(); }
   if (panel === 'ostand') { title.innerHTML = 'Orchard Stand'; body.innerHTML = ostandHTML(); }
-  if (panel === 'stand' || panel === 'ostand') {   // v0.8.6: the Order Board lives behind an "Orders" button on the stand (not at the top of the stand menu)
-    const L = panel === 'ostand' ? 'orchard' : 'home', board = ordersShown(L) ? orderBoardHTML(L) : '';
-    if (!board) standView = 'stand';
-    if (standView === 'orders' && board) { title.innerHTML = L === 'orchard' ? 'Orchard Stand · Orders' : 'Farm Stand · Orders'; body.innerHTML = `<button class="btn sm ord-back" type="button" data-act="stand-back">‹ Back to the stand</button><p class="ord-what">A customer asks for certain items. Deliver them for <b>double</b> the normal price plus a free <b>Bonus Wheel</b> spin.</p>${board}`; }
-    else if (board) { const B = S.orders[L], ready = B.slots.filter((o) => orderReady(L, o)).length, open = B.slots.filter((o) => o?.items).length;
-      body.insertAdjacentHTML('afterbegin', `<button class="row ord-open" type="button" data-act="stand-orders"><div class="ico emoji-ico">📋</div><div class="meta"><b>Orders</b><small>${open ? `${open} customer${open > 1 ? 's' : ''} waiting${ready ? ` · <b>${ready} ready to fill</b>` : ''}` : 'New orders come in soon'}</small></div><span class="chev">›</span></button>`); }
-  }
+  if (panel === 'orders') { const L = curLoc(); title.innerHTML = 'Orders'; body.innerHTML = `<p class="ord-what">A customer asks for certain items. Deliver them for <b>double</b> the normal price plus a free <b>Bonus Wheel</b> spin.</p>${ordersShown(L) && orderSlots(L) ? orderBoardHTML(L) : '<p class="muted">No orders here yet.</p>'}`; }   // v0.8.7: Orders live behind their own HUD icon, not in any menu
   if (panel === 'bulk') { title.innerHTML = 'Bulk Sell Box'; body.innerHTML = bulkHTML(panelArg); }
   if (panel === 'market') { title.innerHTML = curLoc() === 'orchard' ? 'Supply Market · Orchard' : 'Supply Market · Home'; body.innerHTML = marketHTML(); }
   if (panel === 'rack') { title.innerHTML = 'Drying Rack'; body.innerHTML = rackHTML(); }
@@ -2767,7 +2773,7 @@ function boostText(kind, d) {
   return `${SPECIES[d.sp].name} ready now`;
 }
 function maybeBoost(kind, d, force = false) {
-  const B = BOOSTS, K = B.kinds[kind]; if (!K || !Ads.rewardOn || !monetOn() || !S.introDone || boostEl || adBlocked() || modalOpen()) return false;
+  const B = BOOSTS, K = B.kinds[kind]; if (guideOn() || !K || !Ads.rewardOn || !monetOn() || !S.introDone || boostEl || adBlocked() || modalOpen()) return false;
   if (!force) {
     if ((S.stats.harvests || 0) < B.minHarvests) return false;
     if (now() - (M().boostAt || 0) < B.cooldownMs) return false;
@@ -2867,7 +2873,7 @@ function offerCardHTML(o, compact = false) {
 const starterCardHTML = (compact = false) => offerCardHTML(STARTER_PACK, compact);
 // one popup, the moment the beginning goals are done (S.goalsClosed is set when the closing card is dismissed)
 function starterReady() { const st = M().starter; return !st.bought && !st.shows && starterUnlocked() && !!S.goalsClosed; }
-function maybeStarter() { if (!monetOn() || !S.introDone || panel || placing || buildMode || modalOpen() || closingEl || !starterReady()) return; showStarter(true); }
+function maybeStarter() { if (guideOn() || !monetOn() || !S.introDone || panel || placing || buildMode || modalOpen() || closingEl || !starterReady()) return; showStarter(true); }
 // v0.67 migration: the old $1.99 offer's timed popups don't count — the new Starter Pack gets its one popup after the goals
 // v0.68: Rosehip Oil is Home-press only, Almond Oil/Butter Orchard-press only. A press still working on a recipe that no longer
 // belongs there gives the ingredients back to that place's Bag; finished jars stay ready to collect, so nothing is lost.
@@ -2940,12 +2946,14 @@ function wish(id) { const g = OTHER_GAMES.find((x) => x.id === id); if (!g) retu
   toast(M().wish[id] ? `♥ ${g.name} is on your wishlist` : `Removed ${g.name} from your wishlist`);
   for (const r of document.querySelectorAll('.promo-card')) { r.outerHTML = promoCardHTML(); } fillIcons($('#ui')); }
 function promoMilestone(tag, force = false) {
+  if (!force && afterGuide(() => promoMilestone(tag))) return false;
   if (!monetOn() && !force) return false; const P = CROSS_PROMO, pr = M().promo;
   if (!force && ((pr.shows || 0) >= P.maxShows || M().playMs < P.firstAfterMs || (pr.last && now() - pr.last < P.minGapMs))) return false;
   const go = () => { if (panel || placing || buildMode || modalOpen()) return setTimeout(go, 4000); showPromo(tag); };
   setTimeout(go, force ? 0 : 3500); return true;
 }
 function showPromo(tag = '') {
+  if (afterGuide(() => showPromo(tag))) return;
   const pr = M().promo; pr.shows = (pr.shows || 0) + 1; pr.last = now(); pr.tag = tag; save();
   promoEl?.remove(); const e = promoEl = el('div', 'cozy-modal promo-modal'); e.id = 'promo';
   e.innerHTML = `<div class="cozy-card"><button class="close-btn" data-promo-x aria-label="Close">×</button>${studioHeadHTML()}<p class="muted">Lovely garden! If you enjoy Petalspire, here’s what we’re making next.</p>${promoCardHTML()}<button class="btn sm sp-later" data-promo-x>Back to the garden</button></div>`;
@@ -3018,7 +3026,7 @@ function showDaily(auto = false) {
 }
 // first open each day: show the popup once the intro is done and nothing else is on screen (not in automated tests unless asked)
 function maybeDaily() {
-  if (!S.introDone || dailyEl || adPickEl || Ads.showing || panel || !$('#reveal').classList.contains('hidden')) return;
+  if (guideOn() || !S.introDone || dailyEl || adPickEl || Ads.showing || panel || !$('#reveal').classList.contains('hidden')) return;
   if (navigator.webdriver && !localStorage.getItem('petalspire.dailyTest')) return;
   const st = dailyStatus(); if (st.can && S.daily.seen !== st.today) showDaily(true);
 }
@@ -4327,7 +4335,7 @@ function purchase(c) {
   for (const w of c.wants) { const q = Math.min(w.n, S.stand[w.id] || 0); if (!q) continue; S.stand[w.id] -= q; if (!S.stand[w.id]) delete S.stand[w.id]; total += q * standPrice(w.id); items += q; (S.stats.soldBy ||= {})[w.id] = (S.stats.soldBy[w.id] || 0) + q; if (w.extra && q === w.n) extra = 1; }
   if (total) {
     S.coins += total; S.stats.standEarned += total; S.stats.sold += items; S.stats.customers++; if (extra) S.stats.extraItems = (S.stats.extraItems || 0) + 1;
-    if (S.stats.customers % ADS.interstitialEverySales === 0) setTimeout(() => Ads.maybeBreak('sales', adBlocked()), 2600);
+    if (S.stats.customers % ADS.interstitialEverySales === 0) { if (!guideOn()) setTimeout(() => Ads.maybeBreak('sales', adBlocked()), 2600); }   // v0.8.7: no ad breaks during the guide
     c.bubble.innerHTML = `<span class="thanks">${extra ? '♥ One more, please!' : '♥ Thank you!'}</span>`;
     const p = c.car.group.position; popAt(new THREE.Vector3(p.x, 1.9, p.z), `<i data-icon="coin"></i>+${total}`, 'coinpop');
     for (let k = 0; k < Math.min(6, items + 2); k++) setTimeout(() => coinFly(c.car.group.position), k * 90);
@@ -4767,7 +4775,7 @@ canvas.addEventListener('pointermove', (e) => {
 const endPtr = (e) => {
   const p = ptrs.get(e.pointerId); if (!p) return;
   ptrs.delete(e.pointerId);
-  if (gesture?.tap && ptrs.size === 0 && e.type === 'pointerup' && performance.now() - p.t < 600) handleTap(e.clientX, e.clientY);
+  if (gesture?.tap && ptrs.size === 0 && e.type === 'pointerup') { const dt = performance.now() - p.t; if (dt < 450) handleTap(e.clientX, e.clientY); else if (dt < 3000) handleTap(e.clientX, e.clientY, true); }   // v0.8.7: long-press opens bed details
   if (ptrs.size === 0) gesture = null; else if (ptrs.size === 1) { const [q] = [...ptrs.values()]; q.sx = q.x; q.sy = q.y; gesture = { tap: false }; }
 };
 canvas.addEventListener('pointerup', endPtr); canvas.addEventListener('pointercancel', endPtr);
@@ -4777,7 +4785,7 @@ document.addEventListener('touchmove', (e) => { if (!e.target.closest('.panel-bo
 let lastTouchEnd = 0;
 document.addEventListener('touchend', (e) => { const t = performance.now(); if (t - lastTouchEnd < 320 && !e.target.closest('button')) e.preventDefault(); lastTouchEnd = t; }, { passive: false });
 
-function handleTap(x, y) {
+function handleTap(x, y, long = false) {
   if (!S.introDone && W.ctl.glide) return;
   if (!tutWorldOk(x, y)) return;   // v0.8.6: during the guide only the ringed spot takes a tap
   if (buildMode) {
@@ -4796,7 +4804,10 @@ function handleTap(x, y) {
   if (!hit || hit.kind === 'ground') { deselect(); return; }
   if (hit.kind === 'tile') {
     const p = S.tiles[hit.index];
-    if (selected === hit.index && p) { if (thirsty(p) && totalWater()) return water(hit.index); if (stageOf(p) === 3) return harvest(hit.index); }
+    if (p && !long) {   // v0.8.7: a tap waters a thirsty bed or picks a bloom right away — no menu; long-press opens the details
+      if (thirsty(p)) { if (selected != null && selected !== hit.index) deselect(); if (totalWater()) return water(hit.index); return toast(dryToast()); }
+      if (stageOf(p) === 3) { if (selected != null) deselect(); return harvest(hit.index); }
+    }
     selectTile(hit.index);
   } else if (hit.kind === 'obstacle') { if (!hit.id.startsWith('g:')) deselect(); tapObstacle(hit.id); }
   else if (hit.kind === 'loot') collectLoot(hit.key);
@@ -4864,6 +4875,12 @@ document.addEventListener('keydown', (e) => { if (e.key === 'Enter' && e.target?
 // Each step reads the real game state and moves on by itself when the player does the thing. It only points (a soft
 // honey pulse on a button, or a ring over a tree / soil / stand in the garden); it never moves the camera.
 const tutActive = () => !!(S.tut && !S.tut.done && S.introDone);
+// v0.8.7: a new player's guide comes first — gifts, offers, popups and badges wait until every goal is done
+function guideOn() { return !!(S.tut && !S.tut.done && !S.tut.replay); }
+const afterGuideQ = [];
+function afterGuide(fn, key) { if (!guideOn()) return false; if (key) { const k = afterGuideQ.findIndex((f) => f.key === key); if (k >= 0) afterGuideQ.splice(k, 1); fn.key = key; } afterGuideQ.push(fn); return true; }
+let lvlPend = null;   // level-ups during the guide merge into one popup
+function flushAfterGuide() { document.body.classList.remove('guide-on'); let k = 0; while (afterGuideQ.length) { const f = afterGuideQ.shift(); setTimeout(() => { try { f(); } catch (_) {} }, 2500 + 2600 * k++); } }
 const TUT_TIPS = new Set(['chop', 'stump', 'build', 'standbp', 'water', 'growing', 'bloom', 'harvested', 'stand', 'shade']);
 const tutHomeBeds = () => S.beds.filter((id) => lotLoc(lotOfSite(id) || 'home') === 'home');
 const tutTiles = () => tutHomeBeds().flatMap((id) => siteTiles(id));
@@ -4905,15 +4922,14 @@ const TUT_STEPS = [
   { id: 'seeds', done: () => !!S.tut.seedsInfo || S.stats.harvests > 0,
     at: () => ({ html: `<span class="tut-li"><b>There are three ways:</b></span><span class="tut-li">🌸 Wait for your flowers to bloom and harvest them — every harvest gives seeds back.</span><span class="tut-li">🛒 Buy more seeds at the Market.</span><span class="tut-li">🎴 Open card packs to find new plants.</span>`, btn: 'Got it', el: '#tut .tut-next' }) },
   { id: 'water', done: () => tutTiles().some((i) => S.tiles[i]?.wateredAt) || S.stats.harvests > 0,
-    at() { const t = tutSheetTile();
-      if (t != null && thirsty(S.tiles[t])) return { text: 'Tap to water the bed so your seeds can grow.', el: $('#tile-sheet [data-act="water-bed"]') ? '#tile-sheet [data-act="water-bed"]' : '#tile-sheet [data-act="water"]' };
-      const i = tutTiles().find((k) => thirsty(S.tiles[k])); return { text: 'Seeds need a drink — tap your seedling to water it.', world: i != null ? W.tileWorld(i) : null, tile: i }; } },
+    at() { if (tutSheetTile() != null) deselect();
+      const i = tutTiles().find((k) => thirsty(S.tiles[k])); return { text: 'Seeds need a drink — tap the bed to water it.', world: i != null ? W.tileWorld(i) : null, tile: i }; } },
   { id: 'grow', done: () => tutTiles().some((i) => S.tiles[i] && stageOf(S.tiles[i]) === 3) || S.stats.harvests > 0,
-    at() { const i = tutTiles().find((k) => S.tiles[k]?.wateredAt && thirsty(S.tiles[k])), t = tutSheetTile();
-      if (i != null) return t != null && thirsty(S.tiles[t]) ? { text: 'Your sprout is thirsty again — water the bed.', el: $('#tile-sheet [data-act="water-bed"]') ? '#tile-sheet [data-act="water-bed"]' : '#tile-sheet [data-act="water"]' } : { text: 'Your sprout is thirsty again — tap it to water.', world: W.tileWorld(i), tile: i };
+    at() { const i = tutTiles().find((k) => S.tiles[k]?.wateredAt && thirsty(S.tiles[k])); if (tutSheetTile() != null) deselect();
+      if (i != null) return { text: 'Your sprout is thirsty again — tap the bed to water it.', world: W.tileWorld(i), tile: i };
       return { text: 'It’s growing! Keep your sprouts watered — the bloom is on its way.' }; } },
   { id: 'harvest', done: () => S.stats.harvests > 0,
-    at() { if (tutSheetTile() != null && $('#tile-sheet [data-act="harvest"]')) return { text: 'Tap Harvest to pick your flowers.', el: '#tile-sheet [data-act="harvest"]' };
+    at() { if (tutSheetTile() != null) deselect();   // v0.8.7: no bed panel — point at the plant itself
       const i = tutTiles().find((k) => S.tiles[k] && stageOf(S.tiles[k]) === 3); return { text: 'A bloom! Tap the sparkling plant to harvest it.', world: i != null ? W.tileWorld(i) : null, tile: i }; } },
   { id: 'stand', done: () => !!(S.standBuilt || building.stand),
     at() { tutStandWood();
@@ -4925,13 +4941,13 @@ if (panel === 'build') return { text: 'Build your Farm Stand — drivers buy fro
       return { text: 'Tap your Farm Stand to put flowers on it.', world: V3(SPOTS.stand[0], 1.2, SPOTS.stand[1]) }; } },
   { id: 'sell', done: () => S.stats.customers > 0, at: () => ({ text: 'Wait a moment — cars pull over to buy from your stand.' }) },
   { id: 'orderIntro', done: () => !!S.tut.orders || (S.stats.orders || 0) > 0,
-    at: () => ({ html: `<span class="tut-li">A customer asks for certain items. Deliver them and you get <b>double</b> the normal sale price, plus a free spin on the <b>Bonus Wheel</b>.</span>`, btn: 'Show me', btnDo: () => { S.tut.orders = true; tutFirstOrder(); save(); if (panel) renderPanel(); }, el: '#tut .tut-next' }) },
+    at: () => ({ html: `<span class="tut-li">A customer asks for certain items. Deliver them and you get <b>double</b> the normal sale price, plus a free spin on the <b>Bonus Wheel</b>.</span>`, btn: 'Show me', btnDo: () => { S.tut.orders = true; tutFirstOrder(); save(); syncJewelDock(); if (panel) closePanel(); }, el: '#tut .tut-next' }) },
   { id: 'order', done: () => (S.stats.orders || 0) > 0,
     at() { const k = S.orders.home.slots.findIndex((o) => o?.tut), j = k >= 0 ? k : S.orders.home.slots.findIndex((o) => orderReady('home', o));
-      if (panel === 'stand' && standView === 'orders') { const b = $(`#panel-body [data-v8="order-fill"][data-i="${Math.max(0, j)}"]`);
-        return b && !b.disabled ? { text: 'Tap Fill to deliver the order.', el: b } : { text: 'This order needs a few more flowers — harvest your next bloom, then come back.' }; }
-      if (panel === 'stand') return { text: 'Tap Orders.', el: '#panel-body [data-act="stand-orders"]' };
-      return { text: 'Tap your Farm Stand to see the order.', world: V3(SPOTS.stand[0], 1.2, SPOTS.stand[1]) }; } },
+      if (panel === 'orders') { const b = $(`#panel-body [data-v8="order-fill"][data-i="${Math.max(0, j)}"]`);
+        return b && !b.disabled ? { text: 'Every row has a check — tap Deliver.', el: b } : { text: 'This order needs a few more flowers — harvest your next bloom, then come back.' }; }
+      if (panel) return { text: 'Close this menu first.', el: '#panel-close' };
+      return { text: 'Tap the Orders button to see what the customer wants.', el: $('#jd-orders:not(.hidden)') || null }; } },
   { id: 'spin', done: () => (S.stats.spins || 0) > 0,
     at() { if ($('#wheel-ov')) return { text: 'Tap Spin!', el: '#wheel-go' };
       if (panel) return { text: 'Close this menu — the wheel button is at the top of the screen.', el: '#panel-close' };
@@ -4966,7 +4982,7 @@ function tutFirstOrder() {   // an easy first order: flowers the player already 
 let tutEl = null, tutRing = null, tutCur = null, tutPulse = null, tutFinEl = null;
 function tutStep() { if (!tutActive()) return null; let did = null; while (S.tut.step < TUT_STEPS.length && TUT_STEPS[S.tut.step].done()) { did = TUT_STEPS[S.tut.step].id; S.tut.step++; save(); } if (did && tutEl) tutCheer(did); if (S.tut.step >= TUT_STEPS.length) { tutFinish(); return null; } return TUT_STEPS[S.tut.step]; }
 function tutFinish(skipped = false) {
-  if (!S.tut || S.tut.done) return; S.tut.done = true; if (skipped) S.tut.skipped = true; save(); tutClear();
+  if (!S.tut || S.tut.done) return; S.tut.done = true; if (skipped) S.tut.skipped = true; save(); tutClear(); flushAfterGuide(); try { v8Hud(); hud(); } catch (_) {}
   if (skipped) { const g = GOALS[S.goal]; if (g) setTimeout(() => tip(g.hint), 300); return; }
   tutFinEl?.remove(); tutFinEl = el('div', 'tut-card tut-fin', `<p><b>That’s the basics!</b> Your goals at the top show what to do next.</p><button class="btn btn-primary sm" type="button" data-tut="ok">Got it</button>`);
   $('#ui').appendChild(tutFinEl); tutFinEl.querySelector('button').onclick = () => { tutFinEl?.remove(); tutFinEl = null; }; setTimeout(() => { tutFinEl?.remove(); tutFinEl = null; }, 9000);
@@ -4978,6 +4994,7 @@ function tutCheer(id) {   // a small check + "Goal done" pop under the guide car
 function tutClear() { tutGate = null; tutHole?.classList.add('hidden'); tutArrow?.classList.add('hidden'); tutEl?.classList.add('hidden'); tutRing?.classList.add('hidden'); tutPulse?.classList.remove('tut-pulse'); tutPulse = null; tutCur = null; }
 function tutReplay() { S.tut = { step: 0, replay: true }; save(); closePanel(); if (!tutStep()) { toast('You’ve already done every first step — happy gardening!'); } }
 function tutFrame() {
+  document.body.classList.toggle('guide-on', guideOn());
   const st = tutStep();
   const blocked = !st || document.body.classList.contains('on-title') || modalOpen() || (!!placing && placing.what !== 'plow') || (!S.introDone) || curLoc() === 'orchard' || !!document.querySelector('#ui > .goals-closing');
   if (blocked) { tutGate = null; if (tutEl && !tutEl.classList.contains('hidden')) tutClear(); return; }
@@ -4989,14 +5006,14 @@ function tutFrame() {
       a.look = Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 'right →' : '← left') : (dy > 0 ? 'down ↓' : 'up ↑'); a.text += ` (It’s off screen — drag the view ${a.look})`; } }
   if (a.world && !a.el && panel) a.el = '#panel-close';
   else if (a.world && !a.el && a.tile == null && $('#tile-sheet .close-btn') && !$('#tile-sheet').classList.contains('hidden')) a.el = '#tile-sheet .close-btn';   // a garden target while a menu is open: close the menu first
-  if (!tutEl) { tutEl = el('div', 'tut-card hidden', `${SPRIG_SVG}<p></p><button class="tut-skip" type="button">Skip</button>`); tutEl.id = 'tut';
-    tutEl.querySelector('.tut-skip').onclick = (e) => { e.stopPropagation(); tutFinish(true); }; $('#ui').appendChild(tutEl);
+  if (!tutEl) { tutEl = el('div', 'tut-card hidden', `${SPRIG_SVG}<p></p>${S.tut?.replay ? '<button class="tut-skip" type="button">End replay</button>' : ''}`); tutEl.id = 'tut';
+    const sk = tutEl.querySelector('.tut-skip'); if (sk) sk.onclick = (e) => { e.stopPropagation(); tutFinish(true); }; $('#ui').appendChild(tutEl);
     tutRing = el('div', 'tut-ring hidden', ''); tutRing.id = 'tut-ring'; $('#popups').before(tutRing);
     tutHole = el('div', 'tut-hole hidden', ''); tutHole.id = 'tut-hole'; tutArrow = el('div', 'tut-arrow hidden', '<svg viewBox="0 0 24 24"><path d="M12 22 3 10h6V2h6v8h6z" fill="#F5D07A" stroke="#3D5A40" stroke-width="1.6" stroke-linejoin="round"/></svg>'); tutArrow.id = 'tut-arrow';
     $('#ui').appendChild(tutHole); $('#ui').appendChild(tutArrow); }
   const G = TUT_GOALS[st.id] || [st.id, ''], prog = st.id === 'plant' ? ` (${Math.min(tutPlanted(), tutSeedGoal())}/${tutSeedGoal()})` : '';
   const key = st.id + '|' + prog + '|' + (a.html || a.text) + '|' + (a.look || ''); if (key !== tutCur) { tutCur = key;
-    tutEl.classList.toggle('tut-low', st.id === 'spin' && !$('#wheel-ov')); tutEl.querySelector('p').innerHTML = `<b class="tut-goal">Goal ${S.tut.step + 1} of ${TUT_STEPS.length}: ${G[0]}${prog}</b><span class="tut-why">${G[1]}</span>${a.html ? a.html : `<span class="tut-do">👉 ${a.text ? a.text[0].toUpperCase() + a.text.slice(1) : ''}</span>`}${a.btn ? `<button class="btn btn-primary sm tut-next" type="button">${a.btn}</button>` : ''}`;
+    tutEl.querySelector('p').innerHTML = `<b class="tut-goal">Goal ${S.tut.step + 1} of ${TUT_STEPS.length}: ${G[0]}${prog}</b><span class="tut-why">${G[1]}</span>${a.html ? a.html : `<span class="tut-do">👉 ${a.text ? a.text[0].toUpperCase() + a.text.slice(1) : ''}</span>`}${a.btn ? `<button class="btn btn-primary sm tut-next" type="button">${a.btn}</button>` : ''}`;
     tutEl.dataset.step = st.id; tutEl.classList.toggle('tut-big', !!a.html);
     const nb = tutEl.querySelector('.tut-next'); if (nb) nb.onclick = (e) => { e.stopPropagation(); if (a.btnDo) a.btnDo(); else S.tut.seedsInfo = true; save(); }; }
   tutEl.classList.toggle('over-panel', !!panel); tutEl.classList.remove('hidden');
@@ -5007,10 +5024,11 @@ function tutFrame() {
   // v0.8.6: only the current target can be tapped — a dim layer with a cut-out over it, plus a bouncing pointer
   let box = null; if (target) { const r = target.getBoundingClientRect(); if (r.width && r.height) box = { x: r.left + r.width / 2, y: r.top + r.height / 2, w: r.width + 14, h: r.height + 14, r: 14 }; }
   else if (a.world && tutRing && !tutRing.classList.contains('hidden')) box = { x: parseFloat(tutRing.style.left), y: parseFloat(tutRing.style.top), w: 92, h: 92, r: 46 };
+  if (!(target && tutEl.contains(target))) { const low = !!box && box.y < innerHeight * 0.45; tutEl.classList.toggle('tut-low', low); }   // v0.8.7: the goal card docks on the side away from the target
   tutGate = { el: target, pt: !target && box ? { x: box.x, y: box.y } : null, tile: !target && box && a.tile != null ? a.tile : null, obs: !target && box && a.obs ? a.obs : null };
   tutArrow.classList.toggle('edge', !!edge && !box);
   if (box) { tutHole.style.cssText = `left:${box.x - box.w / 2}px;top:${box.y - box.h / 2}px;width:${box.w}px;height:${box.h}px;border-radius:${box.r}px`; tutHole.classList.remove('hidden');
-    tutArrow.style.left = box.x + 'px'; tutArrow.style.top = (box.y - box.h / 2 - 6) + 'px'; tutArrow.classList.toggle('hidden', !!target?.closest('#tut')); }
+    const up = box.y - box.h / 2 < 56; tutArrow.classList.toggle('below', up); tutArrow.style.left = box.x + 'px'; tutArrow.style.top = (up ? box.y + box.h / 2 + 6 : box.y - box.h / 2 - 6) + 'px'; /* v0.8.7: a target at the top gets the pointer from below */ tutArrow.classList.toggle('hidden', !!target?.closest('#tut')); }
   else if (edge) { tutHole.classList.add('hidden'); tutArrow.style.left = edge.x + 'px'; tutArrow.style.top = edge.y + 'px'; tutArrow.style.setProperty('--rot', edge.ang + 'deg'); tutArrow.classList.remove('hidden'); }
   else { tutHole.classList.add('hidden'); tutArrow.classList.add('hidden'); }
 }
@@ -5024,12 +5042,12 @@ const tutGuard = (e) => { if (!tutGate || !tutActive()) return; const t = e.targ
   e.preventDefault(); e.stopPropagation(); e.stopImmediatePropagation?.(); };
 for (const ev of ['pointerdown', 'pointerup', 'mousedown', 'mouseup', 'touchstart', 'touchend', 'click']) document.addEventListener(ev, tutGuard, { capture: true, passive: false });
 
-// v0.8.5: a soft "Tap to plant" tag floats over every raised bed with empty soil (and says where seeds come from when the
+// v0.8.7: shown only during the guide's planting step · v0.8.5: a soft "Tap to plant" tag floats over every raised bed with empty soil (and says where seeds come from when the
 // bag has none). Purely a label: taps go straight through to the bed underneath.
 const plantTags = new Map(); let plantTagBox = null;
 function plantTagFrame() {
   if (!plantTagBox) { plantTagBox = el('div', 'plant-tags', ''); plantTagBox.id = 'plant-tags'; $('#popups').before(plantTagBox); }
-  const hide = document.body.classList.contains('on-title') || !S.introDone || !!panel || buildMode || !!placing || modalOpen() || curLoc() === 'orchard' || ($('#tile-sheet') && !$('#tile-sheet').classList.contains('hidden'));
+  const hide = document.body.classList.contains('on-title') || !S.introDone || !!panel || buildMode || !!placing || modalOpen() || curLoc() === 'orchard' || !(tutActive() && TUT_STEPS[S.tut.step]?.id === 'plant') || ($('#tile-sheet') && !$('#tile-sheet').classList.contains('hidden'));
   const want = new Set();
   if (!hide) for (const id of tutHomeBeds()) {
     const tiles = siteTiles(id), empty = tiles.filter((i) => !S.tiles[i]).length; if (!empty) continue;
@@ -5113,7 +5131,7 @@ window.__ps = {
   setClock: (t) => { clockAt = t; },
   BUILD, adMult, adPicks, standHTML, itemVal, byValue, sortRows, rewardHTML, get fromBuild() { return fromBuild; }, get bags() { return S.bags; }, get migBags() { return migBags; }, inBag, bagOf, sendGoods, tileLoc, standLoc, splitOrchardGoods, buildHTML, marketHTML, satchelHTML, billboardHTML, bbStatusText, bbReadyIn, BILLBOARD, CHARMS, CHARM_IDS, charmV, charmLv, charmText, craftK, shiftH, standPrice, ostandPrice, custGap, harvestCore, setCharmRoll(v) { charmRoll = v; }, freeGFSpot, bulkSell, bulkAll, bulkPrice, bulkItems, bulkHTML, rollWants, STAND_BUY, BULK, GF_IDS, gfOn, gfPlaced, placeGF, storeGF, onMapOnly, charmAt, oGap, TRUCK, orderDelivery, deliverTrip, syncDeliv, inTransit, vanOn, VAN_LOT, rowOfTree, exitPlace, buyCopy, mktDest, MKT_ONE_TIME, MKT_STACK, MKT_CONSUMABLE, MKT_REPEAT, tabPanel, get deliv() { return S.deliv; }, get vanOut() { return vanOut.size; }, migGF065, get mig065() { return mig065; }, regenNow: () => regenS(), SWAP_TIERS, swapPool, get bagTab() { return bagTab; }, setBagTab(t) { bagTab = t; }, shelfMig063, rollIds, rollPackLoot, catTierOdds, drawPlant, drawOther, isPlantCard, PACK_LOOT, OWNED_K, setForcedLoot(L) { forcedLoot = L; }, consLeft, finishCons, hurryCons, startCons, plantTile: plant, syncTile, bloomTargets, instantBloom, askBloom, customerRush, askRush, rushLeft, rushReady, syncJewelDock, get rush() { return S.rush; }, get nextCustAt() { return nextCust; }, get nextOCustAt() { return nextOCust; }, swapCard, swapIn, swapPool, swapTierOdds, SWAP, setSwapForced(id) { swapForced = id; }, get revealCards() { return revealCards; }, upgLeft, finishUpg, hurryUpg, deselect, get upg() { return S.upg; }, toolLeft, get cons() { return S.cons; }, dailyStatus, claimDaily, showDaily, maybeDaily, dayKey, watchAd, playRewardAd, DAILY, upgradeBuilding, get standLv() { return S.standLv; }, cardFix063, normalizeCards,
   TIPS, JEWEL_DROP, obsState, PACKS,
-  hud, dailyGift: (n) => dailyGift(n), syncBarrels, lotRoofs, standsLine, buildBarrelAt: (lot, x, z) => buildBarrel(lot, x, z), openMap, closeMap, mapLocked, syncMapBtn, maybeBoost, showBoost, applyBoost, hideBoost, showStarter, grantStarter, buyStarter, starterLive, grantOffer, buyOffer, offerValue, offersSorted, maybeStarter, starterReady, maybeStarter, promoMilestone, showPromo, wish, settingsHTML, jewelsHTML, unlockMapIfReady, travel, buyOrchard, claimFollow, SOCIALS, setLoc, loc: () => curLoc(), orchardLocked, mapPlaces: () => MAP_PLACES.map((p) => ({ id: p.id, name: p.name, soon: !!p.soon, state: placeState(p) })), ORCHARD_PRICE, casterIds: () => casters().map((c) => c.id + (c.h != null ? ":box" : ":tree")), checkGoals, regenBarrels, feedLot, reachLots,  get barrelReachTargets() { return W.bedTargets.children.map((g) => ({ b: g.userData.b, ok: g.userData.ok })); }, barrelRoof, lotRoofs, barrelStands, barrelPerTick, get gutterLots() { return [...W.gutters.keys()]; }, gutterPipes(lot) { return W.gutters.get(lot)?.userData.pipes || 0; },
+  hud, guideOn: () => guideOn(), tutFinish: (k) => tutFinish(k), afterGuideN: () => afterGuideQ.length, handleTap: (x, y, l) => handleTap(x, y, l), dailyGift: (n) => dailyGift(n), syncBarrels, lotRoofs, standsLine, buildBarrelAt: (lot, x, z) => buildBarrel(lot, x, z), openMap, closeMap, mapLocked, syncMapBtn, maybeBoost, showBoost, applyBoost, hideBoost, showStarter, grantStarter, buyStarter, starterLive, grantOffer, buyOffer, offerValue, offersSorted, maybeStarter, starterReady, maybeStarter, promoMilestone, showPromo, wish, settingsHTML, jewelsHTML, unlockMapIfReady, travel, buyOrchard, claimFollow, SOCIALS, setLoc, loc: () => curLoc(), orchardLocked, mapPlaces: () => MAP_PLACES.map((p) => ({ id: p.id, name: p.name, soon: !!p.soon, state: placeState(p) })), ORCHARD_PRICE, casterIds: () => casters().map((c) => c.id + (c.h != null ? ":box" : ":tree")), checkGoals, regenBarrels, feedLot, reachLots,  get barrelReachTargets() { return W.bedTargets.children.map((g) => ({ b: g.userData.b, ok: g.userData.ok })); }, barrelRoof, lotRoofs, barrelStands, barrelPerTick, get gutterLots() { return [...W.gutters.keys()]; }, gutterPipes(lot) { return W.gutters.get(lot)?.userData.pipes || 0; },
   get tincGrandfathered() { return tincGrandfathered; }, tincProblem, tincSpots, buildTincture, placeTincture, buildStill, placeStill, distill, collectOil, STILL, TEA, teaInfo, teaId, teaSps, registerTea, buildTea, placeTea, brewTea, collectTea, teaAdd, teaRemove, get teaPick() { return [...teaPick]; }, set teaPick(v) { teaPick = [...v]; }, teaHTML, syncTea, DRY_TIER_S,
   CRAFT, PRESS, FRUITSTAND, TREES, TREE_IDS, SEED_BAGS, bagId, bagSeeds, buildCraft, placeCraft, craftMake, craftCollect, craftHTML, syncCraft, orchardSpots, orchardProblem, plantOrchard, pickTree, syncOrchard, orchStage, orchRipe, waterTree, autoWaterTrees, buyTreeRow, ORCH_ROWS, rowsOwned, rowIrrigated, nextIrrigRow, syncTreeRows, TREE_IRRIG, orchardTreeHTML, startTreePlace, orchardLocked, packW, cardOdds, tierOdds, featureOdds, drawNonBasic, collIds, get sunflowerRefund() { return sunflowerRefund; }, LOTS, ORCHARD_TREE_SPOTS,
   RESALE, sellPlaced, stockAntique, sellRestored, installShelf, uninstallShelf, shelfOn, syncShelf, SHELF_BONUS, STAND_CAP, focusThing, get atmosphere() { return atmosphere(); }, get standCap() { return standCap(); },
@@ -5238,6 +5256,7 @@ function levelUp() {
 function gainXP(n) { if (!(n > 0)) return; S.xp += n; if (navigator.webdriver && window.__v8NoLevel) return;   // older automated tests: XP adds up, but no level-up coins land mid-measurement
   let k = 0; while (S.xp >= xpNeed(S.lvl) && k++ < 200) { S.xp -= xpNeed(S.lvl); levelUp(); } }
 function levelToast(L, c, extra) {
+  if (guideOn()) { lvlPend = { L, c: (lvlPend?.c || 0) + c, extra: (lvlPend?.extra || []).concat(extra) }; afterGuide(() => { const p = lvlPend; lvlPend = null; if (p) levelToast(p.L, p.c, p.extra); }, 'lvl'); return; }
   sfx('levelup'); if (quiet) return;
   const t = el('div', 'lvl-toast', `<div class="lvl-leaf">${L}</div><div><b>Garden Level ${L}!</b><small>+${fmtC(c)} <i data-icon="coin"></i> · +1 bonus spin${extra.length ? ' · ' + extra.join(' · ') : ''}</small></div>`);
   $('#ui').appendChild(t); fillIcons(t); try { petals(t, 14); } catch (_) {} setTimeout(() => t.remove(), 3600);
@@ -5247,7 +5266,7 @@ function v8Hud() {
   const need = xpNeed(S.lvl), k = Math.max(0, Math.min(1, S.xp / need)), C = 2 * Math.PI * 15;
   b.querySelector('.lv-n').textContent = S.lvl; b.querySelector('.lv-ring').setAttribute('stroke-dasharray', `${(C * k).toFixed(1)} ${C.toFixed(1)}`);
   b.setAttribute('aria-label', `Garden Level ${S.lvl} · ${S.xp}/${need} XP`);
-  const sb = $('#spin-btn'); if (sb) { sb.classList.toggle('hidden', !(S.spins > 0)); sb.querySelector('b').textContent = S.spins; }
+  const sb = $('#spin-btn'); if (sb) { sb.classList.toggle('hidden', !(S.spins > 0) || (guideOn() && TUT_STEPS[S.tut.step]?.id !== 'spin')); sb.querySelector('b').textContent = S.spins; }
 }
 // ---------- Orders ----------
 const orderPrice = (loc, id) => (loc === 'orchard' ? ostandPrice(id) : standPrice(id));
@@ -5311,7 +5330,7 @@ function skipOrder(loc, i) {
 }
 let standView = 'stand';
 // orders stay out of sight on a new Home garden until the first-steps guide introduces them (old saves / skipped guide: shown)
-const ordersShown = (loc) => loc === 'orchard' || !S.tut || !!S.tut.done || !!S.tut.orders;
+function ordersShown(loc) { return loc === 'orchard' || !S.tut || !!S.tut.done || !!S.tut.orders; }
 function orderBoardHTML(loc) {
   if (!orderSlots(loc)) return '';
   ordersTick();
@@ -5319,13 +5338,15 @@ function orderBoardHTML(loc) {
   const cards = B.slots.map((o, i) => {
     if (!o?.items) return `<div class="ord-card empty" data-order-slot="${i}"><small>${o?.wait && o.wait > now() ? `New order in <span data-ord-wait="${loc}:${i}">${fmtTime(o.wait - now())}</span>` : 'Grow or make something here to get orders'}</small></div>`;
     const ok = orderReady(loc, o), pay = orderPay(loc, o);
-    const items = o.items.map((it) => { const have = orderHave(loc, o, it.id); return `<span class="ord-it${have >= it.n ? ' ok' : ''}" title="${ITEMS[it.id].name}">${itemSvg(it.id)}<b>${Math.min(have, it.n)}/${it.n}</b></span>`; }).join('');
-    return `<div class="ord-card${ok ? ' ready' : ''}" data-order="${o.id}" data-order-slot="${i}"><div class="ord-items">${items}</div>
-      <div class="ord-meta"><span class="price"><i data-icon="coin"></i>${fmtC(pay)}</span><span class="ord-spin">+1 🎡</span><small data-ord-exp="${loc}:${i}">${fmtTime(o.exp - now())}</small></div>
-      <div class="ord-acts"><button class="btn btn-gold sm" data-v8="order-fill" data-loc="${loc}" data-i="${i}" ${ok ? '' : 'disabled'}>Fill</button><button class="btn sm" data-v8="order-skip" data-loc="${loc}" data-i="${i}">${free ? 'Skip' : `Skip · ${jewelTag(1)}`}</button></div></div>`;
+    const items = o.items.map((it) => { const have = orderHave(loc, o, it.id), met = have >= it.n;   // v0.8.7: one plain row per item — icon, name, have / need, a check when it's met
+      return `<div class="ord-row${met ? ' ok' : ''}" data-ord-item="${it.id}"><span class="ord-ic">${itemSvg(it.id)}</span><b class="ord-name">${ITEMS[it.id].name}</b><span class="ord-have">have ${have} / need ${it.n}</span><span class="ord-chk" aria-label="${met ? 'ready' : 'not yet'}">${met ? '✓' : ''}</span></div>`; }).join('');
+    return `<div class="ord-card${ok ? ' ready' : ''}" data-order="${o.id}" data-order-slot="${i}"><div class="ord-rows">${items}</div>
+      <div class="ord-reward"><span>Reward:</span> <b><i data-icon="coin"></i>${fmtC(pay)} coins</b> <span>+ 1 Bonus Wheel spin</span></div>
+      <button class="btn btn-gold ord-deliver" data-v8="order-fill" data-loc="${loc}" data-i="${i}" ${ok ? '' : 'disabled'}>${ok ? 'Deliver' : 'Deliver · not ready yet'}</button>
+      <div class="ord-foot"><small>Leaves in <span data-ord-exp="${loc}:${i}">${fmtTime(o.exp - now())}</span></small><button class="btn sm ord-skip" data-v8="order-skip" data-loc="${loc}" data-i="${i}">${free ? 'Skip' : `Skip · ${jewelTag(1)}`}</button></div></div>`;
   }).join('');
   const auto = managerAt(loc) ? `<label class="ord-auto"><input type="checkbox" data-v8="order-auto" data-loc="${loc}" ${B.auto ? 'checked' : ''}/> Market Manager fills ready orders</label>` : '';
-  return `<div class="order-board" data-orders="${loc}"><div class="sec-title">📋 Order Board <small>pays 2× the stand price + 1 bonus spin</small></div><div class="ord-grid">${cards}</div>${auto}</div>`;
+  return `<div class="order-board" data-orders="${loc}"><div class="ord-grid">${cards}</div>${auto}</div>`;
 }
 // ---------- Bonus Wheel ----------
 function wheelPick(rnd = Math.random) {
