@@ -1436,3 +1436,4 @@ body.guide-on #tab-build.glow{animation:none;box-shadow:none}
 .tut-arrow.below{transform:rotate(180deg)}
 .order-board .ord-grid{grid-template-columns:1fr}
 body.guide-on #ad-banner{display:none!important}
+body.guide-on #jd-bloom, body.guide-on #jd-rush{display:none!important}
