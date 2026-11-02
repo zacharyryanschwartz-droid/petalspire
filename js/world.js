@@ -1397,6 +1397,13 @@ export function createWorld(canvas) {
       case 'd8_moongate': { const st = mat('#E9E2D2', { roughness: 0.8 }); g.add(M(new THREE.TorusGeometry(0.8, 0.13, 10, 32), st, 0, 0.85, 0), M(new THREE.BoxGeometry(2.0, 0.12, 0.34), st, 0, 0.06, 0));
         for (let k = 0; k < 9; k++) { const a = (k / 8) * Math.PI, x = Math.cos(a) * 0.8, y = 0.85 + Math.sin(a) * 0.8; g.add(M(new THREE.OctahedronGeometry(0.05, 0), mat('#FFF6D8', { emissive: '#C8E0E8', emissiveIntensity: 1.4 }), x, y, 0.15)); }
         const gl = glowSprite('#C8E0E8', 1.8, 0.4); gl.position.set(0, 0.85, 0); g.add(gl); glows.push(gl); hitH = 1.9; break; }
+      case 'd8_lovebug': { const lf = M(new THREE.SphereGeometry(0.42, 14, 8), mat('#B7D4B5', { roughness: 0.8 }), 0, 0.05); lf.scale.set(1, 0.12, 0.62); g.add(lf);
+        const shell = M(new THREE.SphereGeometry(0.22, 16, 12, 0, Math.PI * 2, 0, Math.PI / 2), mat('#E2665E', { roughness: 0.45 }), 0, 0.1); shell.scale.set(1, 0.85, 1.15); g.add(shell);
+        g.add(M(new THREE.SphereGeometry(0.1, 12, 9), mat('#3D2B2B'), 0, 0.14, 0.24), M(new THREE.BoxGeometry(0.012, 0.19, 0.44), mat('#8C3B36'), 0, 0.12, -0.02));
+        for (const [x, z, c] of [[-0.11, 0.06, '#FFF9F0'], [0.11, 0.06, '#FFF9F0'], [-0.1, -0.13, '#F7C5C5'], [0.1, -0.13, '#F7C5C5']]) { const ht = new THREE.Group(); ht.position.set(x, 0.27, z);
+          for (const dx of [-0.022, 0.022]) ht.add(M(new THREE.SphereGeometry(0.032, 8, 6), mat(c), dx, 0, 0)); const tip = M(new THREE.ConeGeometry(0.045, 0.06, 4), mat(c), 0, 0, 0.032, Math.PI / 2, 0, 0); ht.add(tip); g.add(ht); }
+        for (const x of [-0.04, 0.04]) g.add(M(new THREE.CylinderGeometry(0.008, 0.008, 0.12, 4), mat('#3D2B2B'), x, 0.24, 0.3, -0.6, 0, 0));
+        hitH = 0.55; break; }
       case 'd8_arbor': { const cr = mat('#FFF9F0'); for (const x of [-0.6, 0.6]) g.add(M(new THREE.BoxGeometry(0.08, 1.5, 0.08), cr, x, 0.75, 0)); g.add(M(new THREE.TorusGeometry(0.6, 0.05, 6, 20, Math.PI), cr, 0, 1.5, 0));
         for (let k = 0; k < 18; k++) { const a = (k / 17) * Math.PI, x = Math.cos(a) * 0.6, y = 1.5 + Math.sin(a) * 0.6; g.add(M(k % 3 ? leafGeo : new THREE.IcosahedronGeometry(0.08, 0), mat(k % 3 ? '#8DB486' : ['#F7C5C5', '#F5D07A'][k % 2]), x, y, 0.05, 0, hash(k, 4) * 6, 0)); }
         for (let k = 0; k < 8; k++) g.add(M(new THREE.IcosahedronGeometry(0.07, 0), mat('#F7C5C5'), (k < 4 ? -0.6 : 0.6) + (hash(k, 2) - 0.5) * 0.1, 0.3 + (k % 4) * 0.3, 0.06)); hitH = 2.2; break; }

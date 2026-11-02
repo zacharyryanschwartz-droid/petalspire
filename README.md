@@ -1,4 +1,4 @@
-# Petalspire v0.8.4
+# Petalspire v0.8.5
 
 A cozy 3D flower-garden prototype for iPhone Safari (portrait, one thumb). Also plays on desktop with a mouse.
 This is a **prototype**: version numbers stay below 1.0 until the first official release.
@@ -20,6 +20,11 @@ This is a **prototype**: version numbers stay below 1.0 until the first official
 7. **Land for sale.** Five wooded plots, each with a floating For Sale sign: 450 → 900 → 1800 → 3000 → 4500 coins (v0.7.2; was 150 → 1500).
 
 Drag with one finger to pan, pinch to zoom, and twist with two fingers to turn. On desktop, right-drag or shift-drag turns the view.
+
+## New in v0.8.5: first steps guide and clearer planting
+- **First steps guide** for brand-new gardens: one short line at a time, with a soft honey pulse on the button to tap or a glowing ring over the tree, patch, soil square or stand. It moves on by itself when you do the step: chop a tree → build a raised bed → plant a seed → water it → let it grow → harvest the bloom → build the Farm Stand → stock it → sell to a customer. **Skip** anytime; it never moves the camera. Existing saves don't see it. Replay it from **Settings → Help → Replay first steps**.
+- **Planting is easier to spot.** Every raised bed with empty soil shows a small **Tap to plant** tag (taps go straight through to the bed). The soil sheet says **Tap a seed to plant it here** above your seeds. With no seeds, the tag and the sheet say where seeds come from: harvests (every harvest gives seeds back), or the Supply Market once it's rebuilt.
+- **Redeem codes.** Settings › Help › **Redeem code** (any letter case). `LOVEBUG` gives the **Love Bug**, a little blush-red ladybug with heart spots sitting on a leaf: a free, one-time keepsake decoration, one for Home and one for the Orchard. It is just for looks (no stats). A repeat says it is already claimed, and an unknown code says it doesn’t match anything. Claimed codes are kept in the save (`codes`). New codes are one row in `REDEEM_CODES` in `js/data.js`.
 
 ## New in v0.8.4: invite links for itch.io
 - Invite and share links always use the live site, https://zacharyryanschwartz-droid.github.io/petalspire/?ref=CODE, wherever the game runs (one constant, `LIVE_URL` in `js/main.js`). Inside the itch.io embed a `?ref=` never reaches the game, so friends there type the code under **Settings → Friends → Have a friend’s code?**

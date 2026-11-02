@@ -944,10 +944,16 @@ export const DECO8 = {
   d8_moongate:    { name: 'Starlit Moon Gate',             tier: 'otherworld', price: 0,    atm: 8 },
   d8_glasshouse:  { name: 'Aurora Glasshouse',             tier: 'otherworld', price: 0,    atm: 8 },
   d8_arbor:       { name: 'Friendship Arbor',              tier: 'legendary',  price: 0,    atm: 3, special: true },   // referral reward (5 friends)
+  d8_lovebug:     { name: 'Love Bug',                      tier: 'epic',       price: 0,    atm: 0, special: true, cosmetic: true },   // v0.8.5: redeem code LOVEBUG · pure cosmetic
 };
 export const DECO8_IDS = Object.keys(DECO8);
 export const DECO8_SHOP = DECO8_IDS.filter((k) => !DECO8[k].special);   // the 14 (the Friendship Arbor only comes from referrals)
 export const DECO8_LOCS = ['home', 'orchard'];
+// v0.8.5 redeem codes (Settings › Help › Redeem code). Typed case-insensitively; each one can be claimed once per save
+// (S.codes). Add more rows here: { deco: id } gives that decoration (one for Home + one for the Orchard).
+export const REDEEM_CODES = {
+  LOVEBUG: { deco: 'd8_lovebug', toast: '🐞 A Love Bug crawled into your Bag! Place it at Home and at the Orchard.' },
+};
 // chance that a Card Pack ALSO holds a decoration card (a bonus 4th card — the 3 normal cards and their odds are unchanged)
 export const DECO8_PACK = { chance: 0.06, w: { legendary: 50, rare: 30, superrare: 13, ultra: 5, otherworld: 2 } };
 export const DECO8_DUP = { legendary: 150, rare: 300, superrare: 500, ultra: 800, otherworld: 1200 };   // coins for a card you can't use any more
