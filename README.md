@@ -21,7 +21,11 @@ This is a **prototype**: version numbers stay below 1.0 until the first official
 
 Drag with one finger to pan, pinch to zoom, and twist with two fingers to turn. On desktop, right-drag or shift-drag turns the view.
 
-## New in v0.8.7.3: guaranteed tools in your first packs
+## New in v0.8.7.4: an extra spin every 4 orders
+
+Every 4 orders you fill earn 1 extra Bonus Wheel spin (on top of the spin each order already gives). The Orders screen shows how many orders are left.
+
+## v0.8.7.3: guaranteed tools in your first packs
 
 Your first three Card Packs each hold one guaranteed card: Irrigation, then the Hand Plow, then the Harvest Sickle (any you already own is skipped).
 
