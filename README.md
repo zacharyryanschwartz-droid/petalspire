@@ -21,7 +21,11 @@ This is a **prototype**: version numbers stay below 1.0 until the first official
 
 Drag with one finger to pan, pinch to zoom, and twist with two fingers to turn. On desktop, right-drag or shift-drag turns the view.
 
-## New in v0.8.7.2: one set of starting goals
+## New in v0.8.7.3: guaranteed tools in your first packs
+
+Your first three Card Packs each hold one guaranteed card: Irrigation, then the Hand Plow, then the Harvest Sickle (any you already own is skipped).
+
+## v0.8.7.2: one set of starting goals
 
 - Sprig’s guide (Goal X of 13) is now the only set of starting goals. The older 12-goal list, its goal pill at the top of the screen and its “All goals complete” card are gone.
 - The old list’s reward, a free Tincture Stand, is now Sprig’s gift for finishing the guide. Old saves keep it (or get it) on load.

@@ -16,7 +16,7 @@ import { createAudio, MUSIC_CREDITS } from './audio.js';
 
 // Save format: v0.3, v0.31 and v0.4 share one localStorage key (schema v: 3). `build` records which prototype build last wrote the save;
 // v0.3 / v0.31 saves (no `build`, no per-plot barrels) are migrated on load (migrate04 below); v0.4 saves load as-is and are re-tagged. Prototype builds stay below 1.0.
-export const BUILD = '0.8.7.2';
+export const BUILD = '0.8.7.3';
 // v0.65: anonymous player tracking (Games Backend on Appwrite; no API key in the game, nothing personal). Skipped for automated runs (navigator.webdriver).
 try { if (!navigator.webdriver) initTracker({ endpoint: 'https://nyc.cloud.appwrite.io/v1', projectId: '6ae0a41a002ce0a48fac', gameId: 'petalspire', platform: 'web', appVersion: BUILD }); } catch (_) {}
 const SAVE_KEY = 'petalspire.v03', V02_KEY = 'petalspire.v02', OLD_KEYS = ['petalspire.v01'];
@@ -4460,6 +4460,11 @@ function applyPackCard(id, seen = new Set()) {
     const c = addCard(id); let coins = 0; if (id === 'irrigation') S.owned.irrigation = true; if (!isNew && SUPPLY_CARDS.includes(id)) { bagOf('home')[id] += SUPPLY_DUP; undo.supply = SUPPLY_DUP; }   /* v0.7: free units always go to the Home Bag */   /* v0.52: +2 free units per duplicate supply card */ if (!isNew && (CARD_LEVELS.upgradable(id, CARDS[id]) || FEATURES[id]?.tool) && nextAt(id) == null) {   /* v0.64: a Sickle/Plow kept at max level from an older save still pays */ coins = DUP_COINS; S.coins += coins; }
   return { id, isNew, n: c.n, up: canUpgrade(id), coins, undo };
 }
+// v0.8.7.3: the first three packs a player opens (S.packs, saved; older saves keep their count) each hold one guaranteed
+// card in the last slot, in order: Irrigation, Hand Plow, Harvest Sickle. Owned ones are skipped; once all are owned it's a normal pull.
+const GUIDE_PACK_CARDS = ['irrigation', 'plow', 'sickle'];
+const ownsCard = (id) => !!(S.cards?.[id]?.n > 0 || S.owned?.[id]);
+const guidePackCard = () => (S.packs <= GUIDE_PACK_CARDS.length ? GUIDE_PACK_CARDS.find((id) => !ownsCard(id)) || null : null);
 function buyPack(forced) {
   if (!S.marketBuilt && !(S.freePacks > 0)) return;   // v0.8.7.2: a free pack opens anywhere (Sprig's last goal)
   if (S.freePacks > 0) S.freePacks--;   // v0.63: a free pack (Day 10 gift) is opened before any Jewels are spent
@@ -4468,6 +4473,7 @@ function buyPack(forced) {
   S.packs++;
   const ids = rollIds();
   if (S.packs === 1 && !S.unlocked.chamomile) ids[1] = 'chamomile';
+  const gp = guidePackCard(); if (gp) ids[ids.length - 1] = gp;   // v0.8.7.3: packs 1-3 bring Irrigation, Hand Plow, Harvest Sickle (next one not owned yet)
   if (forced) forced.forEach((f, k) => f && (ids[k] = f));
   const loot = forcedLoot || rollPackLoot(); forcedLoot = null; if (!scrapUsable()) loot.scrap = 0;   // v0.63: coins, wood & Scrap Metal in every pack
   S.coins += loot.coins; S.wood += loot.wood; S.scrap += loot.scrap; const st = (S.stats.packLoot ||= { coins: 0, wood: 0, scrap: 0 }); for (const r in loot) st[r] += loot[r];
