@@ -21,9 +21,15 @@ This is a **prototype**: version numbers stay below 1.0 until the first official
 
 Drag with one finger to pan, pinch to zoom, and twist with two fingers to turn. On desktop, right-drag or shift-drag turns the view.
 
-## New in v0.8.7.4: an extra spin every 4 orders
+## New in v0.8.7.5: 1 spin per 4 orders
 
-Every 4 orders you fill earn 1 extra Bonus Wheel spin (on top of the spin each order already gives). The Orders screen shows how many orders are left.
+Orders no longer give a spin each. Every 4 orders you fill earn 1 Bonus Wheel spin, and the Orders screen shows "Spin in N orders". In Sprig's guide, the order goal gives you the spin for the wheel goal that follows.
+
+Rain barrel irrigation now shares its water: each pour goes to a random dry plant in the irrigated bed with the most dry plants (unwatered seedlings first), so no bed is left without water.
+
+## v0.8.7.4: an extra spin every 4 orders
+
+Every 4 orders filled earned 1 extra spin (replaced in v0.8.7.5).
 
 ## v0.8.7.3: guaranteed tools in your first packs
 

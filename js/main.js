@@ -16,7 +16,7 @@ import { createAudio, MUSIC_CREDITS } from './audio.js';
 
 // Save format: v0.3, v0.31 and v0.4 share one localStorage key (schema v: 3). `build` records which prototype build last wrote the save;
 // v0.3 / v0.31 saves (no `build`, no per-plot barrels) are migrated on load (migrate04 below); v0.4 saves load as-is and are re-tagged. Prototype builds stay below 1.0.
-export const BUILD = '0.8.7.4';
+export const BUILD = '0.8.7.5';
 // v0.65: anonymous player tracking (Games Backend on Appwrite; no API key in the game, nothing personal). Skipped for automated runs (navigator.webdriver).
 try { if (!navigator.webdriver) initTracker({ endpoint: 'https://nyc.cloud.appwrite.io/v1', projectId: '6ae0a41a002ce0a48fac', gameId: 'petalspire', platform: 'web', appVersion: BUILD }); } catch (_) {}
 const SAVE_KEY = 'petalspire.v03', V02_KEY = 'petalspire.v02', OLD_KEYS = ['petalspire.v01'];
@@ -417,7 +417,14 @@ function regenBarrels() {
   return ch;
 }
 // v0.63: drip lines pour into each hooked-up bed until its thirsty plants are paid for or the barrel runs dry
-function autoIrrigate() { if (!S.irrigBeds.length) return; for (const bed of [...S.irrigBeds]) { let guard = 200; while (guard-- > 0) { const i = siteTiles(bed).find((k) => thirsty(S.tiles[k])); if (i == null || !water(i, true)) break; } } }
+// v0.8.7.5: one pour at a time to a random thirsty plant across ALL irrigated beds (unwatered seedlings first), so the
+// first bed in the list no longer drinks the barrel dry while the others get nothing. A plant that can't be paid is set aside.
+function autoIrrigate(rnd = Math.random) { if (!S.irrigBeds.length) return;
+  const skip = new Set(); let guard = 400;   // each pour goes to a random plant in the bed with the most dry plants left (ties random)
+  while (guard-- > 0) { const th = irrigTiles().filter((k) => !skip.has(k) && thirsty(S.tiles[k])); if (!th.length) break;
+    const fresh = th.filter((k) => !S.tiles[k].wateredAt), pool0 = fresh.length ? fresh : th, dry = {};
+    for (const k of pool0) dry[bedOfTile(k)] = (dry[bedOfTile(k)] || 0) + 1; const key = (k) => -dry[bedOfTile(k)], lo = Math.min(...pool0.map(key)), pool = pool0.filter((k) => key(k) === lo), i = pool[Math.floor(rnd() * pool.length)];
+    if (!water(i, true)) skip.add(i); } }
 // Offline: per barrel, replay the time since the last save — pours whenever a hooked-up bed has a thirsty plant (to start, or one
 // that reached the bud stop) and the barrel has a drop, refilling tick by tick.
 function catchUpIrrigation() {
@@ -2196,7 +2203,7 @@ function renderPanel_() {
   if (panel === 'build') { title.innerHTML = curLoc() === 'orchard' ? 'Build · Orchard' : 'Build · Home'; body.innerHTML = buildHTML(); }
   if (panel === 'stand') { title.innerHTML = 'Farm Stand'; body.innerHTML = standHTML(); }
   if (panel === 'ostand') { title.innerHTML = 'Orchard Stand'; body.innerHTML = ostandHTML(); }
-  if (panel === 'orders') { const L = curLoc(); title.innerHTML = 'Orders'; body.innerHTML = `<p class="ord-what">A customer asks for certain items. Deliver them for <b>extra coins</b> on top of the normal price, plus a free <b>Bonus Wheel</b> spin.</p>${ordersShown(L) && orderSlots(L) ? orderSpinHint() + orderBoardHTML(L) : '<p class="muted">No orders here yet.</p>'}`; }   // v0.8.7: Orders live behind their own HUD icon, not in any menu
+  if (panel === 'orders') { const L = curLoc(); title.innerHTML = 'Orders'; body.innerHTML = `<p class="ord-what">A customer asks for certain items. Deliver them for <b>extra coins</b> on top of the normal price. Every 4 orders filled earn a <b>Bonus Wheel</b> spin.</p>${ordersShown(L) && orderSlots(L) ? orderSpinHint() + orderBoardHTML(L) : '<p class="muted">No orders here yet.</p>'}`; }   // v0.8.7: Orders live behind their own HUD icon, not in any menu
   if (panel === 'bulk') { title.innerHTML = 'Bulk Sell Box'; body.innerHTML = bulkHTML(panelArg); }
   if (panel === 'market') { title.innerHTML = curLoc() === 'orchard' ? 'Supply Market · Orchard' : 'Supply Market · Home'; body.innerHTML = marketHTML(); }
   if (panel === 'rack') { title.innerHTML = 'Drying Rack'; body.innerHTML = rackHTML(); }
@@ -4923,7 +4930,7 @@ if (panel === 'build') return { text: 'Build your Farm Stand — drivers buy fro
       return { text: 'Tap your Farm Stand to put flowers on it.', world: V3(SPOTS.stand[0], 1.2, SPOTS.stand[1]) }; } },
   { id: 'sell', done: () => S.stats.customers > 0, at: () => ({ text: 'Wait a moment — cars pull over to buy from your stand.' }) },
   { id: 'orderIntro', done: () => !!S.tut.orders || (S.stats.orders || 0) > 0,
-    at: () => ({ html: `<span class="tut-li">A customer asks for certain items. Deliver them and you get <b>a bit extra</b> on top of the normal sale price, plus a free spin on the <b>Bonus Wheel</b>.</span>`, btn: 'Show me', btnDo: () => { S.tut.orders = true; tutFirstOrder(); save(); syncJewelDock(); if (panel) closePanel(); }, el: '#tut .tut-next' }) },
+    at: () => ({ html: `<span class="tut-li">A customer asks for certain items. Deliver them and you get <b>a bit extra</b> on top of the normal sale price, and for your first one Sprig gives you a spin on the <b>Bonus Wheel</b>.</span>`, btn: 'Show me', btnDo: () => { S.tut.orders = true; tutFirstOrder(); save(); syncJewelDock(); if (panel) closePanel(); }, el: '#tut .tut-next' }) },
   { id: 'order', done: () => (S.stats.orders || 0) > 0,
     at() { const k = S.orders.home.slots.findIndex((o) => o?.tut), j = k >= 0 ? k : S.orders.home.slots.findIndex((o) => orderReady('home', o));
       if (panel === 'orders') { const b = $(`#panel-body [data-v8="order-fill"][data-i="${Math.max(0, j)}"]`);
@@ -4931,7 +4938,8 @@ if (panel === 'build') return { text: 'Build your Farm Stand — drivers buy fro
       if (panel) return { text: 'Close this menu first.', el: '#panel-close' };
       return { text: 'Tap the Orders button to see what the customer wants.', el: $('#jd-orders:not(.hidden)') || null }; } },
   { id: 'spin', done: () => (S.stats.spins || 0) > 0,
-    at() { if ($('#wheel-ov')) return { text: 'Tap Spin!', el: '#wheel-go' };
+    at() { if (!(S.spins > 0) && !S.tut.orderSpin && guideTutSpin()) { save(); hud(); }   /* v0.8.7.5: a save that reached this goal without the order reward still gets its spin */
+      if ($('#wheel-ov')) return { text: 'Tap Spin!', el: '#wheel-go' };
       if (panel) return { text: 'Close this menu — the wheel button is at the top of the screen.', el: '#panel-close' };
       return { text: 'Tap the wheel button to use your free spin.', el: $('#spin-btn:not(.hidden)') || null }; } },
   // v0.8.7.2: the last goal — open a Card Pack (skipped, and not counted, if one was opened before this point)
@@ -5312,18 +5320,21 @@ function ordersTick() {
 const managerAt = (loc) => Object.entries(S.managers || {}).some(([lot, w]) => w && now() < w.end && workerLoc(lot) === loc);
 const ORDER_SPIN_EVERY = 4;
 const orderSpinLeft = () => ORDER_SPIN_EVERY - ((+S.orderSpinN || 0) % ORDER_SPIN_EVERY);
-const orderSpinHint = () => `<p class="ord-spin-hint muted" data-ord-spin="${orderSpinLeft()}">Extra spin in ${orderSpinLeft()} order${orderSpinLeft() > 1 ? 's' : ''}</p>`;
+const orderSpinHint = () => `<p class="ord-spin-hint muted" data-ord-spin="${orderSpinLeft()}">Spin in ${orderSpinLeft()} order${orderSpinLeft() > 1 ? 's' : ''}</p>`;
+// v0.8.7.5: the guide's spin goal gets its spin from the order goal (once per save), not from the order itself
+function guideTutSpin() { if (!guideOn() || S.tut.orderSpin) return false; S.tut.orderSpin = true; S.spins++; return true; }
 function fillOrder(loc, i, auto = false) {
   const B = S.orders[loc], o = B?.slots[i]; if (!o?.items) return false;
   if (!orderReady(loc, o)) { if (!auto) toast(`Your ${loc === 'orchard' ? 'Orchard' : 'Home'} Bag doesn’t hold everything for this order yet`); return false; }
   const bag = bagOf(loc); for (const it of o.items) { const fromBag = Math.min(bag[it.id] || 0, it.n); bag[it.id] = (bag[it.id] || 0) - fromBag; if (it.n > fromBag) { S.stand[it.id] -= it.n - fromBag; if (!(S.stand[it.id] > 0)) delete S.stand[it.id]; try { syncStand(); } catch (_) {} } }
-  const pay = orderPay(loc, o); S.coins += pay; S.spins++;
+  const pay = orderPay(loc, o); S.coins += pay;   // v0.8.7.5: no spin per order any more (1 per 4 orders, below)
   S.stats.orders = (S.stats.orders || 0) + 1;
-  // v0.8.7.4: every 4 orders filled earns 1 extra bonus spin (S.orderSpinN counts toward it, saved); its toast waits out Sprig's guide
+  // v0.8.7.4/v0.8.7.5: every 4 orders filled earn 1 spin (S.orderSpinN counts toward it, saved); its toast waits out Sprig's guide
   S.orderSpinN = (+S.orderSpinN || 0) + 1; let bonus = false; if (S.orderSpinN >= ORDER_SPIN_EVERY) { S.orderSpinN = 0; S.spins++; bonus = true; if (guideOn() || auto) S.orderSpinToast = (S.orderSpinToast || 0) + 1; }
+  const tutSpin = guideTutSpin();   // v0.8.7.5: Sprig's order goal pays its own spin (for the spin goal right after)
   S.stats.orderEarned = (S.stats.orderEarned || 0) + pay;
   B.slots[i] = { wait: now() + V8.orders[loc].refillMs };
-  if (!auto) { sfx('coin'); toast(`📋 Order filled · +${fmtC(pay)} <i data-icon="coin"></i> · +1 bonus spin`); if (bonus && !guideOn()) setTimeout(() => toast(`🎡 ${ORDER_SPIN_EVERY} orders filled · +1 extra bonus spin`), 2400); }
+  if (!auto) { sfx('coin'); toast(`📋 Order filled · +${fmtC(pay)} <i data-icon="coin"></i>${tutSpin ? ' · Sprig gives you 1 spin' : ''}`); if (bonus && !guideOn()) setTimeout(() => toast(`🎡 ${ORDER_SPIN_EVERY} orders filled · +1 spin`), 2400); }
   v8Tick(); save(); hud(); if (panel) renderPanel(); return true;
 }
 function skipOrder(loc, i) {
@@ -5347,7 +5358,7 @@ function orderBoardHTML(loc) {
     const items = o.items.map((it) => { const have = orderHave(loc, o, it.id), met = have >= it.n;   // v0.8.7: one plain row per item — icon, name, have / need, a check when it's met
       return `<div class="ord-row${met ? ' ok' : ''}" data-ord-item="${it.id}"><span class="ord-ic">${itemSvg(it.id)}</span><b class="ord-name">${ITEMS[it.id].name}</b><span class="ord-have">have ${have} / need ${it.n}</span><span class="ord-chk" aria-label="${met ? 'ready' : 'not yet'}">${met ? '✓' : ''}</span></div>`; }).join('');
     return `<div class="ord-card${ok ? ' ready' : ''}" data-order="${o.id}" data-order-slot="${i}"><div class="ord-rows">${items}</div>
-      <div class="ord-reward"><span>Reward:</span> <b><i data-icon="coin"></i>${fmtC(pay)} coins</b> <span>+ 1 Bonus Wheel spin</span></div>
+      <div class="ord-reward"><span>Reward:</span> <b><i data-icon="coin"></i>${fmtC(pay)} coins</b></div>
       <button class="btn btn-gold ord-deliver" data-v8="order-fill" data-loc="${loc}" data-i="${i}" ${ok ? '' : 'disabled'}>${ok ? 'Deliver' : 'Deliver · not ready yet'}</button>
       <div class="ord-foot"><small>Leaves in <span data-ord-exp="${loc}:${i}">${fmtTime(o.exp - now())}</span></small><button class="btn sm ord-skip" data-v8="order-skip" data-loc="${loc}" data-i="${i}">${free ? 'Skip' : `Skip · ${jewelTag(1)}`}</button></div></div>`;
   }).join('');
@@ -5549,7 +5560,7 @@ function v8SettingsHTML() {
 V8_PANELS = { invite: () => ({ t: 'Invite friends', b: inviteHTML() }), level: () => ({ t: 'Garden Level', b: levelHTML() }) };
 // ---------- tick, UI wiring ----------
 function v8Tick() {
-  if (S.orderSpinToast > 0 && !guideOn() && S.introDone) { const n = S.orderSpinToast; S.orderSpinToast = 0; toast(`🎡 Orders filled · +${n} extra bonus spin${n > 1 ? 's' : ''}`); save(); }   // v0.8.7.4: held back during Sprig's guide
+  if (S.orderSpinToast > 0 && !guideOn() && S.introDone) { const n = S.orderSpinToast; S.orderSpinToast = 0; toast(`🎡 ${n * ORDER_SPIN_EVERY} orders filled · +${n} spin${n > 1 ? 's' : ''}`); save(); }   // v0.8.7.4: held back during Sprig's guide
   if (!S) return; const cur = statXP();
   if (cur > S.xpSeen) gainXP(cur - S.xpSeen); S.xpSeen = cur;
   const ch = ordersTick(); if (ch && (panel === 'stand' || panel === 'ostand')) renderPanel();
