@@ -1,0 +1,17 @@
+{
+  "appId": "com.schwarzespiele.petalspire",
+  "appName": "Petalspire",
+  "webDir": "www",
+  "ios": {
+    "contentInset": "never",
+    "backgroundColor": "#FFF9F0",
+    "preferredContentMode": "mobile",
+    "scrollEnabled": false
+  },
+  "plugins": {
+    "StatusBar": {
+      "overlaysWebView": true,
+      "style": "LIGHT"
+    }
+  }
+}
