@@ -5163,9 +5163,17 @@ let tutGate = null, tutHole = null, tutArrow = null;
 const TUT_TAP_R = 46;
 // world taps during the guide: only on the ringed spot (pan / pinch-zoom of the camera still work)
 const tutWorldOk = (x, y) => !tutGate || (!!tutGate.pt && Math.hypot(x - tutGate.pt.x, y - tutGate.pt.y) <= TUT_TAP_R);
-// every other tap or click (buttons, menus, sheets) is swallowed unless it is on the target or the guide card itself
+// A step that needs a menu points at the control inside it. Closing is always allowed; the next
+// frame points at the world spot, Build tab, stand, or Orders button so the menu is easy to reopen.
+const tutCanDismiss = (t) => !!(t.closest('#panel-close, #tile-sheet .close-btn, [data-v8="wheel-close"]')
+  || t.id === 'panel'
+  || (panel && t.closest('#tabbar button[data-panel]') && (t.closest('#tabbar button').dataset.panel === panel || (panel === 'ostand' && t.closest('#tabbar button').dataset.panel === 'stand'))));
+// every other tap or click is swallowed unless it is on the target or the guide card itself
 const tutGuard = (e) => { if (!tutGate || !tutActive()) return; const t = e.target; if (!(t instanceof Element)) return;
   if (t.tagName === 'CANVAS' || t.closest('#tut, .tut-fin')) return; if (tutGate.el && (tutGate.el === t || tutGate.el.contains(t))) return;
+  if (tutCanDismiss(t)) return;
+  // Scrolling a menu still works. A click on a button inside it has to be the step's own target.
+  if (t.closest('.panel-body, .tile-sheet') && e.type !== 'click') return;
   e.preventDefault(); e.stopPropagation(); e.stopImmediatePropagation?.(); };
 for (const ev of ['pointerdown', 'pointerup', 'mousedown', 'mouseup', 'touchstart', 'touchend', 'click']) document.addEventListener(ev, tutGuard, { capture: true, passive: false });
 
