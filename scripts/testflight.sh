@@ -66,6 +66,7 @@ xcodebuild "${XCODE[@]}" \
   -authenticationKeyIssuerID "$ASC_ISSUER_ID" \
   DEVELOPMENT_TEAM="$TEAM_ID" \
   CODE_SIGN_STYLE=Automatic \
+  "CODE_SIGN_IDENTITY=Apple Distribution" \
   CURRENT_PROJECT_VERSION="$BUILD_NUM" \
   MARKETING_VERSION="$MARKETING_VERSION" \
   archive
