@@ -16,10 +16,10 @@ import { createAudio, MUSIC_CREDITS } from './audio.js';
 
 // Save format: v0.3, v0.31 and v0.4 share one localStorage key (schema v: 3). `build` records which prototype build last wrote the save;
 // v0.3 / v0.31 saves (no `build`, no per-plot barrels) are migrated on load (migrate04 below); v0.4 saves load as-is and are re-tagged. Prototype builds stay below 1.0.
-export const BUILD = '0.8.7.5';
+export const BUILD = '0.8.7.6';
 // v0.65: anonymous player tracking (Games Backend on Appwrite; no API key in the game, nothing personal). Skipped for automated runs (navigator.webdriver).
 try { if (!navigator.webdriver) initTracker({ endpoint: 'https://nyc.cloud.appwrite.io/v1', projectId: '6ae0a41a002ce0a48fac', gameId: 'petalspire', platform: 'web', appVersion: BUILD }); } catch (_) {}
-const SAVE_KEY = 'petalspire.v03', V02_KEY = 'petalspire.v02', OLD_KEYS = ['petalspire.v01'];
+const SAVE_KEY = 'petalspire.v03', V02_KEY = 'petalspire.v02', OLD_KEYS = ['petalspire.v01'], SAVE_BAK = 'petalspire.v03.bak';
 const QS = new URLSearchParams(location.search);
 const TREE_MS = Math.max(0.05, +QS.get('treeMin') || TREE.growMin) * 60000;   // ?treeMin=1 for quick testing
 const $ = (s, r = document) => r.querySelector(s);
@@ -120,12 +120,25 @@ function realPlants(raw) {
 // v0.5: Moonflower, Spiral Sunpetal and Crystal Rose are real catalog plants again (Other World tier), so the old-id
 // mapping only runs on saves written BEFORE v0.5 (no build, or build < 0.5). v0.5+ saves are loaded untouched.
 const preCatalog = (raw) => { if (!raw) return false; const m = /"build":"([^"]*)"/.exec(raw); return !m || !(parseFloat(m[1]) >= 0.5); };
-try { const raw = localStorage.getItem(SAVE_KEY); S = JSON.parse(preCatalog(raw) ? realPlants(raw) : raw); } catch { S = null; }
+let rawSave = null, saveBroken = false;
+try { rawSave = localStorage.getItem(SAVE_KEY); S = JSON.parse(preCatalog(rawSave) ? realPlants(rawSave) : rawSave); } catch { S = null; saveBroken = rawSave != null; }
+// v0.8.7.6: an unreadable save is copied aside before a fresh garden replaces it. If the backup cannot be written, later saves
+// leave the bad string alone so it is not silently thrown away.
+let preserveCorrupt = false;
+if (saveBroken) { try { localStorage.setItem(SAVE_BAK, rawSave); } catch { preserveCorrupt = true; } }
 if (!S || S.v !== 3) {
   let old = null; try { old = JSON.parse(realPlants(localStorage.getItem(V02_KEY))); } catch {}
   if (old && old.v === 2) { S = migrate02(old); upgraded = true; needs04 = true; }
   else { S = freshState(); for (const k of OLD_KEYS) if (localStorage.getItem(k)) { migrated = true; localStorage.removeItem(k); } }
 } else { fromBuild = S.build || (S.barrels ? '0.4-dev' : S.irrigBeds ? '0.31' : '0.3'); needs04 = !S.barrels; S = mergeState(S); }
+// v0.8.7.6: a missing or non-array list (tiles: null, and the same for beds, trees, stands…) must not throw on startup.
+// Coins and every other good field stay. Empty lists are filled back in; a plant list that is not an array cannot be read, so it becomes empty.
+const SAVE_LISTS = ['tiles', 'beds', 'trees', 'decor', 'ground', 'irrigBeds', 'treeIrrig', 'rack', 'tinc', 'stills', 'teas', 'pressSlots', 'opressSlots', 'fruitstandSlots', 'restoring', 'gf', 'deliv'];
+function repairSaveArrays() {
+  for (const k of SAVE_LISTS) if (!Array.isArray(S[k])) S[k] = [];
+  for (const k of ['barrels', 'stand', 'ostand', 'obs', 'cards', 'lots', 'stats', 'hives', 'orchard']) if (!S[k] || typeof S[k] !== 'object' || Array.isArray(S[k])) S[k] = k === 'lots' ? { home: true } : {};
+}
+repairSaveArrays();
 // v0.8.5: the First steps guide is for brand-new gardens only (existing saves skip it; Settings › Help replays it). Automated test
 // browsers skip it too unless a test opts in (localStorage 'petalspire.tutTest'), so older tests still run.
 if (!S.tut || !S.introDone) S.tut = S.introDone || (navigator.webdriver && !localStorage.getItem('petalspire.tutTest')) ? { done: true } : { step: 0 };
@@ -170,7 +183,7 @@ function migrateOrchGrid() {
 migrateOrchGrid();
 let saveTimer = 0;
 let frozen = false;
-const writeSave = () => { if (frozen) return; try { S.savedAt = now(); localStorage.setItem(SAVE_KEY, JSON.stringify(S)); } catch {} };
+const writeSave = () => { if (frozen || preserveCorrupt) return; try { S.savedAt = now(); localStorage.setItem(SAVE_KEY, JSON.stringify(S)); } catch {} };
 function save() { clearTimeout(saveTimer); saveTimer = setTimeout(writeSave, 150); }
 window.addEventListener('visibilitychange', () => { if (document.hidden) writeSave(); });
 window.addEventListener('pagehide', writeSave);
@@ -425,17 +438,40 @@ function autoIrrigate(rnd = Math.random) { if (!S.irrigBeds.length) return;
     const fresh = th.filter((k) => !S.tiles[k].wateredAt), pool0 = fresh.length ? fresh : th, dry = {};
     for (const k of pool0) dry[bedOfTile(k)] = (dry[bedOfTile(k)] || 0) + 1; const key = (k) => -dry[bedOfTile(k)], lo = Math.min(...pool0.map(key)), pool = pool0.filter((k) => key(k) === lo), i = pool[Math.floor(rnd() * pool.length)];
     if (!water(i, true)) skip.add(i); } }
-// Offline: per barrel, replay the time since the last save — pours whenever a hooked-up bed has a thirsty plant (to start, or one
-// that reached the bud stop) and the barrel has a drop, refilling tick by tick.
-function catchUpIrrigation() {
-  if (!S.irrigBeds.length) return;
+// Offline: per barrel, replay the time since the last save. Each pour uses the same rule as autoIrrigate — one thirsty plant in the
+// irrigated bed that has the most dry plants (unwatered seedlings first, ties random) — and the plant starts at that past moment,
+// so the closed time counts. Water is not walked bed-by-bed, and a pour is not left sitting as unused bed credit.
+function catchUpIrrigation(rnd = Math.random) {
+  if (!S.irrigBeds.length || !Array.isArray(S.tiles)) return;
   const t0 = S.savedAt || now(), end = now(), rs = regenS() * 1000;
   for (const [lot, b] of Object.entries(S.barrels)) {
     const beds = barrelBeds(lot); if (!beds.length) continue;
-    const max = regenMax(b), per = barrelPerTick(lot); let w = b.w, wAt = w >= max ? t0 : b.at || t0, t = t0, guard = 50000;
-    const dry = (bed, at) => !siteTiles(bed).some((k) => thirsty(S.tiles[k], at));
-    const pour = (at) => { for (const bed of beds) { let g = 200; while (g-- > 0) { settleBed(bed, null, at, true, false); if (dry(bed, at) || w <= 0) break;
-      if (w >= max) wAt = at; w--; S.stats.watered++; S.stats.irrigated = (S.stats.irrigated || 0) + 1; (S.bedCredit ||= {})[bed] = (S.bedCredit[bed] || 0) + WATER.unit; } } };
+    const max = regenMax(b), per = barrelPerTick(lot); let w = b.w, wAt = w >= max ? t0 : (b.at || t0), t = t0, guard = 50000;
+    const tilesOf = () => beds.flatMap(siteTiles);
+    const thirstyNow = (at, skip) => tilesOf().filter((k) => S.tiles[k] && !skip.has(k) && thirsty(S.tiles[k], at));
+    const pick = (at, skip) => {
+      const th = thirstyNow(at, skip); if (!th.length) return null;
+      const fresh = th.filter((k) => !S.tiles[k].wateredAt), pool0 = fresh.length ? fresh : th, dry = {};
+      for (const k of pool0) dry[bedOfTile(k)] = (dry[bedOfTile(k)] || 0) + 1;
+      const key = (k) => -dry[bedOfTile(k)], lo = Math.min(...pool0.map(key)), pool = pool0.filter((k) => key(k) === lo);
+      return pool[Math.floor(rnd() * pool.length)];
+    };
+    const pour = (at) => {
+      const skip = new Set(); let inner = 400;
+      while (inner-- > 0) {
+        const i = pick(at, skip); if (i == null) return;
+        const bed = bedOfTile(i), p = S.tiles[i];
+        let ev = settleBed(bed, i, at, true);
+        if (thirsty(p, at)) {
+          if (!(w > 0)) { skip.add(i); continue; }
+          if (w >= max) wAt = at; w--;
+          S.stats.watered++; S.stats.irrigated = (S.stats.irrigated || 0) + 1;
+          (S.bedCredit ||= {})[bed] = (S.bedCredit[bed] || 0) + WATER.unit;
+          ev = ev.concat(settleBed(bed, i, at, true));
+        }
+        if (!ev.some((e) => e.kind === 'start' || e.kind === 'bud')) skip.add(i);
+      }
+    };
     const nextBud = (after) => { let m = Infinity; for (const bed of beds) for (const k of siteTiles(bed)) { const p = S.tiles[k]; if (p && p.wateredAt && p.bud === false) { const tb = p.wateredAt + WATER.budAt * p.growMs; if (tb > after && tb < m) m = tb; } } return m; };
     while (t <= end && guard-- > 0) {
       pour(t);
@@ -2167,7 +2203,7 @@ const MENU_TIPS = {
   cards: 'Here are your cards. Extra copies of the same card level it up, so your plants sell for more.',
   build: 'The Build menu. Pick something, then tap a glowing spot in your garden to place it.',
   stand: 'Your Farm Stand. Put flowers out and drivers stop to buy them.',
-  orders: 'The Order Board. Each customer wants certain items — deliver them for extra coins and a free wheel spin.',
+  orders: 'The Order Board. Each customer wants certain items — deliver them for extra coins. Every 4 orders you fill earn a Bonus Wheel spin.',
   worker: 'Workers help out while you’re busy. Hire one and they’ll do their job on their own.',
   still: 'The Still turns flowers into oils. Put flowers in, wait a bit, and sell what comes out.',
   tincture: 'The Tincture bench makes remedies from your herbs. Add herbs, wait, and collect.',
@@ -2828,7 +2864,8 @@ function offerCardHTML(o, compact = false) {
 const starterCardHTML = (compact = false) => offerCardHTML(STARTER_PACK, compact);
 // one popup, the moment the beginning goals are done (S.goalsClosed is set when the closing card is dismissed)
 function starterReady() { const st = M().starter; return !st.bought && !st.shows && starterUnlocked(); }
-function maybeStarter() { if (guideOn() || !monetOn() || !S.introDone || panel || placing || buildMode || modalOpen() || closingEl || !starterReady()) return; showStarter(true); }
+const titleUp = () => document.body.classList.contains('on-title');   // v0.8.7.6: offers wait until Continue / Begin has been pressed
+function maybeStarter() { if (titleUp() || guideOn() || !monetOn() || !S.introDone || panel || placing || buildMode || modalOpen() || closingEl || !starterReady()) return; showStarter(true); }
 // v0.67 migration: the old $1.99 offer's timed popups don't count — the new Starter Pack gets its one popup after the goals
 // v0.68: Rosehip Oil is Home-press only, Almond Oil/Butter Orchard-press only. A press still working on a recipe that no longer
 // belongs there gives the ingredients back to that place's Bag; finished jars stay ready to collect, so nothing is lost.
@@ -2981,7 +3018,7 @@ function showDaily(auto = false) {
 }
 // first open each day: show the popup once the intro is done and nothing else is on screen (not in automated tests unless asked)
 function maybeDaily() {
-  if (guideOn() || !S.introDone || dailyEl || adPickEl || Ads.showing || panel || !$('#reveal').classList.contains('hidden')) return;
+  if (titleUp() || guideOn() || !S.introDone || dailyEl || adPickEl || Ads.showing || panel || !$('#reveal').classList.contains('hidden')) return;
   if (navigator.webdriver && !localStorage.getItem('petalspire.dailyTest')) return;
   const st = dailyStatus(); if (st.can && S.daily.seen !== st.today) showDaily(true);
 }
@@ -5272,7 +5309,7 @@ function v8Hud() {
   b.setAttribute('aria-label', `Garden Level ${S.lvl} · ${S.xp}/${need} XP`);
   const sb = $('#spin-btn'); if (sb) { sb.classList.toggle('hidden', !(S.spins > 0) || (guideOn() && TUT_STEPS[S.tut.step]?.id !== 'spin')); sb.querySelector('b').textContent = S.spins; }
   // v0.8.7.2: the Daily Gift lives on the HUD beside the wheel (hidden until Sprig's guide is done), with a dot when ready
-  const gb = $('#gift-btn'); if (gb) { const show = !!(S.introDone && guideDone() && !guideOn()); gb.classList.toggle('hidden', !show);
+  const gb = $('#gift-btn'); if (gb) { const show = !!(S.introDone && guideDone() && !guideOn() && !titleUp()); gb.classList.toggle('hidden', !show);
     let can = false; try { can = !!dailyStatus().can; } catch (_) {} gb.classList.toggle('ready', can); gb.setAttribute('aria-label', can ? 'Daily Gift: ready to claim' : 'Daily Gift');
     gb.style.right = sb && !sb.classList.contains('hidden') ? `calc(env(safe-area-inset-right,0px) + ${sb.offsetWidth + 16}px)` : ''; }
 }
