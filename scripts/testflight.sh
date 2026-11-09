@@ -60,13 +60,10 @@ xcodebuild "${XCODE[@]}" \
   -configuration Release \
   -destination "generic/platform=iOS" \
   -archivePath "$ARCHIVE" \
-  -allowProvisioningUpdates \
-  -authenticationKeyPath "$ASC_KEY_PATH" \
-  -authenticationKeyID "$ASC_KEY_ID" \
-  -authenticationKeyIssuerID "$ASC_ISSUER_ID" \
   DEVELOPMENT_TEAM="$TEAM_ID" \
-  CODE_SIGN_STYLE=Automatic \
-  "CODE_SIGN_IDENTITY=Apple Distribution" \
+  CODE_SIGNING_ALLOWED=NO \
+  CODE_SIGNING_REQUIRED=NO \
+  CODE_SIGN_IDENTITY="" \
   CURRENT_PROJECT_VERSION="$BUILD_NUM" \
   MARKETING_VERSION="$MARKETING_VERSION" \
   archive
