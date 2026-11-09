@@ -9,8 +9,9 @@ import { ROAD, LOTS, SIGNS, LOT_FOR_SALE, LOT_PRICES, SITES, OBSTACLES, SPOTS, P
 import { ICONS, itemIcon, FEATURE_ART, findIcon, decorIcon } from './icons.js';
 import { Payments } from './payments.js';
 import { createAds, gameArt } from './ads.js';
-import { isNative } from './native.js';
+import { isNative, openExternal } from './native.js';
 import { considerNativeAds } from './admob.js';
+import { PRIVACY_URL, finishProduct, listenForTransactions, loadStore, purchasesVisible, restoreProducts, storePrice } from './store.js';
 import { initTracker } from './games-tracker.js';
 import { createReferral, cleanCode } from './referral.js';
 import { shadeAt, speedFor, sunLabel, rebaseStart } from './shade.js';
@@ -2255,7 +2256,7 @@ function renderPanel_() {
   if (panel === 'lot') { title.innerHTML = LOTS[panelArg].name; body.innerHTML = lotHTML(panelArg); }
   if (panel === 'worker') { title.innerHTML = `${locLabel(workerLoc(panelArg)).replace(/^t/, 'T')} · ${wkName(panelArg)}`; body.innerHTML = workerHTML(panelArg); }
   if (panel === 'settings') { title.innerHTML = 'Settings'; body.innerHTML = settingsHTML(); }
-  if (panel === 'jewels') { title.innerHTML = `Jewel Shop${Payments.isTest && !isNative() ? ' <span class="test-tag">Test mode</span>' : ''}`; body.innerHTML = jewelsHTML(); }
+  if (panel === 'jewels') { title.textContent = 'Jewel Shop'; body.innerHTML = jewelsHTML(); }
   const ck = CONS_PANEL[panel] || (CRAFT[panel] ? panel : null); if (ck && consLeft(ck) > 0) body.innerHTML = consHTML(ck);   // v0.63
   fillIcons(body); fillIcons(title); body.scrollTop = st;
 }
@@ -2301,9 +2302,10 @@ function settingsHTML() {
   const games = OTHER_GAMES.filter((g) => g.id !== CROSS_PROMO.gameId).map((g) => `<div class="game-row" data-game="${g.id}"><div class="game-art">${gameArt(g.id)}</div>
     <div class="meta"><b>${g.name}${g.status === 'soon' ? ' <span class="soon-tag">Coming soon</span>' : ''}</b><small class="gr-tag">${g.tagline}</small><small>${g.blurb}</small></div>
     ${g.status === 'live' && g.url ? `<a class="btn btn-primary sm" href="${g.url}" target="_blank" rel="noopener">Play</a>` : ''}</div>`).join('');
-  const adsRow = isNative() ? (S.noAds ? `<div class="row"><div class="ico"><i data-icon="heart" style="width:34px;height:34px"></i></div><div class="meta"><b>No More Ads · Owned</b><small>Thank you! Banners and partner ads are switched off.</small></div></div>` : '') : ADS_MODE === 'off' ? '' : S.noAds
+  const adsPrice = storePrice(NO_ADS_BUNDLE.productId, NO_ADS_BUNDLE.price);
+  const adsRow = !purchasesVisible() ? '' : S.noAds
     ? `<div class="row"><div class="ico"><i data-icon="heart" style="width:34px;height:34px"></i></div><div class="meta"><b>No More Ads · Owned</b><small>Thank you! Banners and partner ads are switched off.</small></div></div>`
-    : `<div class="row"><div class="ico"><i data-icon="jewel" style="width:34px;height:34px"></i></div><div class="meta"><b>No More Ads + ${NO_ADS_BUNDLE.n} Jewels</b><small>Removes the banner and partner ads · ${NO_ADS_BUNDLE.price}</small></div><div class="acts"><button class="btn btn-blush sm" data-act="open-jewels">View</button></div></div>`;
+    : `<div class="row"><div class="ico"><i data-icon="jewel" style="width:34px;height:34px"></i></div><div class="meta"><b>No More Ads + ${NO_ADS_BUNDLE.n} Jewels</b><small>Removes the banner and partner ads · ${adsPrice}</small></div><div class="acts"><button class="btn btn-blush sm" data-act="open-jewels">View</button></div></div>`;
   const follow = SOCIALS.map((p) => { const got = !!S.follows?.[p.id];
     return `<a class="follow-btn ${p.id}${got ? ' claimed' : ''}" href="${p.url}" target="_blank" rel="noopener" data-follow="${p.id}" aria-label="Follow Petalspire on ${p.name}">
       <span class="fb-ico">${SOCIAL_ART[p.id]}</span><span class="fb-txt"><b>${p.name}</b><small>${p.handle}</small></span>
@@ -2314,10 +2316,12 @@ function settingsHTML() {
     ${adsRow ? `<div class="sec-title">Ads</div><div class="list">${adsRow}</div>` : ''}
     ${v8SettingsHTML()}
     <div class="sec-title">Help</div><div class="list"><button class="row set-btn" data-act="tips-again"><b>Show tips again</b><small>Replay the helpful hints from the start</small></button><div class="row redeem-row"><div class="meta"><b>Redeem code</b><small>Got a special code? Type it here.</small><div class="redeem-form"><input id="redeem-in" type="text" maxlength="24" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="Your code" aria-label="Redeem code" /><button class="btn btn-primary sm" type="button" data-act="redeem">Redeem</button></div></div></div><button class="row set-btn" data-act="tut-replay"><b>Replay first steps</b><small>The short guide for planting, growing and selling</small></button></div>
-    <div class="sec-title">Your save</div><div class="list"><div class="row"><div class="meta"><b>Autosaves on this device</b><small>Progress is kept in this browser, even while the game is closed.</small></div></div>
+    <div class="sec-title">Your save</div><div class="list"><div class="row"><div class="meta"><b>Autosaves on this device</b><small>${isNative() ? 'Progress is kept on this device, even while the app is updated.' : 'Progress is kept in this browser, even while the game is closed.'}</small></div></div>
+    ${isNative() ? '<button class="row set-btn" data-act="restore"><b>Restore Purchases</b><small>Bring back No More Ads and packs you already bought</small></button>' : ''}
+    <button class="row set-btn" data-act="privacy"><b>Privacy policy</b><small>What Petalspire keeps, and what it doesn’t</small></button>
     <button class="row set-btn danger" data-act="reset"><b>Reset garden…</b><small>Erase all progress and start again in the woods</small></button></div>
     <div class="studio-credit-set" data-studio-credit><img src="${STUDIO.logo}" alt="${STUDIO.name}" /><small>Petalspire is made by ${STUDIO.name}</small></div>
-    <p class="muted" style="margin:14px 4px 0;text-align:center">Petalspire v${BUILD} · prototype${Payments.isTest && !isNative() ? ' · <span class="test-tag" style="margin:0">Test mode</span>' : ''}</p>`;
+    <p class="muted" style="margin:14px 4px 0;text-align:center">Petalspire v${BUILD}${isNative() ? '' : ' · prototype'}</p>`;
 }
 function bagHTML() {
   const nf = Object.values(S.finds).reduce((a, v) => a + v, 0) + S.restoring.length;
@@ -2866,14 +2870,14 @@ function offerCardHTML(o, compact = false) {
     <div class="sp-head"><div><b>${o.name}</b><small>${o.blurb}</small><em class="sp-val">≈ ${fmtC(offerValue(o))} coins of value</em></div></div>
     <ul class="sp-chips" data-offer-chips>${offerChips(o).map(([ic, n, l, k]) => `<li data-chip="${k}"><span class="ci">${ic}</span><b>${n}</b><small>${l}</small></li>`).join('')}</ul>
     <ul class="sp-items sp-fine">${offerRows(o).map(([ic, t, w]) => `<li${w ? ' class="wide"' : ''}><i data-icon="${ic}"></i>${t}</li>`).join('')}</ul>
-    ${owned ? '<p class="sp-owned">Owned · thank you!</p>' : `<button class="btn btn-gold" data-offer-buy="${o.id}"${o.starter ? ' data-starter-buy' : ''}>Get it · ${o.price}</button>`}
-    <p class="sp-note" data-starter-note>Purchases arrive with the iPhone app. This web prototype never charges.</p></div>`;
+    ${owned ? '<p class="sp-owned">Owned · thank you!</p>' : `<button class="btn btn-gold" data-offer-buy="${o.id}"${o.starter ? ' data-starter-buy' : ''}>Get it · ${storePrice(o.productId, o.price)}</button>`}
+    <p class="sp-note" data-starter-note>${isNative() ? 'You’ll confirm with the App Store.' : 'Purchases arrive with the iPhone app. This web prototype never charges.'}</p></div>`;
 }
 const starterCardHTML = (compact = false) => offerCardHTML(STARTER_PACK, compact);
 // one popup, the moment the beginning goals are done (S.goalsClosed is set when the closing card is dismissed)
 function starterReady() { const st = M().starter; return !st.bought && !st.shows && starterUnlocked(); }
 const titleUp = () => document.body.classList.contains('on-title');   // v0.8.7.6: offers wait until Continue / Begin has been pressed
-function maybeStarter() { if (isNative() || titleUp() || guideOn() || !monetOn() || !S.introDone || panel || placing || buildMode || modalOpen() || closingEl || !starterReady()) return; showStarter(true); }
+function maybeStarter() { if (!purchasesVisible() || titleUp() || guideOn() || !monetOn() || !S.introDone || panel || placing || buildMode || modalOpen() || closingEl || !starterReady()) return; showStarter(true); }
 // v0.67 migration: the old $1.99 offer's timed popups don't count — the new Starter Pack gets its one popup after the goals
 // v0.68: Rosehip Oil is Home-press only, Almond Oil/Butter Orchard-press only. A press still working on a recipe that no longer
 // belongs there gives the ingredients back to that place's Bag; finished jars stay ready to collect, so nothing is lost.
@@ -2888,7 +2892,7 @@ syncTreeRows();
 { const st = M().starter; if (!st.v067) { st.v067 = true; st.shows = 0; delete st.until; delete st.lastShow; } }
 setInterval(maybeStarter, 3000);
 function showStarter(auto = false) {
-  if (isNative()) return null;
+  if (!purchasesVisible()) return null;
   const st = M().starter; if (st.bought) return null;
   if (auto) { st.shows = (st.shows || 0) + 1; st.lastShow = now(); save(); }
   starterEl?.remove(); const e = starterEl = el('div', 'cozy-modal starter-modal'); e.id = 'starter';
@@ -2898,12 +2902,16 @@ function showStarter(auto = false) {
   return e;
 }
 async function buyOffer(id, root) {
-  if (isNative()) return false;
-  const o = offerById(id); if (!o || offerOwned(o)) return false;
+  const o = offerById(id); if (!o || offerOwned(o) || !purchasesVisible()) return false;
   const r = await Payments.purchaseOffer(o);
-  if (r.ok) return grantOffer(id, r.receipt);
-  const n = root?.querySelector(`[data-offer-card="${id}"] [data-starter-note]`) || root?.querySelector('[data-starter-note]'); if (n) { n.textContent = r.reason; n.classList.add('on'); }
-  S.stats.offerTaps = (S.stats.offerTaps || 0) + 1; if (o.starter) S.stats.starterTaps = (S.stats.starterTaps || 0) + 1; save(); return false;
+  if (r.cancelled) return false;
+  if (!r.ok) {
+    const n = root?.querySelector(`[data-offer-card="${id}"] [data-starter-note]`) || root?.querySelector('[data-starter-note]'); if (n) { n.textContent = r.reason || 'Purchase didn’t go through'; n.classList.add('on'); }
+    if (!r.pending) toast(r.reason || 'Purchase didn’t go through');
+    else toast(r.reason);
+    S.stats.offerTaps = (S.stats.offerTaps || 0) + 1; if (o.starter) S.stats.starterTaps = (S.stats.starterTaps || 0) + 1; save(); return false;
+  }
+  return deliverVerified({ status: 'purchased', verified: true, productId: o.productId, transactionId: r.transactionId });
 }
 const buyStarter = (root) => buyOffer(STARTER_PACK.id, root);
 // Called only with a verified store receipt (the iPhone app). Hands out the contents (a once-pack only once).
@@ -4136,17 +4144,16 @@ function tradeJewel(what) {
   toast(what === 'coins' ? `Traded 1 Jewel for ${JEWEL_EXCHANGE.coins} coins` : `Traded 1 Jewel for ${JEWEL_EXCHANGE.wood} Wood`);
 }
 function jewelsHTML() {
-  const native = isNative();
-  const cards = native ? '' : JEWEL_BUNDLES.map((b) => `<button class="jewel-card${b.best ? ' best' : ''}" data-jewels="${b.id}">${b.best ? '<span class="best-tag">Best value</span>' : ''}
-    <span class="jc-art">${'<i data-icon="jewel"></i>'.repeat(b.n >= 50 ? 3 : b.n >= 10 ? 2 : 1)}</span><b>${b.n} Jewel${b.n > 1 ? 's' : ''}</b><em>${b.price}</em></button>`).join('');
-  const offers = native ? [] : offersSorted().filter((o) => !o.starter || starterUnlocked() || M().starter.bought);   // v0.67: highest value first; the Starter Pack once the beginning goals are done
-  const shop = native ? '' : `<div class="jewel-grid">${cards}</div><div class="sec-title">Packs</div><div class="shop-offers" data-shop-starter>${offers.map((o) => offerCardHTML(o, true)).join('')}</div>`;
-  const priceTag = S.noAds ? '<em class="owned-tag">Owned</em>' : '<em>' + NO_ADS_BUNDLE.price + '</em>';
-  const noads = native || ADS_MODE === 'off' ? '' : `<button class="noads-card${S.noAds ? ' owned' : ''}" data-jewels="${NO_ADS_BUNDLE.id}" ${S.noAds ? 'disabled' : ''}>
+  const shopOn = purchasesVisible();
+  const cards = !shopOn ? '' : JEWEL_BUNDLES.map((b) => `<button class="jewel-card${b.best ? ' best' : ''}" data-jewels="${b.id}">${b.best ? '<span class="best-tag">Best value</span>' : ''}
+    <span class="jc-art">${'<i data-icon="jewel"></i>'.repeat(b.n >= 50 ? 3 : b.n >= 10 ? 2 : 1)}</span><b>${b.n} Jewel${b.n > 1 ? 's' : ''}</b><em>${storePrice(b.productId, b.price)}</em></button>`).join('');
+  const offers = !shopOn ? [] : offersSorted().filter((o) => !o.starter || starterUnlocked() || M().starter.bought);
+  const shop = !shopOn ? '' : `<div class="jewel-grid">${cards}</div><div class="sec-title">Packs</div><div class="shop-offers" data-shop-starter>${offers.map((o) => offerCardHTML(o, true)).join('')}</div>`;
+  const priceTag = S.noAds ? '<em class="owned-tag">Owned</em>' : '<em>' + storePrice(NO_ADS_BUNDLE.productId, NO_ADS_BUNDLE.price) + '</em>';
+  const noads = !shopOn || ADS_MODE === 'off' ? '' : `<button class="noads-card${S.noAds ? ' owned' : ''}" data-jewels="${NO_ADS_BUNDLE.id}" ${S.noAds ? 'disabled' : ''}>
       <span class="na-art"><svg viewBox="0 0 48 48"><rect x="5" y="11" width="38" height="26" rx="7" fill="#FFF9F0" stroke="#3D5A40" stroke-width="2.6"/><text x="24" y="29" text-anchor="middle" font-family="Nunito" font-weight="900" font-size="12" fill="#3D5A40">AD</text><path d="M8 40L40 8" stroke="#E07F86" stroke-width="4.2" stroke-linecap="round"/></svg></span>
       <span class="na-meta"><b>No More Ads + ${NO_ADS_BUNDLE.n} Jewels</b><small>Removes every ad for good, and adds ${NO_ADS_BUNDLE.n} <i data-icon="jewel"></i></small></span>
       ${priceTag}</button>`;
-  const note = !native && Payments.isTest ? '<p class="test-note"><span class="test-tag">Test mode</span> Prototype only — purchases are simulated and nothing is charged.</p>' : '';
   return `<div class="jewel-hero"><i data-icon="jewel"></i><div><b>${S.jewels}</b><small>Jewels</small></div></div>
     <p class="muted" style="margin:6px 4px 12px">Jewels open Card Packs (${PACK_JEWELS} each), finish a restoration instantly (${RESTORE_HURRY_JEWELS}), grow a planted tree by a stage (${TREE.hurryJewels}) or complete the market rebuild (${BUILDS.market.hurryJewels}).</p>
     ${shop}
@@ -4156,26 +4163,65 @@ function jewelsHTML() {
       <div class="row"><div class="ico"><i data-icon="coin" style="width:36px;height:36px"></i></div><div class="meta"><b>${JEWEL_EXCHANGE.coins} coins</b><small>Trade 1 Jewel</small></div><button class="btn btn-gold sm" data-act="trade-coins" ${S.jewels < 1 ? 'disabled' : ''}>${jewelPrice(1)}</button></div>
       <div class="row"><div class="ico"><i data-icon="wood" style="width:36px;height:36px"></i></div><div class="meta"><b>${JEWEL_EXCHANGE.wood} Wood</b><small>Trade 1 Jewel</small></div><button class="btn btn-gold sm" data-act="trade-wood" ${S.jewels < 1 ? 'disabled' : ''}>${jewelPrice(1)}</button></div>
     </div>
-    ${noads}
-    ${note}`;
+    ${noads}`;
 }
 function confirmBox(html, okText, onOk) {
   const C = $('#confirm'); C.innerHTML = `<div class="confirm-card">${html}<div class="confirm-acts"><button class="btn" data-c="no">Cancel</button><button class="btn btn-gold" data-c="ok">${okText}</button></div></div>`;
   fillIcons(C); C.classList.remove('hidden');
   C.onclick = (e) => { const b = e.target.closest('[data-c]'); if (!b && e.target !== C) return; C.classList.add('hidden'); C.innerHTML = ''; if (b?.dataset.c === 'ok') onOk(); };
 }
-function askBuyJewels(id) {
-  if (isNative()) return;
-  const b = id === NO_ADS_BUNDLE.id ? NO_ADS_BUNDLE : JEWEL_BUNDLES.find((x) => x.id === id); if (!b || (b.noAds && S.noAds)) return;
-  const test = Payments.isTest;
-  confirmBox(`<i data-icon="jewel" class="confirm-ico"></i><h3>${b.noAds ? `No More Ads + ${b.n} Jewels` : `${b.n} Jewel${b.n > 1 ? 's' : ''}`} · ${b.price}</h3>
-    ${test ? `<p class="confirm-proto"><b>Prototype: purchase simulated, no charge.</b></p><p class="muted">This is a test build. No payment is taken and no card is needed — the Jewels are simply added.</p>` : '<p class="muted">You’ll be asked to confirm with the App Store.</p>'}`,
-    test ? 'Simulate purchase' : `Buy for ${b.price}`, async () => {
-      const r = await Payments.purchase(b);
-      if (!r.ok) { toast(r.reason || 'Purchase didn’t go through'); return; }
-      S.jewels += b.n; S.stats.jewelsBought += b.n; if (b.noAds) { S.noAds = true; Ads.sync(); } save(); hud(); if (panel === 'jewels' || panel === 'stand') renderPanel();
+const iapInflight = new Set();
+function txSeen(id) { return !!(id && S.iapTx && S.iapTx[id]); }
+function rememberTx(id) { if (id) (S.iapTx ||= {})[id] = Date.now(); }
+async function deliverVerified(r) {
+  if (!r || r.status !== 'purchased' || r.verified !== true) return false;
+  const id = String(r.transactionId || '');
+  if (!id || txSeen(id) || iapInflight.has(id)) { if (txSeen(id)) finishProduct(id); return false; }
+  iapInflight.add(id);
+  try {
+    const jewel = JEWEL_BUNDLES.find((b) => b.productId === r.productId) || (NO_ADS_BUNDLE.productId === r.productId ? NO_ADS_BUNDLE : null);
+    const offer = OFFER_PACKS.find((o) => o.productId === r.productId);
+    if (jewel?.noAds && S.noAds) { rememberTx(id); save(); await finishProduct(id); Ads.sync(); return false; }
+    if (offer && offerOwned(offer)) { rememberTx(id); save(); await finishProduct(id); return false; }
+    let granted = false;
+    if (jewel) {
+      S.jewels += jewel.n; S.stats.jewelsBought = (S.stats.jewelsBought || 0) + jewel.n;
+      if (jewel.noAds) { S.noAds = true; Ads.sync(); }
+      granted = true;
       sparkles($('#ui'), window.innerWidth / 2, window.innerHeight * 0.35, 20);
-      toast(`<i data-icon="jewel"></i> ${b.noAds ? 'Ads removed · ' : ''}+${b.n} Jewel${b.n > 1 ? 's' : ''}${r.simulated ? ' (simulated, no charge)' : ''}`);
+      toast(`<i data-icon="jewel"></i> ${jewel.noAds ? 'Ads removed · ' : ''}+${jewel.n} Jewel${jewel.n > 1 ? 's' : ''}`);
+    } else if (offer) granted = !!grantOffer(offer.id, id);
+    if (!granted) return false;
+    rememberTx(id); save(); hud(); if (panel === 'jewels' || panel === 'settings' || panel === 'stand') renderPanel();
+    await finishProduct(id);
+    return true;
+  } finally { iapInflight.delete(id); }
+}
+async function restorePurchases() {
+  const r = await restoreProducts();
+  if (!r.ok) { toast('Couldn’t restore purchases'); return; }
+  const ids = r.productIds || [];
+  if (ids.includes(NO_ADS_BUNDLE.productId)) { S.noAds = true; Ads.sync(); }
+  for (const o of OFFER_PACKS) {
+    if (!ids.includes(o.productId)) continue;
+    const m = M(); m.owned ||= {}; m.owned[o.id] = true;
+    if (o.starter) m.starter.bought = true;
+    if (o.dailyX2) S.dailyX2 = true;
+  }
+  save(); hud(); if (panel) renderPanel();
+  toast(ids.length ? 'Purchases restored' : 'Nothing new to restore');
+}
+function askBuyJewels(id) {
+  if (!purchasesVisible()) return;
+  const b = id === NO_ADS_BUNDLE.id ? NO_ADS_BUNDLE : JEWEL_BUNDLES.find((x) => x.id === id); if (!b || (b.noAds && S.noAds)) return;
+  const price = storePrice(b.productId, b.price);
+  confirmBox(`<i data-icon="jewel" class="confirm-ico"></i><h3>${b.noAds ? `No More Ads + ${b.n} Jewels` : `${b.n} Jewel${b.n > 1 ? 's' : ''}`} · ${price}</h3>
+    <p class="muted">You’ll be asked to confirm with the App Store.</p>`,
+    `Buy for ${price}`, async () => {
+      const r = await Payments.purchase(b);
+      if (r.cancelled) return;
+      if (!r.ok) { toast(r.reason || 'Purchase didn’t go through'); return; }
+      await deliverVerified({ status: 'purchased', verified: true, productId: b.productId, transactionId: r.transactionId });
     });
 }
 
@@ -4272,6 +4318,8 @@ $('#panel-body').addEventListener('click', (e) => {
   if (a === 'stand-back') { standView = 'stand'; renderPanel(); return; }
   if (a === 'tut-replay') { tutReplay(); return; }
   if (a === 'tips-again') { S.tips = {}; save(); closePanel(); tip('chop'); return; }
+  if (a === 'restore') return restorePurchases();
+  if (a === 'privacy') return openExternal(PRIVACY_URL);
   if (a === 'reset') return confirmBox('<h3>Reset your garden?</h3><p class="muted">This erases all progress on this device and starts again in the woods.</p>', 'Reset', () => {
     clearTimeout(saveTimer); localStorage.removeItem(SAVE_KEY); localStorage.removeItem(V02_KEY); S = null; location.reload(); });
   if (a === 'buy-lot') return buyLot(b.dataset.lot);
@@ -5656,6 +5704,9 @@ function v8Tick() {
   setInterval(() => { refProgress(); if (S.myCode) refClaim(); }, 10 * 60000); setTimeout(() => { refProgress(); if (S.myCode) refClaim(); }, 15000);
 })();
 considerNativeAds(() => guideDone());
+listenForTransactions((tx) => { deliverVerified(tx); });
+loadStore();
+window.addEventListener('petalspire-store', () => { try { if (panel === 'jewels' || panel === 'settings') renderPanel(); } catch { /* panel not open */ } });
 Object.defineProperties(window.__ps, Object.getOwnPropertyDescriptors({   // descriptors, so the getters stay live
   v8Tick, statXP, xpNeed, gainXP, get lvl() { return S.lvl; }, get xp() { return S.xp; }, get spins() { return S.spins; }, set spins(v) { S.spins = v; v8Hud(); },
   orderSlots, orderPool, makeOrder, fillOrder, skipOrder, ordersTick, orderPay, get orders() { return S.orders; }, managerAt,

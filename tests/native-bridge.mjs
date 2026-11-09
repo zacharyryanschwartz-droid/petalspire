@@ -5,6 +5,7 @@ import { ADMOB_TEST_ADS, ADMOB_LIVE, admobIds } from '../js/admob-config.js';
 import { chooseSave, isNative } from '../js/native.js';
 import { bannerSlots } from '../js/ads.js';
 import { Payments } from '../js/payments.js';
+import { purchasesVisible, storePrice } from '../js/store.js';
 
 test('books list is the only promo source', () => {
   assert.equal(BOOKS_PROMO_ENABLED, true);
@@ -54,15 +55,15 @@ test('chooseSave prefers a newer or only-surviving mirror', () => {
   assert.equal(chooseSave(newer, newer), 'local');
 });
 
-test('web purchases stay simulated and the native build refuses them', async () => {
-  assert.equal(isNative(), false);
-  const web = await Payments.purchase({ id: 'jewels_1', n: 1 });
-  assert.equal(web.ok, true);
-  assert.equal(web.simulated, true);
+test('real-money buttons stay hidden until the iOS store has loaded', async () => {
+  globalThis.__PETALSPIRE_NATIVE__ = false;
+  assert.equal(purchasesVisible(), false);
+  assert.equal(storePrice('com.petalspire.jewels.1', '$0.99'), '$0.99');
+  const web = await Payments.purchase({ id: 'jewels_1', n: 1, productId: 'com.petalspire.jewels.1' });
+  assert.equal(web.ok, false);
   globalThis.__PETALSPIRE_NATIVE__ = true;
-  const native = await Payments.purchase({ id: 'jewels_1', n: 1 });
+  assert.equal(purchasesVisible(), false);
+  const native = await Payments.purchase({ id: 'jewels_1', n: 1, productId: 'com.petalspire.jewels.1' });
   assert.equal(native.ok, false);
-  const offer = await Payments.purchaseOffer({ productId: 'com.petalspire.starter', name: 'Starter' });
-  assert.equal(offer.ok, false);
   globalThis.__PETALSPIRE_NATIVE__ = false;
 });
