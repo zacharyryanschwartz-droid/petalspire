@@ -89,6 +89,25 @@ const shown = await native.page.evaluate(() => {
   return { t, buys: document.querySelectorAll('#bundle-showcase [data-offer-buy]').length, later: !!document.querySelector('#bundle-showcase [data-bundle-x]') };
 });
 ok('showcase lists both bundles with prices and a way out', /Starter Pack/.test(shown.t) && /Collector/.test(shown.t) && /\$4\.99/.test(shown.t) && /\$19\.99/.test(shown.t) && shown.buys === 2 && shown.later, shown.t.slice(0, 180));
+await native.page.waitForFunction(() => [...document.querySelectorAll('#bundle-showcase [data-offer-hero] img')].every((img) => img.complete && img.naturalWidth > 0));
+const heroes = await native.page.evaluate(() => {
+  const fit = (root) => [...root.querySelectorAll('[data-offer-hero]')].map((hero) => {
+    const img = hero.querySelector('img');
+    const s = img ? getComputedStyle(img) : null;
+    const hr = hero.getBoundingClientRect();
+    const ir = img?.getBoundingClientRect();
+    return {
+      id: hero.dataset.offerHero,
+      src: img?.getAttribute('src') || '',
+      fit: s?.objectFit,
+      pos: s?.objectPosition,
+      ribbon: !!hero.querySelector('[data-offer-ribbon]'),
+      fills: !!(ir && hr.width > 80 && Math.abs(ir.width - hr.width) < 2 && Math.abs(ir.height - hr.height) < 2),
+    };
+  });
+  return { showcase: fit(document.getElementById('bundle-showcase')) };
+});
+ok('each showcase bouquet fills its frame', heroes.showcase.length === 2 && heroes.showcase.every((h) => h.fit === 'cover' && h.fills && /offer-/.test(h.src)) && heroes.showcase.find((h) => h.id === 'collector_bundle')?.ribbon, heroes);
 await native.page.screenshot({ path: '/opt/cursor/artifacts/market-showcase-390x844.png' });
 await native.page.click('#bundle-showcase .sp-later');
 await native.page.waitForSelector('#mkt-tut', { timeout: 5000 });
@@ -116,6 +135,20 @@ const after = await native.page.evaluate(() => {
 });
 ok('the bought seed is in the bag and the welcome does not return', after.n >= 1 && after.showcase === false && after.guide === false, after);
 ok('market welcome does not throw', native.errors.length === 0 && web.errors.length === 0, native.errors.concat(web.errors));
+await native.page.evaluate(() => { window.__ps.closePanel(); window.__ps.openPanel('jewels'); });
+await native.page.waitForFunction(() => document.querySelectorAll('#panel-body [data-offer-hero]').length >= 2);
+await native.page.waitForFunction(() => [...document.querySelectorAll('#panel-body [data-offer-hero] img')].every((img) => img.complete && img.naturalWidth > 0));
+const shop = await native.page.evaluate(() => [...document.querySelectorAll('#panel-body [data-offer-hero]')].map((hero) => {
+  const img = hero.querySelector('img');
+  const s = getComputedStyle(img);
+  const hr = hero.getBoundingClientRect();
+  const ir = img.getBoundingClientRect();
+  return { id: hero.dataset.offerHero, fit: s.objectFit, fills: Math.abs(ir.width - hr.width) < 2 && Math.abs(ir.height - hr.height) < 2, note: hero.closest('[data-offer-card]')?.innerText?.includes('App Store') };
+}));
+ok('Jewel Shop pack cards show the bouquets filling the frame', shop.length === 2 && shop.every((h) => h.fit === 'cover' && h.fills && h.note), shop);
+const card = native.page.locator('#panel-body [data-offer-card="starter_pack"]');
+await card.scrollIntoViewIfNeeded();
+await native.page.screenshot({ path: '/opt/cursor/artifacts/jewel-shop-bouquets-390x844.png' });
 
 await browser.close();
 server.close();

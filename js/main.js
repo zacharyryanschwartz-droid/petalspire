@@ -3119,7 +3119,7 @@ function offerRows(o) {
 }
 // v0.67.1 → v0.68: each pack is a hero bouquet made of the items themselves (plant cards fanned like petals, the Plow
 // and Sickle tucked in, Jewels, coins and Wood spilling at the base); the Collector's is bigger, with a glowing Other World bloom.
-const OFFER_ART = {};   // v0.8.6: no illustrations inside menus (rows stay clean)   // v0.7.1: re-cropped art (cache-busted)
+const OFFER_ART = { starter_pack: 'assets/offer-starter.jpg?v=0.7.1', collector_bundle: 'assets/offer-collector.jpg?v=0.7.1' };   // gift-wrapped bouquets, centred in the frame
 function offerChips(o) {
   const c = [], nT = TIER_ORDER.length;
   if (o.plantsPerTier) c.push(['<i data-icon="sprout"></i>', `${o.plantsPerTier * nT}`, 'plants · 1 per tier', 'plants']);
@@ -3133,10 +3133,15 @@ function offerChips(o) {
   if (o.saplings) c.push(['<i data-icon="sapling"></i>', `${o.saplings}`, 'saplings', 'saplings']);
   return c;
 }
+function offerHeroHTML(o) {
+  const art = OFFER_ART[o.id]; if (!art) return '';
+  const big = o.id === 'collector_bundle';
+  return `<div class="sp-hero${big ? ' big' : ''}" data-offer-hero="${o.id}"><img src="${art}" alt="${o.name}: a gift-wrapped bouquet of everything inside"/><span class="sp-shimmer"></span>${big ? '<span class="sp-glow"></span>' : ''}${o.dailyX2 ? '<span class="sp-ribbon" data-offer-ribbon>Double Daily</span>' : ''}</div>`;
+}
 function offerCardHTML(o, compact = false) {
-  const owned = offerOwned(o), art = OFFER_ART[o.id], big = o.id === 'collector_bundle';
+  const owned = offerOwned(o), big = o.id === 'collector_bundle';
   return `<div class="starter-card offer-card${compact ? ' compact' : ''}${o.starter ? ' is-starter' : ''}${big ? ' is-collector' : ''}" data-offer-card="${o.id}"${o.starter ? ' data-starter-card' : ''}>
-    ${art ? `<div class="sp-hero${big ? ' big' : ''}" data-offer-hero="${o.id}"><img src="${art}" alt="${o.name}: a gift-wrapped bouquet of everything inside"/><span class="sp-shimmer"></span>${big ? '<span class="sp-glow"></span>' : ''}${o.dailyX2 ? '<span class="sp-ribbon" data-offer-ribbon>Double Daily</span>' : ''}</div>` : ''}
+    ${offerHeroHTML(o)}
     <div class="sp-head"><div><b>${o.name}</b><small>${o.blurb}</small><em class="sp-val">≈ ${fmtC(offerValue(o))} coins of value</em></div></div>
     <ul class="sp-chips" data-offer-chips>${offerChips(o).map(([ic, n, l, k]) => `<li data-chip="${k}"><span class="ci">${ic}</span><b>${n}</b><small>${l}</small></li>`).join('')}</ul>
     <ul class="sp-items sp-fine">${offerRows(o).map(([ic, t, w]) => `<li${w ? ' class="wide"' : ''}><i data-icon="${ic}"></i>${t}</li>`).join('')}</ul>
@@ -3219,8 +3224,9 @@ const welcomeBusy = () => !!(showcaseEl || (S.marketWelcome?.started && !S.marke
 function showcaseOffers() { return OFFER_PACKS.filter((o) => !bundleOwned(o)); }
 function showcaseCard(o) {
   return `<div class="starter-card offer-card compact${o.starter ? ' is-starter' : ''}${o.id === 'collector_bundle' ? ' is-collector' : ''}" data-offer-card="${o.id}">
-    <div class="sp-head"><div><b>${o.name}</b><small>${o.blurb}</small></div></div>
-    <ul class="sp-chips">${offerChips(o).map(([ic, n, l, k]) => `<li data-chip="${k}"><span class="ci">${ic}</span><b>${n}</b><small>${l}</small></li>`).join('')}</ul>
+    ${offerHeroHTML(o)}
+    <div class="sp-head"><div><b>${o.name}</b></div></div>
+    <ul class="sp-chips sp-chips-slim">${offerChips(o).map(([ic, n, l, k]) => `<li data-chip="${k}"><span class="ci">${ic}</span><b>${n}</b><small>${l}</small></li>`).join('')}</ul>
     <button class="btn btn-gold" data-offer-buy="${o.id}">Buy · ${storePrice(o.productId, o.price)}</button></div>`;
 }
 function showMarketShowcase() {
