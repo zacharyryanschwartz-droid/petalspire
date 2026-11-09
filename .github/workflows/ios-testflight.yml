@@ -3,8 +3,8 @@ name: iOS TestFlight
 on:
   workflow_dispatch:
   push:
-    tags:
-      - "v*"
+    branches:
+      - cursor/ios-safe-area-da06
 
 permissions:
   contents: read
