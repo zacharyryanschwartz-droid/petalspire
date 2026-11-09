@@ -40,6 +40,26 @@ npm run bundle:www
 npx cap sync ios
 node scripts/configure-ios.mjs
 
+export ASC_SIGN_DIR="${RUNNER_TEMP:-/tmp}/petalspire-sign"
+node scripts/asc.mjs materialize-signing
+P12_PASS="$(cat "$ASC_SIGN_DIR/p12.pass")"
+KEYCHAIN="$ASC_SIGN_DIR/build.keychain-db"
+security create-keychain -p "$P12_PASS" "$KEYCHAIN"
+security set-keychain-settings -lut 21600 "$KEYCHAIN"
+security unlock-keychain -p "$P12_PASS" "$KEYCHAIN"
+security import "$ASC_SIGN_DIR/dist.p12" -k "$KEYCHAIN" -P "$P12_PASS" -T /usr/bin/codesign -T /usr/bin/security -T /usr/bin/xcodebuild
+security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$P12_PASS" "$KEYCHAIN" >/dev/null
+security list-keychains -d user -s "$KEYCHAIN" $(security list-keychains -d user | tr -d '"')
+security default-keychain -s "$KEYCHAIN"
+security find-identity -v -p codesigning "$KEYCHAIN" | sed 's/[A-F0-9]\{10,\}/ID/'
+PROFILE_PLIST="$ASC_SIGN_DIR/profile.plist"
+security cms -D -i "$ASC_SIGN_DIR/profile.mobileprovision" > "$PROFILE_PLIST"
+PROFILE_UUID="$(/usr/libexec/PlistBuddy -c 'Print UUID' "$PROFILE_PLIST")"
+PROFILE_NAME="$(/usr/libexec/PlistBuddy -c 'Print Name' "$PROFILE_PLIST")"
+mkdir -p "$HOME/Library/MobileDevice/Provisioning Profiles"
+cp "$ASC_SIGN_DIR/profile.mobileprovision" "$HOME/Library/MobileDevice/Provisioning Profiles/${PROFILE_UUID}.mobileprovision"
+echo "profile installed"
+
 BUILD_NUM="$(node scripts/asc.mjs next-build)"
 MARKETING_VERSION="0.8.7"
 echo "marketing=$MARKETING_VERSION build=$BUILD_NUM game=0.8.7.6"
@@ -61,11 +81,13 @@ xcodebuild "${XCODE[@]}" \
   -destination "generic/platform=iOS" \
   -archivePath "$ARCHIVE" \
   DEVELOPMENT_TEAM="$TEAM_ID" \
-  CODE_SIGNING_ALLOWED=NO \
-  CODE_SIGNING_REQUIRED=NO \
-  CODE_SIGN_IDENTITY="" \
+  CODE_SIGN_STYLE=Manual \
+  CODE_SIGN_IDENTITY="Apple Distribution" \
+  PROVISIONING_PROFILE="$PROFILE_UUID" \
+  PROVISIONING_PROFILE_SPECIFIER="$PROFILE_NAME" \
   CURRENT_PROJECT_VERSION="$BUILD_NUM" \
   MARKETING_VERSION="$MARKETING_VERSION" \
+  OTHER_CODE_SIGN_FLAGS="--keychain $KEYCHAIN" \
   archive
 
 PLIST="$EXPORT/ExportOptions.plist"
@@ -79,9 +101,16 @@ cat > "$PLIST" <<EOF
   <key>destination</key>
   <string>export</string>
   <key>signingStyle</key>
-  <string>automatic</string>
+  <string>manual</string>
   <key>teamID</key>
   <string>${TEAM_ID}</string>
+  <key>signingCertificate</key>
+  <string>Apple Distribution</string>
+  <key>provisioningProfiles</key>
+  <dict>
+    <key>com.schwarzespiele.petalspire</key>
+    <string>${PROFILE_NAME}</string>
+  </dict>
   <key>uploadSymbols</key>
   <true/>
   <key>manageAppVersionAndBuildNumber</key>
@@ -93,11 +122,7 @@ EOF
 xcodebuild -exportArchive \
   -archivePath "$ARCHIVE" \
   -exportPath "$EXPORT" \
-  -exportOptionsPlist "$PLIST" \
-  -allowProvisioningUpdates \
-  -authenticationKeyPath "$ASC_KEY_PATH" \
-  -authenticationKeyID "$ASC_KEY_ID" \
-  -authenticationKeyIssuerID "$ASC_ISSUER_ID"
+  -exportOptionsPlist "$PLIST"
 
 IPA="$(find "$EXPORT" -name '*.ipa' -print -quit)"
 if [ -z "$IPA" ]; then

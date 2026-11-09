@@ -1,7 +1,8 @@
 // App Store Connect helper. Reads the API key from the environment, never from argv, and never prints it.
-import { createSign } from 'crypto';
+import { createSign, randomBytes } from 'crypto';
+import { execFileSync } from 'child_process';
 import { mkdirSync, readFileSync, writeFileSync } from 'fs';
-import { dirname } from 'path';
+import { dirname, join } from 'path';
 
 const APP_ID = '6832561595';
 const BUNDLE_ID = 'com.schwarzespiele.petalspire';
@@ -99,6 +100,77 @@ async function cmdWait() {
   throw new Error(`Build ${build} was not processing after 40 minutes`);
 }
 
+function openssl(args, opts = {}) {
+  return execFileSync('openssl', args, { encoding: 'utf8', ...opts });
+}
+
+async function bundleResourceId() {
+  const json = await api(`/v1/bundleIds?filter[identifier]=${encodeURIComponent(BUNDLE_ID)}&limit=5`);
+  const row = (json.data || []).find((d) => d.attributes?.identifier === BUNDLE_ID) || json.data?.[0];
+  if (!row?.id) throw new Error('Petalspire bundle id was not found in App Store Connect');
+  return row.id;
+}
+
+async function cmdMaterialize() {
+  const dir = process.env.ASC_SIGN_DIR;
+  if (!dir) throw new Error('ASC_SIGN_DIR is not set');
+  mkdirSync(dir, { recursive: true, mode: 0o700 });
+  const keyPath = join(dir, 'dist.key');
+  const csrPath = join(dir, 'dist.csr');
+  openssl(['req', '-new', '-newkey', 'rsa:2048', '-nodes', '-keyout', keyPath, '-out', csrPath, '-subj', '/CN=Petalspire CI/O=Schwarze Spiele/C=US']);
+  const csr = readFileSync(csrPath, 'utf8');
+  const existing = await api('/v1/certificates?limit=200&fields[certificates]=name,certificateType,displayName,expirationDate');
+  const dist = (existing.data || []).filter((c) => /DISTRIBUTION/.test(c.attributes?.certificateType || ''));
+  console.log(`existing distribution certificates: ${dist.length}`);
+  let created = null;
+  let lastErr = null;
+  for (const certificateType of ['DISTRIBUTION', 'IOS_DISTRIBUTION']) {
+    try {
+      created = await api('/v1/certificates', {
+        method: 'POST',
+        body: { data: { type: 'certificates', attributes: { certificateType, csrContent: csr } } },
+      });
+      console.log(`created certificate type ${certificateType}`);
+      break;
+    } catch (err) {
+      lastErr = err;
+      console.log(`certificate type ${certificateType} was not created`);
+    }
+  }
+  if (!created?.data?.id) throw lastErr || new Error('Could not create a distribution certificate');
+  const certB64 = created.data.attributes?.certificateContent;
+  if (!certB64) throw new Error('Certificate response did not include certificate content');
+  const cerPath = join(dir, 'dist.cer');
+  const pemPath = join(dir, 'dist.pem');
+  writeFileSync(cerPath, Buffer.from(certB64, 'base64'));
+  try { openssl(['x509', '-inform', 'DER', '-in', cerPath, '-out', pemPath]); }
+  catch { openssl(['x509', '-inform', 'PEM', '-in', cerPath, '-out', pemPath]); }
+  const pass = randomBytes(24).toString('hex');
+  const p12 = join(dir, 'dist.p12');
+  openssl(['pkcs12', '-export', '-inkey', keyPath, '-in', pemPath, '-out', p12, '-passout', `pass:${pass}`]);
+  writeFileSync(join(dir, 'p12.pass'), pass, { mode: 0o600 });
+  const bundleId = await bundleResourceId();
+  const profileName = `Petalspire App Store ${Date.now()}`;
+  const profile = await api('/v1/profiles', {
+    method: 'POST',
+    body: {
+      data: {
+        type: 'profiles',
+        attributes: { name: profileName, profileType: 'IOS_APP_STORE' },
+        relationships: {
+          bundleId: { data: { type: 'bundleIds', id: bundleId } },
+          certificates: { data: [{ type: 'certificates', id: created.data.id }] },
+        },
+      },
+    },
+  });
+  const profB64 = profile.data?.attributes?.profileContent;
+  if (!profB64) throw new Error('Profile response did not include profile content');
+  writeFileSync(join(dir, 'profile.mobileprovision'), Buffer.from(profB64, 'base64'));
+  writeFileSync(join(dir, 'profile-name.txt'), profileName);
+  console.log('signing materials ready');
+}
+
 function cmdWriteKey() {
   const pem = normalizePem(process.env.ASC_KEY_P8 || '');
   if (!pem.includes('BEGIN') || !pem.includes('PRIVATE KEY')) throw new Error('ASC_KEY_P8 is missing or is not a private key');
@@ -110,7 +182,7 @@ function cmdWriteKey() {
 }
 
 const cmd = process.argv[2];
-const run = { 'write-key': cmdWriteKey, team: cmdTeam, 'next-build': cmdNextBuild, wait: cmdWait }[cmd];
+const run = { 'write-key': cmdWriteKey, team: cmdTeam, 'next-build': cmdNextBuild, wait: cmdWait, 'materialize-signing': cmdMaterialize }[cmd];
 if (!run) {
   console.error('usage: asc.mjs write-key|team|next-build|wait <build>');
   process.exit(2);
