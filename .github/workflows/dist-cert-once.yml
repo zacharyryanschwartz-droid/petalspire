@@ -1,9 +1,7 @@
 name: Save distribution cert once
 
 on:
-  push:
-    branches:
-      - cursor/dist-cert-once-da06
+  workflow_dispatch:
 
 permissions:
   contents: read
