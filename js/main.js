@@ -705,6 +705,7 @@ S.beds.forEach((id) => W.addBed(id, false));
 while (S.tiles.length < S.beds.length * PER_BED) S.tiles.push(null);
 if (S.standBuilt) W.appear(W.stand, false);
 for (const [lot, b] of Object.entries(S.barrels)) { if (lot === 'home') W.appear(W.barrel, false); else W.addBarrel(lot, b.x, b.z, false); }
+applyPlaces();
 // v0.4: the Honeybee Skep used to boost every harvest everywhere. An old global hive becomes a placed hive on the home plot.
 let hiveMigrated = false;
 // v0.4: card stacks — every card already discovered becomes a stack of 1 at Lv1 (extra Irrigation cards already owned count as copies).
@@ -1109,7 +1110,7 @@ function enterPlace(what, type) {
   $('#buildbar-text').innerHTML = `Tap open ground on your land to place <b>${name}</b>${what === 'sapling' ? ' · not in beds · sunny spots grow faster' : ''}`;
   $('#buildbar').classList.remove('hidden');
 }
-function exitPlace() { if (placing?.spots) W.setSpotGhosts(null); placing = null; syncBedTargets(); $('#buildbar').classList.add('hidden'); }
+function exitPlace() { if (placing?.spots) W.setSpotGhosts(null); if (placing?.what === 'move') { W.setMoveGhost(null); W.setGhosts(null); } placing = null; syncBedTargets(); $('#buildbar').classList.add('hidden'); }
 function placeAt(x, z) {
   if (placing?.what === 'orchardtree') {   // v0.6: plant a bought tree sapling on a free Orchard spot
     const near = placing.spots.filter((p) => Math.hypot(p.x - x, p.z - z) < 1.0).sort((a, b) => Math.hypot(a.x - x, a.z - z) - Math.hypot(b.x - x, b.z - z))[0];
@@ -1283,6 +1284,227 @@ function sellPlaced(f) {
     gone(); S.coins += v; S.stats.sold = (S.stats.sold || 0) + 1; deselect(); save(); hud(); if (panel) renderPanel(); syncBlueprints?.(); toast(`Sold ${name} · +${v} coins`); });
   return true;
 }
+
+function applyPlaces() {
+  const P = S.place || {};
+  if (P.stand) { SPOTS.stand[0] = P.stand.x; SPOTS.stand[1] = P.stand.z; W.stand.position.set(P.stand.x, 0, P.stand.z); W.moveBlueprint?.('stand', P.stand.x, P.stand.z); }
+  if (P.rack) { SPOTS.rack[0] = P.rack.x; SPOTS.rack[1] = P.rack.z; W.rack.position.set(P.rack.x, 0, P.rack.z); W.moveBlueprint?.('rack', P.rack.x, P.rack.z); }
+  if (P.market) { SPOTS.market[0] = P.market.x; SPOTS.market[1] = P.market.z; W.market.position.set(P.market.x, 0, P.market.z); }
+  if (P.oshed) { SPOTS.orchardshed[0] = P.oshed.x; SPOTS.orchardshed[1] = P.oshed.z; W.orchardShed.position.set(P.oshed.x, 0, P.oshed.z); }
+  if (P.billboard) { SPOTS.billboard[0] = P.billboard.x; SPOTS.billboard[1] = P.billboard.z; W.billboard.position.set(P.billboard.x, 0, P.billboard.z); }
+  for (const [key, mesh] of [['parking', 'parking'], ['oparking', 'oparking'], ['obillboard', 'obillboard'], ['windmill', 'windmill']]) if (P[key] && W[mesh]) W[mesh].position.set(P[key].x, 0, P[key].z);
+  W.setBulkPos('home', P.bulkHome?.x ?? -2.2, P.bulkHome?.z ?? 2.35);
+  if (P.bulkOrch) W.setBulkPos('orchard', P.bulkOrch.x, P.bulkOrch.z);
+  for (const k of ['tincture', 'still', 'teastand', 'windmill', 'press', 'opress', 'fruitstand']) {
+    const pos = S[k === 'tincture' ? 'tincPos' : k === 'teastand' ? 'teaPos' : k + 'Pos'];
+    if (pos && W[k]) { SPOTS[k] = [pos.x, pos.z]; W[k].position.set(pos.x, 0, pos.z); }
+  }
+  let nudged = false;
+  for (const [lot, b] of Object.entries(S.barrels || {})) {
+    const bulk = W.bulkAt(lotLoc(lot) === 'orchard' ? 'orchard' : 'home');
+    if (Math.hypot(b.x - bulk.x, b.z - bulk.z) >= 1.7) { W.setBarrelXZ(lot, b.x, b.z); continue; }
+    let nx = b.x, nz = b.z, placed = false;
+    const base = Math.atan2(b.z - bulk.z, b.x - bulk.x) || Math.PI;
+    for (let k = 0; k < 8 && !placed; k++) {
+      const ang = base + k * Math.PI / 4;
+      const tx = bulk.x + Math.cos(ang) * 2.4, tz = bulk.z + Math.sin(ang) * 2.4;
+      if (lotAt(tx, tz) !== lot) continue;
+      const crowded = [[SPOTS.stand], [SPOTS.rack], [SPOTS.market]].some(([p]) => Math.hypot(tx - p[0], tz - p[1]) < 1.8);
+      if (crowded) continue;
+      nx = tx; nz = tz; placed = true;
+    }
+    if (!placed) { nx = lot === 'home' ? -3.4 : b.x - 2.2; nz = lot === 'home' ? 2.4 : b.z; }
+    b.x = nx; b.z = nz; W.setBarrelXZ(lot, nx, nz); nudged = true;
+  }
+  if (nudged) save();
+}
+function starterBedId() { return S.beds.find((id) => (lotOfSite(id) || 'home') === 'home') || S.beds[0] || null; }
+function canDemolish(kind, id) {
+  if (kind === 'stand' || kind === 'market' || kind === 'bulk' || kind === 'oshed' || kind === 'orchardshed') return false;
+  if (kind === 'barrel' && id === 'home') return false;
+  if (kind === 'bed' && id === starterBedId()) return false;
+  return true;
+}
+function placeKey(kind, id) { return kind + ':' + (id || ''); }
+function occupiedSpots(exceptKey) {
+  const pts = [];
+  const add = (x, z, key) => { if (x == null || key === exceptKey) return; pts.push({ x, z }); };
+  add(SPOTS.stand[0], SPOTS.stand[1], 'stand:');
+  add(SPOTS.rack[0], SPOTS.rack[1], 'rack:');
+  add(SPOTS.market[0], SPOTS.market[1], 'market:');
+  const bh = W.bulkAt('home'), bo = W.bulkAt('orchard');
+  add(bh.x, bh.z, 'bulk:home'); add(bo.x, bo.z, 'bulk:orchard');
+  for (const [lot, b] of Object.entries(S.barrels || {})) add(b.x, b.z, 'barrel:' + lot);
+  for (const [lot, h] of Object.entries(S.hives || {})) add(h.x, h.z, 'hive:' + lot);
+  for (const id of S.beds) { const s = siteById(id); if (s) add(s.x, s.z, 'bed:' + id); }
+  for (const k of ['tincture', 'still', 'teastand', 'windmill', 'press', 'opress', 'fruitstand', 'parking', 'billboard']) { const m = W[k]; if (m?.visible) add(m.position.x, m.position.z, k + ':'); }
+  if (W.orchardShed?.visible) add(W.orchardShed.position.x, W.orchardShed.position.z, 'oshed:');
+  for (const d of S.decor || []) add(d.x, d.z, 'decor:' + d.key);
+  for (const d of S.gf || []) add(d.x, d.z, 'gfeat:' + d.key);
+  return pts;
+}
+function moveSpotOk(x, z, kind, id) {
+  const lot = lotAt(x, z);
+  if (!lot || !S.lots[lot]) return false;
+  if ((kind === 'barrel' || kind === 'hive') && lot !== id) return false;
+  const want = (kind === 'barrel' || kind === 'hive') ? lotLoc(id) : (kind === 'bulk' ? (id === 'orchard' ? 'orchard' : 'home') : curLoc());
+  if (lotLoc(lot) !== want) return false;
+  const key = placeKey(kind, id);
+  if (occupiedSpots(key).some((p) => Math.hypot(p.x - x, p.z - z) < 1.45)) return false;
+  return true;
+}
+function rememberPlace(key, x, z) { (S.place ||= {})[key] = { x, z }; }
+function commitMove(p, x, z) {
+  const { kind, id } = p;
+  if (kind === 'bed') {
+    if (S.beds.includes(id) && siteClear(x) && !siteStands(siteById(x)).length && !S.beds.includes(x) && lotLoc(lotOfSite(x) || 'home') === lotLoc(lotOfSite(id) || 'home')) {
+      const was = S.irrigBeds.includes(id);
+      if (was) { const k = S.irrigBeds.indexOf(id); if (k >= 0) S.irrigBeds.splice(k, 1); if (S.irrigFrom) delete S.irrigFrom[id]; W.setIrrigation(id, false); }
+      S.beds[S.beds.indexOf(id)] = x; W.moveBed(id, x);
+      if (was) { S.irrigBeds.push(x); W.setIrrigation(x, true, barrelXZ(feedLot(x))); }
+      save(); exitMove(); toast('Bed moved · the plants came with it'); return true;
+    }
+    toast('Tap a clear patch'); return false;
+  }
+  if (!moveSpotOk(x, z, kind, id)) { toast(kind === 'barrel' ? 'Keep the barrel on its own plot, clear of the other things' : 'That spot is taken or off your land'); return false; }
+  if (kind === 'barrel') { S.barrels[id].x = x; S.barrels[id].z = z; W.setBarrelXZ(id, x, z); syncBarrels(); }
+  else if (kind === 'bulk') { W.setBulkPos(id, x, z); rememberPlace(id === 'orchard' ? 'bulkOrch' : 'bulkHome', x, z); }
+  else if (kind === 'stand' || kind === 'rack' || kind === 'market') { SPOTS[kind][0] = x; SPOTS[kind][1] = z; W[kind].position.set(x, 0, z); W.moveBlueprint?.(kind, x, z); rememberPlace(kind, x, z); }
+  else if (kind === 'hive') { S.hives[id].x = x; S.hives[id].z = z; W.addHive(id, x, z, false); }
+  else if (kind === 'decor') { const d = S.decor.find((q) => q.key === id); if (!d) return false; d.x = x; d.z = z; W.removeDecor(id); W.addDecor(id, d.type, x, z, d.r || 0, false); }
+  else if (kind === 'gfeat') { const d = S.gf.find((q) => q.key === id); if (!d) return false; d.x = x; d.z = z; W.removeFeat(id, false); W.addFeat(id, d.id, x, z, d.r || 0, false); }
+  else if (kind === 'oshed') { SPOTS.orchardshed[0] = x; SPOTS.orchardshed[1] = z; W.orchardShed.position.set(x, 0, z); rememberPlace('oshed', x, z); }
+  else {
+    const posKey = kind === 'tincture' ? 'tincPos' : kind === 'teastand' ? 'teaPos' : kind + 'Pos';
+    if (S[posKey]) S[posKey] = { ...S[posKey], x, z, lot: lotAt(x, z) };
+    if (SPOTS[kind]) SPOTS[kind] = [x, z];
+    if (W[kind]) W[kind].position.set(x, 0, z);
+    rememberPlace(kind, x, z);
+  }
+  try { syncBarrels(); } catch (_) {}
+  save(); hud(); exitMove(); toast('Moved · everything inside stayed put'); return true;
+}
+function exitMove() { if (placing?.what === 'move') { W.setMoveGhost(null); W.setGhosts(null); } exitPlace(); }
+function startMove(kind, id) {
+  if (guideOn()) { toast('Finish Sprig’s first steps, then you can rearrange the garden'); return; }
+  closePanel(); deselect(); if (buildMode) exitBuild(); if (placing) exitPlace();
+  placing = { what: 'move', kind, id };
+  $('#buildbar-text').innerHTML = kind === 'bed' ? '<b>Move bed</b> · tap a glowing patch. The plants stay in it.' : '<b>Move</b> · drag or tap a clear spot. Green means it fits. What’s inside stays.';
+  fillIcons($('#buildbar')); $('#buildbar').classList.remove('hidden');
+  if (kind === 'bed') {
+    const loc = lotLoc(lotOfSite(id) || 'home');
+    const list = SITES.filter((s) => S.lots[s.lot] && lotLoc(s.lot) === loc && !S.beds.includes(s.id)).map((s) => ({ id: s.id, ok: siteClear(s.id) && !siteStands(s).length }));
+    if (!list.length) { exitMove(); toast('No other patch on this land'); return; }
+    W.setGhosts(list); placing.sites = true;
+  }
+}
+function previewMove(x, z) {
+  if (placing?.what !== 'move') return;
+  const g = W.groundAt(x, z); if (!g) return;
+  const ok = placing.kind === 'bed' ? false : moveSpotOk(g.x, g.z, placing.kind, placing.id);
+  placing.preview = { x: g.x, z: g.z, ok };
+  if (placing.kind !== 'bed') W.setMoveGhost(g.x, g.z, ok);
+}
+function askDemolish(kind, id) {
+  if (!canDemolish(kind, id)) { toast('That one stays — the garden needs it'); return; }
+  const name = demolishName(kind, id);
+  let back;
+  if (kind === 'decor' || kind === 'gfeat' || kind === 'hive') back = 'It goes back to your bag, and its effect stops until you place it again.';
+  else if (kind === 'barrel') back = `You get <b>${Math.floor((BARREL.price || 0) * 0.5)} coins</b> back, half what it cost. Its water is emptied, and any irrigated beds unhook.`;
+  else { const wood = demolishWood(kind, id); back = (wood ? `You get <b>${wood} Wood</b> back, half the wood it took to build. ` : 'It didn’t cost Wood, so no materials come back. ') + 'Anything stored, and any plants, go back to your bag.'; }
+  confirmBox(`<h3>Demolish ${name}?</h3><p class="muted">${back} <b>Upgrades on it are lost.</b></p>`, 'Demolish', () => doDemolish(kind, id));
+}
+function demolishWood(kind, id) {
+  if (kind === 'bed') return Math.floor((BED_COSTS[Math.min(S.beds.indexOf(id), BED_COSTS.length - 1)] || 12) * 0.5);
+  if (kind === 'barrel') return 0;
+  const B = BUILDS[kind];
+  return Math.floor(((B?.wood) || 0) * 0.5);
+}
+function demolishName(kind, id) {
+  if (kind === 'bed') return 'this raised bed';
+  if (kind === 'barrel') return `the rain barrel on ${lotName(id)}`;
+  if (kind === 'hive') return 'the Honeybee Skep';
+  if (kind === 'rack') return 'the Drying Rack';
+  return BUILD_NAMES[kind] || FEATURES[kind]?.name || CRAFT[kind]?.name || kind;
+}
+function reclaimTile(i) {
+  const p = S.tiles[i]; if (!p) return;
+  const loc = tileLoc(i);
+  inBag(loc, () => {
+    if (stageOf(p) >= 3 && !SPECIES[p.sp]?.noFlower) S.inv['flower_' + p.sp] = (S.inv['flower_' + p.sp] || 0) + (SPECIES[p.sp].yieldF?.[0] || 1);
+    S.inv['seed_' + p.sp] = (S.inv['seed_' + p.sp] || 0) + 1;
+  });
+  S.tiles[i] = null;
+}
+function doDemolish(kind, id) {
+  if (!canDemolish(kind, id)) return;
+  const wood = demolishWood(kind, id);
+  if (kind === 'bed') {
+    const i = S.beds.indexOf(id); if (i < 0) return;
+    const start = i * PER_BED;
+    for (let k = 0; k < PER_BED; k++) reclaimTile(start + k);
+    const hook = S.irrigBeds.indexOf(id); if (hook >= 0) S.irrigBeds.splice(hook, 1);
+    if (S.irrigFrom) delete S.irrigFrom[id]; try { W.setIrrigation(id, false); } catch (_) {}
+    S.tiles.splice(start, PER_BED); S.beds.splice(i, 1); W.dropBed(id);
+  } else if (kind === 'barrel') {
+    const back = Math.floor((BARREL.price || 0) * 0.5); if (back) S.coins += back;
+    for (const bed of barrelBeds(id)) { const k = S.irrigBeds.indexOf(bed); if (k >= 0) S.irrigBeds.splice(k, 1); try { W.setIrrigation(bed, false); } catch (_) {} if (S.irrigFrom) delete S.irrigFrom[bed]; }
+    delete S.upg?.['barrel:' + id]; W.removeBarrel(id); delete S.barrels[id];
+  } else if (kind === 'hive') { S.hiveInv = (S.hiveInv || 0) + 1; W.removeHive(id); delete S.hives[id]; syncBees(); }
+  else if (kind === 'rack') {
+    inBag('home', () => { for (const r of S.rack) if (r?.sp) S.inv[(now() - r.start >= r.ms ? 'dried_' : 'flower_') + r.sp] = (S.inv[(now() - r.start >= r.ms ? 'dried_' : 'flower_') + r.sp] || 0) + 1; });
+    S.rackBuilt = false; S.rackLv = 1; S.rack = Array(rackSlots()).fill(null); delete S.upg?.rack; W.rack.visible = false; syncRack();
+  } else if (kind === 'tincture') {
+    inBag('home', () => { for (const t of S.tinc) if (t?.sp) { if (now() - t.start >= t.ms) { const tid = tinctureId(t.sp, t.base); S.inv[tid] = (S.inv[tid] || 0) + 1; } else { const r = TINCTURE.recipes[t.sp]; S.inv['flower_' + t.sp] = (S.inv['flower_' + t.sp] || 0) + (r?.n || 1); if (t.base) S.inv[t.base] = (S.inv[t.base] || 0) + 1; } } });
+    S.tinc = Array(TINCTURE.slots).fill(null); S.tinctureBuilt = false; W.tincture.visible = false;
+  } else if (kind === 'still') {
+    inBag('home', () => { for (const t of S.stills) if (t?.sp) { const r = STILL.recipes[t.sp]; if (now() - t.start >= t.ms) { S.inv[oilId(t.sp)] = (S.inv[oilId(t.sp)] || 0) + 1; S.inv[hydroId(t.sp)] = (S.inv[hydroId(t.sp)] || 0) + 1; } else if (r) S.inv[r.in || 'seed_' + t.sp] = (S.inv[r.in || 'seed_' + t.sp] || 0) + r.n; } });
+    S.stills = Array(STILL.slots).fill(null); S.stillBuilt = false; W.still.visible = false;
+  } else if (kind === 'teastand') {
+    inBag('home', () => { for (const t of S.teas) if (t?.sps) { if (now() >= t.start + t.ms && t.id) S.inv[t.id] = (S.inv[t.id] || 0) + 1; else for (const sp of t.sps) S.inv['dried_' + sp] = (S.inv['dried_' + sp] || 0) + 1; } });
+    S.teas = Array(TEA.slots).fill(null); S.teaBuilt = false; W.teastand.visible = false;
+  } else if (CRAFT[kind]) {
+    const C = CRAFT[kind];
+    inBag(kind === 'opress' || kind === 'fruitstand' ? 'orchard' : 'home', () => { for (const t of S[C.slots] || []) if (t) { const r = craftRecipe(kind, t.rid); if (now() >= t.start + t.ms && t.item) S.inv[t.item] = (S.inv[t.item] || 0) + 1; else if (r) S.inv[r.in] = (S.inv[r.in] || 0) + r.n; } });
+    S[C.slots] = (S[C.slots] || []).map(() => null); S[C.built] = false; if (W[kind]) W[kind].visible = false;
+  } else if (kind === 'decor') { const d = S.decor.find((q) => q.key === id); if (d) { S.decorInv[d.type] = (S.decorInv[d.type] || 0) + 1; S.decor = S.decor.filter((q) => q !== d); W.removeDecor(id); } }
+  else if (kind === 'gfeat') { const d = S.gf.find((q) => q.key === id); if (d) { S.gfInv[d.id] = (S.gfInv[d.id] || 0) + 1; S.gf = S.gf.filter((q) => q !== d); W.removeFeat(id); } }
+  else if (kind === 'windmill') { S.windmillBuilt = false; W.windmill.visible = false; }
+  else if (kind === 'billboard' || kind === 'obillboard' || kind === 'parking' || kind === 'oparking') { S[kind === 'billboard' ? 'billboardBuilt' : kind === 'obillboard' ? 'obillboardBuilt' : kind === 'parking' ? 'parkingBuilt' : 'oparkingBuilt'] = false; const mesh = W[kind]; if (mesh) mesh.visible = false; }
+  if (wood) S.wood += wood;
+  if (S.buildDone) delete S.buildDone[kind];
+  delete S.upg?.[kind];
+  closePanel(); deselect(); save(); hud(); syncBlueprints();
+  const bagged = kind === 'decor' || kind === 'gfeat' || kind === 'hive';
+  toast(bagged ? 'Back in your bag · its effect stops until you place it again' : wood ? `Demolished · +${wood} Wood · upgrades on it are gone` : 'Demolished · what was inside is back in your bag');
+}
+function moveDemoHTML(kind, id, demo) {
+  if (guideOn()) return '';
+  const demoBtn = demo && canDemolish(kind, id) ? `<button class="btn btn-blush" data-act="demo-thing" data-move="${kind}" data-id="${id || ''}">Demolish</button>` : '';
+  return `<div class="ts-actions move-demo"><button class="btn" data-act="move-thing" data-move="${kind}" data-id="${id || ''}">Move</button>${demoBtn}</div>`;
+}
+function paintMoveBar(body) {
+  if (guideOn() || !panel || !body) return;
+  const map = {
+    stand: ['stand', '', !!S.standBuilt, false],
+    ostand: ['oshed', '', !!S.oshedBuilt, false],
+    bulk: ['bulk', panelArg || 'home', true, false],
+    rack: ['rack', '', !!S.rackBuilt, true],
+    market: ['market', '', true, false],
+    tincture: ['tincture', '', !!S.tinctureBuilt, true],
+    still: ['still', '', !!S.stillBuilt, true],
+    teastand: ['teastand', '', !!S.teaBuilt, true],
+    press: ['press', '', !!S.pressBuilt, true],
+    opress: ['opress', '', !!S.opressBuilt, true],
+    fruitstand: ['fruitstand', '', !!S.fruitstandBuilt, true],
+    windmill: ['windmill', '', !!S.windmillBuilt, true],
+    billboard: ['billboard', '', !!S.billboardBuilt, true],
+  };
+  const spec = map[panel];
+  if (!spec || !spec[2] || consLeft(panel) > 0) return;
+  body.insertAdjacentHTML('beforeend', moveDemoHTML(spec[0], spec[1], spec[3]));
+}
+
 function finishRestore(r) {
   S.restoring = S.restoring.filter((x) => x !== r); const f = FINDS[r.kind]; S.stats.restored++;
   if (f.into.bonus === 'crate') { S.bonus.crate = true; toast(`<i data-icon="sparkle"></i> Restored: <b>${f.into.name}</b> · ${S.shelfOn ? 'your Farm Stand already has one — sell this spare or stock it as an antique' : `install it on your Farm Stand from Bag → Finds (+${SHELF_BONUS} shelf space)`}`); }
@@ -1471,21 +1693,28 @@ function renderFocus() {
       ${S.windmillBuilt && barrelRoof(focus.lot) ? `<p class="wm-line"><b>Windmill: faster refill</b> <small>(every ${regenS()} s instead of ${S.bonus.can ? WATER_REGEN_S / 2 : WATER_REGEN_S} s)</small></p>` : ''}<p class="muted">Refills ${barrelPerTick(focus.lot) || 1} water every ${regenS() >= 60 ? 'minute' : regenS() + ' s'} (up to ${max}), even while the game is closed. Reaches ${behind ? `this plot and <b>${lotName(behind)}</b> behind it (green frames)` : BEHIND[focus.lot] ? `this plot, and ${lotName(BEHIND[focus.lot])} behind it once you buy it` : 'this plot'}; hand watering there uses it too.</p>`
       + (beds.length ? `<div class="list barrel-beds">${beds.map((id) => `<div class="row"><div class="ico">${FEATURE_ART.irrigation}</div><div class="meta"><b>Bed ${S.beds.indexOf(id) + 1}</b><small>${lotOfSite(id) !== focus.lot ? `${lotName(lotOfSite(id))} (behind) · ` : ''}Irrigated from this barrel</small></div><div class="acts"><button class="btn sm" data-unhook="${id}">Unhook</button></div></div>`).join('')}</div>` : `<p class="muted">No irrigated beds yet${hasIrrig() ? '' : ' · Irrigation cards come from Card Packs and the Supply Market'}.</p>`)
       + barrelUpgHTML(focus.lot)
-      + `<div class="ts-actions">${spare && beds.length < BARREL.maxBeds && !irrigBlock() ? `<button class="btn btn-primary" data-buy="irrigation" data-price="${buyCost('irrigation').coins}" ${canPay(buyCost('irrigation')) ? '' : 'disabled'}><i data-icon="water"></i> Irrigation · ${coin(buyCost('irrigation').coins)}</button>` : ''}<button class="btn btn-blush" data-act="sell-placed">${focus.lot === 'home' ? 'Sell…' : `Sell ${coin(buyback(RESALE.placed.barrel))}`}</button></div>`;
+      + `<div class="ts-actions">${spare && beds.length < BARREL.maxBeds && !irrigBlock() ? `<button class="btn btn-primary" data-buy="irrigation" data-price="${buyCost('irrigation').coins}" ${canPay(buyCost('irrigation')) ? '' : 'disabled'}><i data-icon="water"></i> Irrigation · ${coin(buyCost('irrigation').coins)}</button>` : ''}${focus.lot === 'home' ? '' : `<button class="btn btn-blush" data-act="sell-placed">Sell ${coin(buyback(RESALE.placed.barrel))}</button>`}</div>`
+      + moveDemoHTML('barrel', focus.lot, true);
   } else if (focus.kind === 'hive') {
     const h = S.hives[focus.lot]; if (!h) return deselect(); const n = S.beds.filter((id) => lotOfSite(id) === focus.lot).length;
     head = `<h3>Honeybee Skep <small>${lotName(focus.lot)} · one hive per plot</small></h3>`;
     body = `<p class="bee-line">🐝 +${HIVE_BONUS} flower per harvest on this plot’s ${n} bed${n === 1 ? '' : 's'} (only this plot)</p>
-      <div class="ts-actions"><button class="btn btn-blush" data-act="sell-placed">Sell ${coin(buyback(RESALE.placed.beehive))}</button></div>`;
+      <div class="ts-actions"><button class="btn btn-blush" data-act="sell-placed">Sell ${coin(buyback(RESALE.placed.beehive))}</button></div>`
+      + moveDemoHTML('hive', focus.lot, true);
   } else if (focus.kind === 'gfeat') {
     const d = S.gf.find((x) => x.key === focus.key); if (!d) return deselect(); const id = d.id;
     head = `<h3>${FEATURES[id].name} <small>${PLANT_TIERS[cardTier(FEATURES[id])].label} garden feature${CHARMS[id] ? ` · Lv${charmLv(id)}` : ''} · ${lotName(d.lot)}</small></h3>`;
     body = `<p class="gf-line" data-gf-fx>${CHARMS[id] ? charmText(id) : 'Every plant you water grows faster'}</p>${CHARMS[id] && nextAt(id) != null ? `<p class="muted">${S.cards[id]?.n || 0}/${nextAt(id)} copies to Lv${charmLv(id) + 1}</p>` : ''}
-      <div class="ts-actions">${canUpgrade(id) ? `<button class="btn btn-gold" data-act="upg-gf">✨ Upgrade to Lv${cardLv(id) + 1}</button>` : ''}<button class="btn" data-act="store-gf">Put back in bag</button></div>`;
+      <div class="ts-actions">${canUpgrade(id) ? `<button class="btn btn-gold" data-act="upg-gf">✨ Upgrade to Lv${cardLv(id) + 1}</button>` : ''}<button class="btn" data-act="store-gf">Put back in bag</button></div>`
+      + moveDemoHTML('gfeat', focus.key, true);
   } else if (focus.kind === 'decor') {
     const d = S.decor.find((x) => x.key === focus.key); if (!d) return deselect(); const info = DECOR_INFO[d.type];
     head = `<h3>${info.name} <small>${info.cosmetic ? 'Keepsake decoration · just for looks' : info.d8 ? `${PLANT_TIERS[info.tier].label} decoration · +${info.atm} atmosphere at ${decoLocOf(d) === 'orchard' ? 'the Orchard' : 'Home'}` : `Garden decor · +${info.atm} atmosphere`}</small></h3>`;
-    body = `<p class="muted">Atmosphere ${atmosphere(curLoc())} here · customers arrive ${Math.round((1 - atmosMult(curLoc())) * 100)}% sooner.</p><div class="ts-actions"><button class="btn" data-act="store-decor">Put back in bag</button>${info.d8 ? '' : `<button class="btn btn-blush" data-act="sell-placed">Sell ${coin(buyback(RESALE.antique[kindOfDecor(d.type)]))}</button>`}</div>`;
+    body = `<p class="muted">Atmosphere ${atmosphere(curLoc())} here · customers arrive ${Math.round((1 - atmosMult(curLoc())) * 100)}% sooner.</p><div class="ts-actions"><button class="btn" data-act="store-decor">Put back in bag</button>${info.d8 ? '' : `<button class="btn btn-blush" data-act="sell-placed">Sell ${coin(buyback(RESALE.antique[kindOfDecor(d.type)]))}</button>`}</div>`
+      + moveDemoHTML('decor', focus.key, true);
+  } else if (focus.kind === 'build') {
+    head = `<h3>${BUILD_NAMES[focus.id] || focus.id}</h3>`;
+    body = `<p class="muted">Slide it to a clear spot, or take it down.</p>` + moveDemoHTML(focus.id, '', true);
   }
   sh.innerHTML = `<div class="ts-head"><div class="ts-ico">${focus.kind === 'tree' ? ICONS.sapling : focus.kind === 'barrel' ? FEATURE_ART.rainbarrel : focus.kind === 'hive' ? '<span style="font-size:30px;line-height:1">🐝</span>' : focus.kind === 'gfeat' ? FEATURE_ART[S.gf.find((x) => x.key === focus.key)?.id] || '' : decorIcon(S.decor.find((x) => x.key === focus.key)?.type)}</div>${head}<button class="close-btn" data-act="close">×</button></div>${body}`;
   sh.dataset.st = focus.kind === 'tree' ? treeStage(treeById(focus.id)) : -1;
@@ -1502,6 +1731,7 @@ function renderSheet() {
     const owned = Object.keys(SPECIES).filter((sp) => S.inv['seed_' + sp] > 0);
     if (!owned.length) body += S.marketBuilt ? `<p class="muted no-seeds-line">You’re out of seeds. Buy more at the Supply Market, or harvest a bloom — every harvest gives seeds.</p><div class="ts-actions"><button class="btn btn-primary" data-act="open-market">Visit Supply Market</button></div>` : `<p class="muted no-seeds-line">You’re out of seeds. Harvest a bloom — every harvest gives seeds back.</p>`;
     else body += `<p class="plant-cue"><i data-icon="sprout"></i> Tap a seed to plant it here</p><div class="ts-row">${owned.map((sp) => `<button class="seed-chip" data-plant="${sp}"><span class="chip-ico">${itemSvg('seed_' + sp)}</span>${SPECIES[sp].name}<small>×${S.inv['seed_' + sp]} seeds</small></button>`).join('')}</div>`;
+    body += moveDemoHTML('bed', bedOfTile(i), true);
   } else {
     const sp = SPECIES[p.sp], st = stageOf(p), k = progress(p);
     head = `<h3>${sp.name}${cardLv(p.sp) > 1 ? ` <em class="lv-badge inline">Lv${cardLv(p.sp)}</em>` : ''} <small>${tileName(i)} · ${budWait(p) ? 'Sprout · thirsty' : p.wateredAt ? STAGES[st] : p.sp === 'bluelotus' ? `Barrel ${LOTUS_TXT[lotusFill(p)]}` : 'Thirsty seed'}</small></h3>`;
@@ -1513,6 +1743,7 @@ function renderSheet() {
       <p class="muted">${p.wateredAt ? 'Growth has paused at the end of the sprout stage — it needs one more drink to bud.' : p.sp === 'bluelotus' ? (lotusFill(p) ? 'One more watering fills the barrel — then the lotus grows.' : 'The lotus barrel needs two waterings: half, then full.') : 'Water it and it starts growing right away.'} Each plant waters on its own${dryN > 1 ? ` · ${dryN} plants in this bed are dry` : ''}.${tw ? '' : ` Rain barrels refill by 1 water every ${regenS() >= 60 ? 'minute' : regenS() + ' s'}${wait.length ? ` · next in ${clock(Math.min(...wait))}` : ''}.`}</p><p class="ts-tapwater"><i data-icon="water"></i> Tap a plant to water it · ${tw} in barrels</p>`; }
     else if (st < 3) body += `<div class="progress"><b id="sheet-prog" style="width:${(k * 100).toFixed(1)}%"></b></div>${dots}<p class="muted" id="sheet-left" style="margin-top:6px">Blooms in ${fmtTime(p.growMs * (1 - k))}</p>`;
     else body += `${dots}<div class="ts-actions"><button class="btn btn-gold" data-act="harvest"><i data-icon="sparkle"></i> Harvest</button></div>`;
+    body += moveDemoHTML('bed', bedOfTile(i), true);
   }
   sh.innerHTML = `<div class="ts-head">${head}<button class="close-btn" data-act="close">×</button></div>${body}`;
   sh.dataset.st = p ? stageOf(p) : -1; sh.dataset.bw = p && budWait(p) ? '1' : '0'; sh.dataset.water = totalWater();
@@ -1528,6 +1759,8 @@ $('#tile-sheet').addEventListener('click', (e) => {
   if (a === 'assign-irrig') { deselect(); return startBuy('irrigation'); }
   if (a === 'pay-worker') return payWorker(b.dataset.lot);
   if (a === 'open-worker') return openPanel('worker', b.dataset.lot);
+  if (a === 'move-thing') return startMove(b.dataset.move, b.dataset.id || '');
+  if (a === 'demo-thing') return askDemolish(b.dataset.move, b.dataset.id || '');
   if (a === 'close') deselect(); else if (a === 'water') water(selected); else if (a === 'water-bed') waterBed(selected); else if (a === 'harvest') harvest(selected); else if (a === 'open-market') openPanel('market', 'buy');
   else if (a === 'hurry-tree') hurryTree(focus.id); else if (a === 'chop-tree') tapGrown(focus.id); else if (a === 'store-decor') storeDecor(focus.key); else if (a === 'store-gf') storeGF(focus.key); else if (a === 'upg-gf') { const d = S.gf.find((x) => x.key === focus.key); if (d) { upgradeCard(d.id); renderFocus(); } } else if (a === 'sell-placed') sellPlaced(focus);
 });
@@ -2290,6 +2523,7 @@ function renderPanel_() {
   if (panel === 'settings') { title.innerHTML = 'Settings'; body.innerHTML = settingsHTML(); }
   if (panel === 'jewels') { title.textContent = 'Jewel Shop'; body.innerHTML = jewelsHTML(); }
   const ck = CONS_PANEL[panel] || (CRAFT[panel] ? panel : null); if (ck && consLeft(ck) > 0) body.innerHTML = consHTML(ck);   // v0.63
+  paintMoveBar(body);
   fillIcons(body); fillIcons(title); body.scrollTop = st;
 }
 // v0.6: drawn brand marks for the Follow us buttons (brand colours, same soft hand-drawn style as js/icons.js)
@@ -4342,6 +4576,8 @@ $('#panel-body').addEventListener('click', (e) => {
   if (a === 'hurry-market') return hurryMarket();
   if (a === 'open-jewels') return openPanel('jewels');
   if (a === 'sell-stand') return sellPlaced({ kind: 'stand' });
+  if (a === 'move-thing') return startMove(b.dataset.move, b.dataset.id || '');
+  if (a === 'demo-thing') return askDemolish(b.dataset.move, b.dataset.id || '');
   if (a === 'go-packs') { if (!S.marketBuilt) { toast('Card Packs are sold at the Supply Market — rebuild it first'); return; } return openPanel('market', 'packs'); }
   if (a === 'trade-coins' || a === 'trade-wood') return tradeJewel(a.slice(6));
   if (a === 'watch-ad') return watchAd();
@@ -4880,6 +5116,7 @@ canvas.addEventListener('pointermove', (e) => {
   const p = ptrs.get(e.pointerId); if (!p || !gesture || W.ctl.glide) return;
   const px = p.x, py = p.y, dx = e.clientX - p.x, dy = e.clientY - p.y; p.x = e.clientX; p.y = e.clientY;
   if (Math.hypot(p.x - p.sx, p.y - p.sy) > 9) gesture.tap = false;
+  if (ptrs.size === 1 && placing?.what === 'move' && placing.kind !== 'bed') { previewMove(e.clientX, e.clientY); return; }
   if (ptrs.size >= 2 && gesture.pinch) {
     W.ctl.zoom = THREE.MathUtils.clamp(gesture.zoom * gesture.pinch / pinchDist(), 0.5, 1.6);
     const ang = pinchAng(); let d = ang - gesture.ang; d = Math.atan2(Math.sin(d), Math.cos(d)); W.ctl.az -= d; gesture.ang = ang;
@@ -4891,8 +5128,14 @@ canvas.addEventListener('pointermove', (e) => {
 });
 const endPtr = (e) => {
   const p = ptrs.get(e.pointerId); if (!p) return;
+  const wasTap = gesture?.tap;
   ptrs.delete(e.pointerId);
-  if (gesture?.tap && ptrs.size === 0 && e.type === 'pointerup') { const dt = performance.now() - p.t; if (dt < 450) handleTap(e.clientX, e.clientY); else if (dt < 3000) handleTap(e.clientX, e.clientY, true); }   // v0.8.7: long-press opens bed details
+  if (placing?.what === 'move' && placing.kind !== 'bed' && !wasTap && ptrs.size === 0 && e.type === 'pointerup' && placing.preview) {
+    if (placing.preview.ok) commitMove(placing, placing.preview.x, placing.preview.z);
+    else toast('That spot is taken or off your land');
+    gesture = null; return;
+  }
+  if (wasTap && ptrs.size === 0 && e.type === 'pointerup') { const dt = performance.now() - p.t; if (dt < 450) handleTap(e.clientX, e.clientY); else if (dt < 3000) handleTap(e.clientX, e.clientY, true); }   // v0.8.7: long-press opens bed details
   if (ptrs.size === 0) gesture = null; else if (ptrs.size === 1) { const [q] = [...ptrs.values()]; q.sx = q.x; q.sy = q.y; gesture = { tap: false }; }
 };
 canvas.addEventListener('pointerup', endPtr); canvas.addEventListener('pointercancel', endPtr);
@@ -4915,6 +5158,11 @@ function handleTap(x, y, long = false) {
     if (b < 0) { toast('Tap one of your raised beds'); return; }
     if (placing.what === 'sickle') sickleBed(b); else plowBed(b, placing.sp); syncTools(); return; }
   if (placing?.what === 'irrigation') { const h = W.pick(x, y); const id = h?.kind === 'tile' ? bedOfTile(h.index) : null; if (!id) { toast('Tap one of your raised beds'); return; } if (!commitBuy(placing)) return; if (assignIrrigation(id)) exitPlace(); else rollbackBuy(placing); return; }
+  if (placing?.what === 'move') {
+    if (placing.kind === 'bed') { const h = W.pick(x, y, 'build'); if (h?.kind === 'site' && h.ok) commitMove(placing, h.id); else toast('Tap a glowing patch'); }
+    else { const g = W.groundAt(x, y); if (g) commitMove(placing, g.x, g.z); }
+    return;
+  }
   if (placing) { const g = W.pick(x, y, 'ground'); if (g) placeAt(g.point.x, g.point.z); return; }
   if (panel) return closePanel();
   let hit = tutGate?.tile != null ? { kind: 'tile', index: tutGate.tile } : tutGate?.obs ? { kind: 'obstacle', id: tutGate.obs } : W.pick(x, y);   // v0.8.6: the guide's ringed square wins over anything drawn in front of it
@@ -4950,9 +5198,9 @@ function handleTap(x, y, long = false) {
   else if (hit.kind === 'teastand') openPanel('teastand');
   else if (hit.kind === 'press' || hit.kind === 'opress' || hit.kind === 'fruitstand') openPanel(hit.kind);
   else if (hit.kind === 'orchardtree') { const t = S.orchard[hit.k]; if (t && orchRipe(t)) pickTree(hit.k); else if (t?.dry && orchStage(t) >= 3 && waterTree(hit.k)) { save(); hud(); } else openPanel('orchardtree', hit.k); }
-  else if (hit.kind === 'windmill') { if (!building.windmill) toast(`Windmill · every connected rain barrel refills every ${regenS()} s (instead of ${S.bonus.can ? WATER_REGEN_S / 2 : WATER_REGEN_S} s)`); }
+  else if (hit.kind === 'windmill') { if (!building.windmill) focusThing({ kind: 'build', id: 'windmill' }); }
   else if (hit.kind === 'billboard') { if (!building[hit.loc === 'orchard' ? 'obillboard' : 'billboard']) openPanel('billboard'); }
-  else if (hit.kind === 'parking') { const o = hit.loc === 'orchard'; if (!building[o ? 'oparking' : 'parking']) toast(`${o ? 'Orchard ' : ''}Parking Lot Lv${cardLv('parking')} · ${(o ? ocusts : custs).length}/${o ? oparkCap() : parkCap()} spots in use · groups of ${o ? oparkCars() : parkCars()} cars · ${Math.round((o ? oExtraChance() : extraItemChance()) * 100)}% add an extra item${cardLv('parking') < 4 ? ' · buy more Parking Lot cards (Market or Build menu) to level up' : ''}`); }
+  else if (hit.kind === 'parking') { const o = hit.loc === 'orchard'; if (!building[o ? 'oparking' : 'parking']) focusThing({ kind: 'build', id: o ? 'oparking' : 'parking' }); }
   else if (hit.kind === 'barrel') focusThing({ kind: 'barrel', lot: hit.lot });
   else if (hit.kind === 'hive') focusThing({ kind: 'hive', lot: hit.lot });
 }
@@ -5281,7 +5529,7 @@ const V = (x, y, z) => new THREE.Vector3(x, y, z);
 window.__ps = {
   STAND_UNLOCK, coinUnlock, coinUnlockAsk, nextCoinStand, WORKER, hireWorker, payWorker, migWorkerHour, migWorkerSplit, migWorkerLoc, locLots, workerPass, wkKey, wkAll, workerStatus, migBasesHome, shiftTxt, wkTimerText, musicSkip: () => Sound?.skip(), get sound() { return Sound?.state; }, get audioPrefs() { return S.audio; }, setVolume, toggleMute, soundSetHTML, sfxPlay: (n) => Sound?.play(n), workerPass, catchUpWorkers, syncWorkers, workerStatus, workStands, workersOn, workerAt: (l) => W.workerAt(l), workerPose: (l) => W.workerPose(l), camAt: (x, z, zoom = 0.7) => { W.ctl.moved = true; W.glide({ target: V3(x, 0.3, z), zoom }, 0.01); }, wkPath, wkQueue, wkVis, wkGrid, standXZ, get workers() { return S.workers; },
   setClock: (t) => { clockAt = t; },
-  BUILD, adMult, adPicks, standHTML, itemVal, byValue, sortRows, rewardHTML, get fromBuild() { return fromBuild; }, get bags() { return S.bags; }, get migBags() { return migBags; }, inBag, bagOf, sendGoods, tileLoc, standLoc, splitOrchardGoods, buildHTML, marketHTML, satchelHTML, billboardHTML, bbStatusText, bbReadyIn, BILLBOARD, CHARMS, CHARM_IDS, charmV, charmLv, charmText, craftK, shiftH, standPrice, ostandPrice, custGap, harvestCore, setCharmRoll(v) { charmRoll = v; }, freeGFSpot, bulkSell, bulkAll, bulkPrice, bulkItems, bulkHTML, rollWants, STAND_BUY, BULK, GF_IDS, gfOn, gfPlaced, placeGF, storeGF, onMapOnly, charmAt, oGap, TRUCK, orderDelivery, deliverTrip, syncDeliv, inTransit, vanOn, VAN_LOT, rowOfTree, exitPlace, buyCopy, mktDest, MKT_ONE_TIME, MKT_STACK, MKT_CONSUMABLE, MKT_REPEAT, tabPanel, get deliv() { return S.deliv; }, get vanOut() { return vanOut.size; }, migGF065, get mig065() { return mig065; }, regenNow: () => regenS(), SWAP_TIERS, swapPool, get bagTab() { return bagTab; }, setBagTab(t) { bagTab = t; }, shelfMig063, rollIds, rollPackLoot, catTierOdds, drawPlant, drawOther, isPlantCard, PACK_LOOT, OWNED_K, setForcedLoot(L) { forcedLoot = L; }, consLeft, finishCons, hurryCons, startCons, plantTile: plant, syncTile, bloomTargets, instantBloom, askBloom, customerRush, askRush, rushLeft, rushReady, syncJewelDock, get rush() { return S.rush; }, get nextCustAt() { return nextCust; }, get nextOCustAt() { return nextOCust; }, swapCard, swapIn, swapPool, swapTierOdds, SWAP, setSwapForced(id) { swapForced = id; }, get revealCards() { return revealCards; }, upgLeft, finishUpg, hurryUpg, deselect, get upg() { return S.upg; }, toolLeft, get cons() { return S.cons; }, dailyStatus, claimDaily, showDaily, maybeDaily, dayKey, watchAd, playRewardAd, DAILY, upgradeBuilding, get standLv() { return S.standLv; }, cardFix063, normalizeCards,
+  BUILD, adMult, adPicks, standHTML, itemVal, byValue, sortRows, rewardHTML, get fromBuild() { return fromBuild; }, get bags() { return S.bags; }, get migBags() { return migBags; }, inBag, bagOf, sendGoods, tileLoc, standLoc, splitOrchardGoods, buildHTML, marketHTML, satchelHTML, billboardHTML, bbStatusText, bbReadyIn, BILLBOARD, CHARMS, CHARM_IDS, charmV, charmLv, charmText, craftK, shiftH, standPrice, ostandPrice, custGap, harvestCore, setCharmRoll(v) { charmRoll = v; }, freeGFSpot, bulkSell, bulkAll, bulkPrice, bulkItems, bulkHTML, rollWants, STAND_BUY, BULK, GF_IDS, gfOn, gfPlaced, placeGF, storeGF, onMapOnly, charmAt, oGap, TRUCK, orderDelivery, deliverTrip, syncDeliv, inTransit, vanOn, VAN_LOT, rowOfTree, exitPlace, startMove, commitMove, canDemolish, doDemolish, askDemolish, moveSpotOk, buyCopy, mktDest, MKT_ONE_TIME, MKT_STACK, MKT_CONSUMABLE, MKT_REPEAT, tabPanel, get deliv() { return S.deliv; }, get vanOut() { return vanOut.size; }, migGF065, get mig065() { return mig065; }, regenNow: () => regenS(), SWAP_TIERS, swapPool, get bagTab() { return bagTab; }, setBagTab(t) { bagTab = t; }, shelfMig063, rollIds, rollPackLoot, catTierOdds, drawPlant, drawOther, isPlantCard, PACK_LOOT, OWNED_K, setForcedLoot(L) { forcedLoot = L; }, consLeft, finishCons, hurryCons, startCons, plantTile: plant, syncTile, bloomTargets, instantBloom, askBloom, customerRush, askRush, rushLeft, rushReady, syncJewelDock, get rush() { return S.rush; }, get nextCustAt() { return nextCust; }, get nextOCustAt() { return nextOCust; }, swapCard, swapIn, swapPool, swapTierOdds, SWAP, setSwapForced(id) { swapForced = id; }, get revealCards() { return revealCards; }, upgLeft, finishUpg, hurryUpg, deselect, get upg() { return S.upg; }, toolLeft, get cons() { return S.cons; }, dailyStatus, claimDaily, showDaily, maybeDaily, dayKey, watchAd, playRewardAd, DAILY, upgradeBuilding, get standLv() { return S.standLv; }, cardFix063, normalizeCards,
   TIPS, JEWEL_DROP, obsState, PACKS,
   hud, guideOn: () => guideOn(), tutFinish: (k) => tutFinish(k), afterGuideN: () => afterGuideQ.length, handleTap: (x, y, l) => handleTap(x, y, l), dailyGift: (n) => dailyGift(n), syncBarrels, lotRoofs, standsLine, buildBarrelAt: (lot, x, z) => buildBarrel(lot, x, z), openMap, closeMap, mapLocked, syncMapBtn, maybeBoost, showBoost, applyBoost, hideBoost, showStarter, grantStarter, buyStarter, starterLive, grantOffer, buyOffer, offerValue, offersSorted, maybeStarter, starterReady, maybeStarter, promoMilestone, showPromo, wish, settingsHTML, jewelsHTML, unlockMapIfReady, travel, buyOrchard, claimFollow, SOCIALS, setLoc, loc: () => curLoc(), orchardLocked, mapPlaces: () => MAP_PLACES.map((p) => ({ id: p.id, name: p.name, soon: !!p.soon, state: placeState(p) })), ORCHARD_PRICE, casterIds: () => casters().map((c) => c.id + (c.h != null ? ":box" : ":tree")), checkGoals, regenBarrels, feedLot, reachLots,  get barrelReachTargets() { return W.bedTargets.children.map((g) => ({ b: g.userData.b, ok: g.userData.ok })); }, barrelRoof, lotRoofs, barrelStands, barrelPerTick, get gutterLots() { return [...W.gutters.keys()]; }, gutterPipes(lot) { return W.gutters.get(lot)?.userData.pipes || 0; },
   get tincGrandfathered() { return tincGrandfathered; }, tincProblem, tincSpots, buildTincture, placeTincture, buildStill, placeStill, distill, collectOil, STILL, TEA, teaInfo, teaId, teaSps, registerTea, buildTea, placeTea, brewTea, collectTea, teaAdd, teaRemove, get teaPick() { return [...teaPick]; }, set teaPick(v) { teaPick = [...v]; }, teaHTML, syncTea, DRY_TIER_S,

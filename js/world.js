@@ -356,8 +356,12 @@ export function createWorld(canvas) {
     orchardShed.userData.kind = 'orchardshed';
   }
   const bulkOrch = makeBulkBox('orchard'); bulkOrch.position.set(1.45, 0, 0.9); bulkOrch.rotation.y = -0.25; orchardShed.add(bulkOrch);
+  bulkOrch.updateWorldMatrix(true, true); const orchBulkAt = new THREE.Vector3(); bulkOrch.getWorldPosition(orchBulkAt);
+  orchardShed.remove(bulkOrch); scene.add(bulkOrch); bulkOrch.position.copy(orchBulkAt); bulkOrch.rotation.set(0, -0.25, 0);
   function bulkPop(loc) { const g = loc === 'orchard' ? bulkOrch : bulkHome; g.userData.pop = performance.now(); poof(g.getWorldPosition(new THREE.Vector3()).setY(0.7), '#E9B949', 10, 0.9); }
   function setBulk(loc, on) { (loc === 'orchard' ? bulkOrch : bulkHome).visible = !!on; }
+  function setBulkPos(loc, x, z) { const g = loc === 'orchard' ? bulkOrch : bulkHome; g.position.set(x, 0, z); }
+  function bulkAt(loc) { const g = loc === 'orchard' ? bulkOrch : bulkHome; return { x: g.position.x, z: g.position.z }; }
   function setOStandStock(n) { const g = orchardShed.getObjectByName('stock'); if (g) g.visible = n > 0; }
   const orchSign = label('The Orchard', { h: 0.55, color: '#3D5A40', border: '#D9A93F' }); orchSign.position.set(ORCH_X - 2.6, 1.7, 4.1); orchardScene.add(orchSign);
   function buildOrchFence() {
@@ -441,6 +445,18 @@ export function createWorld(canvas) {
     if (animate) { bed.userData.born = performance.now(); bed.scale.set(1, 0.01, 1); poof(new THREE.Vector3(s.x, 0.4, s.z), '#C99A6B', 26, 1.8); poof(new THREE.Vector3(s.x, 0.3, s.z), '#E9D9B8', 16, 1.6); }
     return base;
   }
+  function moveBed(oldId, newId) {
+    const b = beds.find((x) => x.site === oldId); const s = siteById(newId); if (!b || !s) return false;
+    b.site = newId; b.group.position.set(s.x, 0, s.z); return true;
+  }
+  function dropBed(siteId) {
+    const i = beds.findIndex((x) => x.site === siteId); if (i < 0) return null;
+    const b = beds[i]; const idxs = []; tiles.forEach((t, n) => { if (t.bed === b.group) idxs.push(n); });
+    scene.remove(b.group); beds.splice(i, 1);
+    idxs.sort((a, c) => c - a).forEach((n) => tiles.splice(n, 1));
+    tiles.forEach((t, n) => { t.mesh.userData.index = n; });
+    return true;
+  }
   // ---------- v0.31: irrigation (drip hose from the rain barrel + badge on the bed) ----------
   const irrig = new Map(); const hoseM = mat('#3D5A40', { roughness: 0.7 }), hoseL = mat('#5F7F5F', { roughness: 0.8 });
   const IRRIG_TEX = (() => { const c = document.createElement('canvas'); c.width = c.height = 128; const g = c.getContext('2d');
@@ -499,6 +515,19 @@ export function createWorld(canvas) {
   const spotOk = new THREE.MeshBasicMaterial({ color: '#8FD18B', transparent: true, opacity: 0.55, depthWrite: false });
   const spotNo = new THREE.MeshBasicMaterial({ color: '#E8A5A8', transparent: true, opacity: 0.35, depthWrite: false });
   const spotRingOk = new THREE.MeshBasicMaterial({ color: '#4E9F55', transparent: true, opacity: 0.9, depthWrite: false });
+  let moveGhost = null; const moveOk = spotOk.clone(), moveNo = spotNo.clone();
+  function setMoveGhost(x, z, ok) {
+    if (x == null) { if (moveGhost) { scene.remove(moveGhost); moveGhost.traverse((m) => m.geometry?.dispose()); moveGhost = null; } return; }
+    if (!moveGhost) {
+      moveGhost = new THREE.Group();
+      const pl = new THREE.Mesh(new THREE.CircleGeometry(0.72, 24), moveOk); pl.rotation.x = -Math.PI / 2; pl.renderOrder = 2; moveGhost.add(pl);
+      const ring = new THREE.Mesh(new THREE.RingGeometry(0.72, 0.84, 28), spotRingOk.clone()); ring.rotation.x = -Math.PI / 2; ring.position.y = 0.02; ring.renderOrder = 3; ring.name = 'ring'; moveGhost.add(ring);
+      scene.add(moveGhost);
+    }
+    moveGhost.position.set(x, 0.08, z);
+    moveGhost.children[0].material = ok ? moveOk : moveNo;
+    moveGhost.children[1].material.color.set(ok ? '#4E9F55' : '#C45B62');
+  }
   function setSpotGhosts(list) {
     for (const c of [...spotGhosts.children]) { spotGhosts.remove(c); c.traverse((m) => m.geometry?.dispose()); }
     if (!list) return;
@@ -592,10 +621,11 @@ export function createWorld(canvas) {
     const tag = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.2, 0.02), blushM); tag.position.set(0, 0.3, 0.3); tag.rotation.x = -0.08; g.add(tag);
     const coin = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.07, 0.02, 14), goldM); coin.rotation.x = Math.PI / 2; coin.position.set(0, 0.3, 0.315); g.add(coin);
     const lb = label('Bulk Box', { h: 0.3 }); lb.position.set(0, 0.95, 0); g.add(lb);
-    const hit = new THREE.Mesh(new THREE.BoxGeometry(0.95, 1.2, 0.8), new THREE.MeshBasicMaterial({ visible: false })); hit.position.y = 0.5; g.add(hit);
+    const hit = new THREE.Mesh(new THREE.CylinderGeometry(1.05, 1.05, 1.7, 12), new THREE.MeshBasicMaterial({ visible: false })); hit.position.y = 0.8; g.add(hit);
     return g;
   }
-  const bulkHome = makeBulkBox('home'); bulkHome.position.set(-1.95, 0, 0.75); bulkHome.rotation.y = 0.25; stand.add(bulkHome);
+  const bulkHome = makeBulkBox('home'); scene.add(bulkHome); bulkHome.position.set(-2.2, 0, 2.35); bulkHome.rotation.y = -0.15; bulkHome.visible = false;
+  frameHooks.push(() => { bulkHome.visible = !!stand.visible; bulkOrch.visible = !!orchardShed.visible; });
   // ---------- v0.4: one rain barrel per plot, each with a live water/countdown badge ----------
   const BARREL_FONT = '700 54px Nunito, sans-serif', BARREL_FONT2 = '700 40px Nunito, sans-serif';
   function barrelCanvasTex(line1, line2, full) {
@@ -614,7 +644,7 @@ export function createWorld(canvas) {
     const b = shadowy(new THREE.Mesh(new THREE.CylinderGeometry(0.34, 0.3, 0.75, 12), woodM)); b.position.y = 0.38; bd.add(b);
     for (const y of [0.15, 0.6]) { const r = new THREE.Mesh(new THREE.TorusGeometry(0.33, 0.025, 4, 16), mat('#7C6A5A')); r.rotation.x = Math.PI / 2; r.position.y = y; bd.add(r); }
     const w = new THREE.Mesh(new THREE.CircleGeometry(0.29, 14), mat('#A8D2E0', { roughness: 0.2, emissive: '#7FB3C6', emissiveIntensity: 0.15 })); w.rotation.x = -Math.PI / 2; w.position.y = 0.72; bd.add(w); g.userData.surface = w;
-    const hit = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 1.1, 8), new THREE.MeshBasicMaterial({ visible: false })); hit.position.y = 0.55; g.add(hit);
+    const hit = new THREE.Mesh(new THREE.CylinderGeometry(0.95, 0.95, 1.5, 10), new THREE.MeshBasicMaterial({ visible: false })); hit.position.y = 0.7; g.add(hit);
     const info = new THREE.Sprite(new THREE.SpriteMaterial({ transparent: true, depthWrite: false, depthTest: false })); info.renderOrder = 12; info.position.y = 1.35; info.visible = false; info.userData.barrelInfo = lot; g.add(info);
     g.userData.kind = 'barrel'; g.userData.lot = lot; g.userData.info = info; g.visible = false; barrels.set(lot, g); return g;
   }
@@ -632,6 +662,7 @@ export function createWorld(canvas) {
   const barrels = new Map();
   const barrel = makeBarrel('home', SPOTS.barrel[0], SPOTS.barrel[1]);
   function addBarrel(lot, x, z, animate) { const g = barrels.get(lot) || makeBarrel(lot, x, z); g.position.set(x, 0, z); if (animate) buildAnim(g, [0.9, 1.0, 0.9], null); else g.visible = true; return g; }
+  function setBarrelXZ(lot, x, z) { const g = barrels.get(lot); if (g) g.position.set(x, 0, z); }
   function removeBarrel(lot) { const g = barrels.get(lot); if (!g) return; setGutter(lot, null); poof(g.position.clone().setY(0.5), '#E9D9B8', 12, 1); scene.remove(g); barrels.delete(lot); }
   // v0.41: a gutter + downspout from a roof on the same plot into the barrel (a barrel only collects rain when connected)
   const gutters = new Map(); const gutterM = mat('#8E979C', { roughness: 0.45, metalness: 0.35 });
@@ -1290,6 +1321,7 @@ export function createWorld(canvas) {
     g.userData = { kind: 'blueprint', id }; g.visible = false; bpGroup.add(g); blueprints[id] = g; return g;
   }
   function setBlueprint(id, on) { const g = blueprints[id]; if (g && g.visible !== on) { g.visible = on; if (on) poof(g.position.clone().setY(0.4), '#F5D07A', 10, 1.2); } }
+  function moveBlueprint(id, x, z) { const g = blueprints[id]; if (!g) return; g.position.x = x; g.position.z = z; }
 
   // ---------- v0.3: found items on the ground (sparkle, tap to collect) ----------
   const lootG = new THREE.Group(); scene.add(lootG); const loots = new Map();
@@ -1711,22 +1743,36 @@ export function createWorld(canvas) {
     if (mode === 'build') { const h = raycaster.intersectObjects(ghostMeshes, false)[0]; return h ? h.object.userData : null; }
     if (mode === 'ground') { const p = raycaster.ray.intersectPlane(groundPlane, new THREE.Vector3()); return p ? { kind: 'ground', point: p } : null; }
     const targets = [...tiles.map((t) => t.mesh), ...tiles.map((t) => t.holder), woods, lootG, decorG, featG, bpGroup];
-    if (stand.visible) targets.push(stand); if (rack.visible) targets.push(rack); if (tincture.visible) targets.push(tincture); if (still.visible) targets.push(still); if (teastand.visible) targets.push(teastand); if (press.visible) targets.push(press); if (opress.visible) targets.push(opress); if (fruitstand.visible) targets.push(fruitstand); targets.push(orchardG); if (orchardShed.visible) targets.push(orchardShed);   /* v0.65 fix: the Orchard Stand (and its scaffold while it's being built) was never tappable */ if (parking.visible) targets.push(parking); if (oparking.visible) targets.push(oparking); if (obillboard.visible) targets.push(obillboard); if (windmill.visible) targets.push(windmill); if (billboard.visible) targets.push(billboard); targets.push(market); for (const g of barrels.values()) if (g.visible) targets.push(g); for (const g of hives.values()) if (g.visible) targets.push(g); for (const g of workers.values()) if (g.visible) targets.push(g);
+    if (stand.visible) targets.push(stand); if (rack.visible) targets.push(rack); if (tincture.visible) targets.push(tincture); if (still.visible) targets.push(still); if (teastand.visible) targets.push(teastand); if (press.visible) targets.push(press); if (opress.visible) targets.push(opress); if (fruitstand.visible) targets.push(fruitstand); targets.push(orchardG); if (orchardShed.visible) targets.push(orchardShed);   /* v0.65 fix: the Orchard Stand (and its scaffold while it's being built) was never tappable */ if (parking.visible) targets.push(parking); if (oparking.visible) targets.push(oparking); if (obillboard.visible) targets.push(obillboard); if (windmill.visible) targets.push(windmill); if (billboard.visible) targets.push(billboard); targets.push(market); if (bulkHome.visible) targets.push(bulkHome); if (bulkOrch.visible) targets.push(bulkOrch); for (const g of barrels.values()) if (g.visible) targets.push(g); for (const g of hives.values()) if (g.visible) targets.push(g); for (const g of workers.values()) if (g.visible) targets.push(g);
     for (const id of Object.keys(lotFx)) if (lotFx[id].fx.visible) targets.push(lotFx[id].sign, lotFx[id].tag);
     const hits = raycaster.intersectObjects(targets, true);
-    for (const h of hits) { if (h.object.userData?.tag && visibleChain(h.object)) return { kind: 'lot', id: h.object.userData.id }; }
-    for (const h of hits) { const ti = tiles.findIndex((t) => t.icon === h.object); if (ti >= 0 && h.object.visible) return { kind: 'tile', index: ti }; }
-    for (const h of hits) { let o = h.object; if (!visibleChain(o)) continue; while (o && o !== lootG) { if (o.userData?.kind === 'loot') return o.userData; o = o.parent; } }
+    // Overlapping hit boxes: the object whose center is under the finger wins, then the one nearer the camera.
+    const pickV = new THREE.Vector3();
+    const pickCenter = (obj) => { let o = obj; while (o && !o.userData?.kind && o.parent) o = o.parent; return (o || obj).getWorldPosition(pickV); };
+    let best = null, bestScore = Infinity;
+    const consider = (h, res) => {
+      if (!res) return;
+      const sp = project(pickCenter(h.object));
+      const screen = sp.behind ? 4000 : Math.hypot(sp.x - x, sp.y - y);
+      const score = screen * 4 + h.distance;
+      if (score < bestScore) { bestScore = score; best = res; }
+    };
     for (const h of hits) {
-      let o = h.object; if (!visibleChain(o)) continue;
-      if (o.isSprite && o.material.blending === THREE.AdditiveBlending) continue;
+      const o0 = h.object; if (!visibleChain(o0)) continue;
+      if (o0.userData?.tag) { consider(h, { kind: 'lot', id: o0.userData.id }); continue; }
+      const ti = tiles.findIndex((t) => t.icon === o0); if (ti >= 0 && o0.visible) { consider(h, { kind: 'tile', index: ti }); continue; }
+      let loot = o0; while (loot && loot !== lootG) { if (loot.userData?.kind === 'loot') { consider(h, loot.userData); break; } loot = loot.parent; }
+      if (o0.isSprite && o0.material?.blending === THREE.AdditiveBlending) continue;
+      let o = o0;
       while (o) {
-        if (o.userData?.kind === 'obstacle') return { kind: 'obstacle', id: o.userData.id };
-        if (o.userData?.kind) return o.userData;
-        const ti = tiles.findIndex((t) => t.holder === o); if (ti >= 0) return { kind: 'tile', index: ti };
+        if (o.userData?.kind === 'obstacle') { consider(h, { kind: 'obstacle', id: o.userData.id }); break; }
+        if (o.userData?.kind === 'tile') { consider(h, { kind: 'tile', index: o.userData.index }); break; }
+        if (o.userData?.kind && o.userData.kind !== 'ground') { consider(h, o.userData); break; }
+        const tj = tiles.findIndex((t) => t.holder === o); if (tj >= 0) { consider(h, { kind: 'tile', index: tj }); break; }
         o = o.parent;
       }
     }
+    if (best) return best;
     const g = raycaster.intersectObject(ground, false)[0];
     return g ? { kind: 'ground', point: g.point } : null;
   }
@@ -1849,7 +1895,7 @@ export function createWorld(canvas) {
     updateCamera, resize, glide, intro, pick, project, tileWorld, sickleSweep, plowFurrows, fxCount: () => fxs.length,
     setObstacle, chop, clearObstacle, addBed, setGhosts, setLotOwned, setLocation, orchardScene, orchardShed, setOStandStock, setStandShelf, standShelf, setStandStock, setMarketOpen, setRack, appear, spawnCar, spawnTruck, poof,
     tilePlant: (i) => tiles[i]?.plant || null, addWorker, removeWorker, setWorker, workerAt, workerGo, workerIdle, workerPose, placeWorker, setPlant, attachPlant, setIcon, setShade, bgTrees, setIrrigation, irrigPulse, irrig, select, splash, render, textSprite, relabel, groundAt,
-    buildAnim, setCons, makeBlueprint, setBlueprint, setMarketState, addLoot, removeLoot, addDecor, removeDecor, addFeat, removeFeat, feats, setBulk, bulkPop, bulkHome: () => bulkHome, bulkOrch: () => bulkOrch, spawnVan, dropCrates, vans: vanPool, crates: dropC, addGrown, setGrown, removeGrown, loots, decors,
+    buildAnim, setCons, makeBlueprint, setBlueprint, moveBlueprint, setMarketState, addLoot, removeLoot, addDecor, removeDecor, addFeat, removeFeat, feats, setBulk, setBulkPos, bulkAt, bulkPop, bulkHome: () => bulkHome, bulkOrch: () => bulkOrch, setMoveGhost, moveBed, dropBed, setBarrelXZ, spawnVan, dropCrates, vans: vanPool, crates: dropC, addGrown, setGrown, removeGrown, loots, decors,
     iconWorld(i) { const t = tiles[i]; t.icon.updateWorldMatrix(true, false); return new THREE.Vector3().setFromMatrixPosition(t.icon.matrixWorld); },
   };
 }
