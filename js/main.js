@@ -906,8 +906,13 @@ function grantTincture(quiet = false) {
   }, 1400);
   return true;
 }
+function farmSoldCoins() {
+  const st = S.stats || {};
+  // Cars at the Farm Stand, Home orders, the Home Bulk Sell Box, and a Double Sale on those.
+  return (st.standEarned || 0) + (st.homeOrderEarned || 0) + (st.homeBulkEarned || 0) + (st.homeSaleBoost || 0);
+}
 function checkGoals(silent = false) {
-  if (!S.marketAvail && S.stats.standEarned >= MARKET_GOAL) {
+  if (!S.marketAvail && farmSoldCoins() >= MARKET_GOAL) {
     S.marketAvail = true; save();
     if (!silent) { toast('<i data-icon="market"></i> New project: Rebuild the Supply Market'); setTimeout(() => tip('rebuild'), 900); }
   }
@@ -920,6 +925,17 @@ function migGoals0872() {   // old saves: drop the retired goal chain's fields; 
   delete S.goal; delete S.goalsClosed; delete S.treeRule065; save();
 }
 migGoals0872();
+function migStandEarn() {
+  // Orders, bulk sales, and Double Sale used to pay coins without moving this counter.
+  if (S.stats.standEarnBackfill) return;
+  S.stats.standEarnBackfill = true;
+  if (S.lots?.orchard) return save();   // those totals mix in the Orchard; only future Home sales are added
+  S.stats.homeOrderEarned = S.stats.orderEarned || 0;
+  S.stats.homeBulkEarned = S.stats.bulkEarned || 0;
+  S.stats.homeSaleBoost = S.stats.boostCoins || 0;
+  save();
+}
+migStandEarn();
 checkGoals(true);
 function renderGoal() { $('#goal')?.remove(); }   // the old goal pill is retired
 function goalPeek() {} function goalCollapse() {} function maybeClosing() {} function closeClosing() {}
@@ -2663,13 +2679,13 @@ function projectCard(id) {
       <button class="btn btn-gold" data-act="build-barrel" ${ok ? '' : 'disabled'}><i data-icon="build"></i> Choose a spot &amp; build</button><small class="opt-note">One per plot · ${BARREL.maxBeds} beds max</small>`);
   }
   if (id === 'market') {
-    const pct = Math.min(100, (S.stats.standEarned / MARKET_GOAL) * 100);
+    const pct = Math.min(100, (farmSoldCoins() / MARKET_GOAL) * 100);
     if (S.marketBuilt) return card(BIG('market'), 'Supply Market', 'Rebuilt and open for business.', status('done', 'Open'));
     if (S.marketProj) { const k = marketK();
       return card(BIG('market'), 'Rebuilding the Supply Market', 'Carpenters are at work on the old cottage.', `<div class="progress"><b data-mprog style="width:${(k * 100).toFixed(1)}%"></b></div><small class="muted" data-mleft>${fmtTime(S.marketProj.ms * (1 - k))} left</small>
         <button class="btn btn-blush" data-act="hurry-market">Finish now · ${jewelTag(B.hurryJewels)}</button>`); }
-    if (!S.marketAvail) return card(BIG('market'), 'Rebuild the Supply Market', `The old market is boarded up. Earn <b>${MARKET_GOAL} coins</b> at your Farm Stand to start the project.`,
-      `<div class="goal-mini"><span class="gbar"><em style="width:${pct}%"></em></span><small>${Math.min(S.stats.standEarned, MARKET_GOAL)} / ${MARKET_GOAL} coins earned</small></div>`, 'gated');
+    if (!S.marketAvail) return card(BIG('market'), 'Rebuild the Supply Market', `The old market is boarded up. Earn <b>${MARKET_GOAL} coins</b> selling at your Farm Stand. Customers, orders, and the Bulk Sell Box all count.`,
+      `<div class="goal-mini"><span class="gbar"><em style="width:${pct}%"></em></span><small>${Math.min(farmSoldCoins(), MARKET_GOAL)} / ${MARKET_GOAL} coins earned</small></div>`, 'gated');
     const c = marketCoins(); const ok = S.wood >= B.wood && S.coins >= c; const canScrap = S.scrap >= B.opt.scrap;
     return card(BIG('market'), 'Rebuild the Supply Market', `Fix the roof, walls and awning. Takes ${fmtTime(B.s * 1000)} once started.`,
       `<div class="cost">${woodTag(B.wood)} ${coin(c)} <span class="${ok ? 'ok' : 'no'}">you have ${S.wood} Wood · ${S.coins} coins</span></div>
@@ -2819,7 +2835,7 @@ function applyBoost(kind, d) {
   const st = (S.stats.boosts ||= {}); st[kind] = (st[kind] || 0) + 1;
   if (kind === 'harvest') { inBag(d.loc, () => { if (d.f) S.inv['flower_' + d.sp] = (S.inv['flower_' + d.sp] || 0) + d.f; S.inv['seed_' + d.sp] = (S.inv['seed_' + d.sp] || 0) + d.s; });
     toast(`<i data-icon="sprout"></i> Double Harvest · ${boostText(kind, d)}`); }
-  else if (kind === 'sale') { S.coins += d.coins; S.stats.boostCoins = (S.stats.boostCoins || 0) + d.coins; toast(`<i data-icon="coin"></i> Double Sale · +${fmtC(d.coins)} coins`); }
+  else if (kind === 'sale') { S.coins += d.coins; S.stats.boostCoins = (S.stats.boostCoins || 0) + d.coins; if (d.loc !== 'orchard') S.stats.homeSaleBoost = (S.stats.homeSaleBoost || 0) + d.coins; toast(`<i data-icon="coin"></i> Double Sale · +${fmtC(d.coins)} coins`); }
   else if (kind === 'grow') { const p = S.tiles[d.i];
     if (!p || p.sp !== d.sp || !p.wateredAt || stageOf(p) >= 3) { toast('That plant is already done — enjoy the ad bonus next time'); }
     else { const t = now(); p.bud = true; p.wu = 0; if (p.sp === 'bluelotus') p.fill = 2; p.wateredAt = t - p.growMs - 1; syncTile(d.i); W.splash?.(d.i); toast(`<i data-icon="sparkle"></i> Fast-Grow · ${SPECIES[d.sp].name} is ready to pick`); } }
@@ -3106,7 +3122,8 @@ function standHTML_() {
   const fromBag = bagStrip() + byValue(SELL_ORDER.filter((id) => S.inv[id] > 0 && sellsAt(id, 'home'))).map((id) => `<div class="row"><div class="ico">${itemSvg(id)}</div><div class="meta"><b>${ITEMS[id].name}</b><small>You have ${S.inv[id]} · sells for ${sellOf(id)}</small></div>
     <div class="acts"><button class="btn sm" data-stock="${id}" data-n="1" ${used >= cap ? 'disabled' : ''}>+1</button><button class="btn btn-gold sm" data-stock="${id}" data-n="all" ${used >= cap ? 'disabled' : ''}>Stock all</button></div></div>`).join('');
   const status = custs.length ? `<b>${custs.length > 1 ? `${custs.length} customers are` : 'A customer is'} at your stand!</b>` : used ? `Next customer in about ${fmtTime(Math.max(0, nextCust - now()))}` : 'Put items on the stand to attract customers.';
-  const prog = !S.marketAvail ? `<div class="goal-mini"><small>Earn ${MARKET_GOAL} coins here to start rebuilding the Supply Market</small><span class="gbar"><em style="width:${Math.min(100, (S.stats.standEarned / MARKET_GOAL) * 100)}%"></em></span><small>${Math.min(S.stats.standEarned, MARKET_GOAL)} / ${MARKET_GOAL}</small></div>` : `<p class="muted" style="margin:0 4px 8px">Earned at your stand: ${coin(S.stats.standEarned)}${atmosphere() ? ` · atmosphere ${atmosphere()}` : ''}</p>`;
+  const sold = farmSoldCoins();
+  const prog = !S.marketAvail ? `<div class="goal-mini"><small>Earn ${MARKET_GOAL} coins selling here — customers, orders, and bulk — to rebuild the Supply Market</small><span class="gbar"><em style="width:${Math.min(100, (sold / MARKET_GOAL) * 100)}%"></em></span><small>${Math.min(sold, MARKET_GOAL)} / ${MARKET_GOAL}</small></div>` : `<p class="muted" style="margin:0 4px 8px">Earned at your stand: ${coin(sold)}${atmosphere() ? ` · atmosphere ${atmosphere()}` : ''}</p>`;
   return `<div class="hero plain"><p>Fresh flowers by the road</p></div>
     <div class="stand-status"><i data-icon="stand"></i><span id="stand-status">${status}</span></div>${upgHTML('stand')}${prog}
     <div class="sec-title">On your stand · ${used}/${cap}${shelfOn() ? ' · crate shelf' : ''}</div>${shelfOn() ? `<div class="shelf-strip" data-shelf-strip>${findIcon('old_crate')}<span><b>Crate Shelf</b> installed · +${SHELF_BONUS} space · permanent</span></div>` : S.bonus.crate ? `<div class="shelf-strip" data-shelf-strip>${findIcon('old_crate')}<span><b>Crate Shelf</b> in your Bag · +${SHELF_BONUS} space for good</span><button class="btn btn-gold sm" data-install-shelf>Install</button></div>` : ''}
@@ -3215,14 +3232,14 @@ function bulkSell_(id, n, loc = curLoc()) {
   if (!sellsAt(id, loc)) { toast(`${ITEMS[id]?.name || 'That'} · ${sellTag(id)}`); return 0; }
   const q = Math.min(S.inv[id] || 0, n === 'all' ? Infinity : n); if (q <= 0) return 0;
   const each = bulkPrice(id, loc), total = q * each;
-  S.inv[id] -= q; S.coins += total; const st = S.stats; st.bulkSold = (st.bulkSold || 0) + q; st.bulkEarned = (st.bulkEarned || 0) + total;
+  S.inv[id] -= q; S.coins += total; const st = S.stats; st.bulkSold = (st.bulkSold || 0) + q; st.bulkEarned = (st.bulkEarned || 0) + total; if (loc === 'home') st.homeBulkEarned = (st.homeBulkEarned || 0) + total;
   save(); hud(); checkGoals(); if (panel) renderPanel();
   W.bulkPop?.(loc); toast(`📦 Bulk sold ${q} ${ITEMS[id].name} · +${total} coins`);
   return total;
 }
 function bulkAll(loc = curLoc()) { return inBag(loc, () => bulkAll_(loc = curLoc())); }
 function bulkAll_(loc = curLoc()) { let t = 0, q = 0; for (const id of bulkItems(loc)) { const n = S.inv[id]; const each = bulkPrice(id, loc); S.inv[id] = 0; t += n * each; q += n; }
-  if (!q) return 0; S.coins += t; S.stats.bulkSold = (S.stats.bulkSold || 0) + q; S.stats.bulkEarned = (S.stats.bulkEarned || 0) + t;
+  if (!q) return 0; S.coins += t; S.stats.bulkSold = (S.stats.bulkSold || 0) + q; S.stats.bulkEarned = (S.stats.bulkEarned || 0) + t; if (loc === 'home') S.stats.homeBulkEarned = (S.stats.homeBulkEarned || 0) + t;
   save(); hud(); checkGoals(); if (panel) renderPanel(); W.bulkPop?.(loc); sfx('coin'); toast(`📦 Bulk sold ${q} items · +${t} coins`); return t; }
 
 // v0.67.1: Market item classes. ONE-TIME items (single builds and unique features) leave the Market once bought.
@@ -5464,6 +5481,7 @@ function fillOrder(loc, i, auto = false) {
   S.orderSpinN = (+S.orderSpinN || 0) + 1; let bonus = false; if (S.orderSpinN >= ORDER_SPIN_EVERY) { S.orderSpinN = 0; S.spins++; bonus = true; if (guideOn() || auto) S.orderSpinToast = (S.orderSpinToast || 0) + 1; }
   const tutSpin = guideTutSpin();   // v0.8.7.5: Sprig's order goal pays its own spin (for the spin goal right after)
   S.stats.orderEarned = (S.stats.orderEarned || 0) + pay;
+  if (loc === 'home') S.stats.homeOrderEarned = (S.stats.homeOrderEarned || 0) + pay;
   B.slots[i] = { wait: now() + V8.orders[loc].refillMs };
   if (!auto) { sfx('coin'); toast(`📋 Order filled · +${fmtC(pay)} <i data-icon="coin"></i>${tutSpin ? ' · Sprig gives you 1 spin' : ''}`); if (bonus && !guideOn()) setTimeout(() => toast(`🎡 ${ORDER_SPIN_EVERY} orders filled · +1 spin`), 2400); }
   v8Tick(); save(); hud(); if (panel) renderPanel(); return true;
