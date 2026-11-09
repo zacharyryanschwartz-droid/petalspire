@@ -122,6 +122,13 @@ async function cmdMaterialize() {
   const existing = await api('/v1/certificates?limit=200&fields[certificates]=name,certificateType,displayName,expirationDate');
   const dist = (existing.data || []).filter((c) => /DISTRIBUTION/.test(c.attributes?.certificateType || ''));
   console.log(`existing distribution certificates: ${dist.length}`);
+  if (dist.length >= 2) {
+    const oldest = [...dist].sort((a, b) => String(a.attributes?.expirationDate || '').localeCompare(String(b.attributes?.expirationDate || '')))[0];
+    if (oldest?.id) {
+      await api(`/v1/certificates/${oldest.id}`, { method: 'DELETE' });
+      console.log('revoked the oldest distribution certificate so a new one can be created');
+    }
+  }
   let created = null;
   let lastErr = null;
   for (const certificateType of ['DISTRIBUTION', 'IOS_DISTRIBUTION']) {

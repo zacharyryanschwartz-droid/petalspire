@@ -1,0 +1,76 @@
+{
+  "identifier" : "Petalspire",
+  "nonRenewingSubscriptions" : [],
+  "products" : [
+    {
+      "displayPrice" : "0.99",
+      "familyShareable" : false,
+      "internalID" : "J1",
+      "localizations" : [{ "description" : "1 Jewel", "displayName" : "1 Jewel", "locale" : "en_US" }],
+      "productID" : "com.petalspire.jewels.1",
+      "referenceName" : "1 Jewel",
+      "type" : "Consumable"
+    },
+    {
+      "displayPrice" : "6.99",
+      "familyShareable" : false,
+      "internalID" : "J10",
+      "localizations" : [{ "description" : "10 Jewels", "displayName" : "10 Jewels", "locale" : "en_US" }],
+      "productID" : "com.petalspire.jewels.10",
+      "referenceName" : "10 Jewels",
+      "type" : "Consumable"
+    },
+    {
+      "displayPrice" : "29.99",
+      "familyShareable" : false,
+      "internalID" : "J50",
+      "localizations" : [{ "description" : "50 Jewels", "displayName" : "50 Jewels", "locale" : "en_US" }],
+      "productID" : "com.petalspire.jewels.50",
+      "referenceName" : "50 Jewels",
+      "type" : "Consumable"
+    },
+    {
+      "displayPrice" : "8.99",
+      "familyShareable" : false,
+      "internalID" : "NOADS",
+      "localizations" : [{ "description" : "Removes ads and adds 10 Jewels", "displayName" : "No More Ads", "locale" : "en_US" }],
+      "productID" : "com.petalspire.noads",
+      "referenceName" : "No More Ads",
+      "type" : "NonConsumable"
+    },
+    {
+      "displayPrice" : "4.99",
+      "familyShareable" : false,
+      "internalID" : "STARTER",
+      "localizations" : [{ "description" : "Starter Pack", "displayName" : "Starter Pack", "locale" : "en_US" }],
+      "productID" : "com.petalspire.starter2",
+      "referenceName" : "Starter Pack",
+      "type" : "NonConsumable"
+    },
+    {
+      "displayPrice" : "19.99",
+      "familyShareable" : false,
+      "internalID" : "COLLECTOR",
+      "localizations" : [{ "description" : "Collector’s Bundle", "displayName" : "Collector’s Bundle", "locale" : "en_US" }],
+      "productID" : "com.petalspire.collector",
+      "referenceName" : "Collector’s Bundle",
+      "type" : "NonConsumable"
+    }
+  ],
+  "settings" : {
+    "_failTransactionsEnabled" : false,
+    "_storeKitErrors" : [
+      { "current" : null, "enabled" : false, "name" : "Load Products" },
+      { "current" : null, "enabled" : false, "name" : "Purchase" },
+      { "current" : null, "enabled" : false, "name" : "Verification" },
+      { "current" : null, "enabled" : false, "name" : "App Store Sync" },
+      { "current" : null, "enabled" : false, "name" : "Subscription Status" },
+      { "current" : null, "enabled" : false, "name" : "App Transaction" },
+      { "current" : null, "enabled" : false, "name" : "Manage Subscriptions Sheet" },
+      { "current" : null, "enabled" : false, "name" : "Refund Request Sheet" },
+      { "current" : null, "enabled" : false, "name" : "Offer Code Redeem Sheet" }
+    ]
+  },
+  "subscriptionGroups" : [],
+  "version" : { "major" : 3, "minor" : 0 }
+}
