@@ -784,11 +784,23 @@ for (const d of S.decor) W.addDecor(d.key, d.type, d.x, d.z, d.r || 0, false);
 for (const d of S.gf) W.addFeat(d.key, d.id, d.x, d.z, d.r || 0, false);   // v0.65
 queueMicrotask(() => { migGF065(); migTrees065(); deliverOverdue(); });
 for (const t of S.trees) W.addGrown(t.id, t.x, t.z, treeStage(t), t.st === 'stump' ? 'stump' : 'full');
+// The guide table is created further down. Until then, an in-progress guide keeps its blueprints hidden.
+let tutSteps = null;
+function guideReached(id) {
+  if (!S.tut || S.tut.done) return true;
+  if (!tutSteps) return false;
+  const i = tutSteps.findIndex((s) => s.id === id);
+  return i >= 0 && (S.tut.step || 0) >= i;
+}
+const guideOpen = () => !!(S.tut && !S.tut.done);
 syncBlueprints();
 function syncBlueprints() {
-  W.setBlueprint('stand', S.beds.length > 0 && !S.standBuilt && !building.stand);
-  W.setBlueprint('rack', S.rackAvail && !S.rackBuilt && !building.rack);
+  // Farm Stand ghost waits for the guide step that introduces it, then stays if the player never built it.
+  W.setBlueprint('stand', S.beds.length > 0 && !S.standBuilt && !building.stand && guideReached('stand'));
+  // The Drying Rack unlocks on the first Lavender harvest, which is before the Farm Stand step and is not a guide step.
+  W.setBlueprint('rack', S.rackAvail && !S.rackBuilt && !building.rack && !guideOpen());
   W.setBlueprint('tincture', false);   // v0.41: no fixed blueprint — the player picks the spot
+  W.setBlueprint('oshed', !!(S.lots.orchard && !S.oshedBuilt && !building.oshed && !guideOpen()));
 }
 function syncMarket() { W.setMarketState(S.marketBuilt ? 'open' : S.marketProj ? 'building' : 'closed', marketK()); }
 const lastStage = [];
@@ -858,7 +870,11 @@ function hud() {
 }
 function buildReady() {
   if (!S.beds.length) return S.wood >= bedCost() && SITES.some((s) => S.lots[s.lot] && !S.beds.includes(s.id) && siteClear(s.id));
-  if (!S.standBuilt && !building.stand) return S.wood >= BUILDS.stand.wood;
+  if (!S.standBuilt && !building.stand) {
+    if (guideOpen() && !guideReached('stand')) return false;
+    return S.wood >= BUILDS.stand.wood;
+  }
+  if (guideOpen()) return false;   // rack and the market rebuild wait until Sprig's guide is finished
   if (S.rackAvail && !S.rackBuilt && !building.rack) return S.wood >= BUILDS.rack.wood;
   if (S.marketAvail && !S.marketBuilt && !S.marketProj) return S.wood >= BUILDS.market.wood && S.coins >= marketCoins();
   return false;
@@ -1570,7 +1586,7 @@ function harvestCore_(i) {   // normal yields/seeds rules, shared by the hand ha
   const moon = charmHit('moonfountain') ? 1 : 0, tin = charmHit('seedtin') ? 1 : 0;
   const f = sp.noFlower ? 0 : randInt(...sp.yieldF) + beeBonus(i) + lvFlower(p.sp) + moon, s = (sp.seedsFixed ? sp.seedsFixed + (sp.seedBonus || 10) * (beeBonus(i) + lvFlower(p.sp) + moon) : rollSeeds(sp.tier)) + tin;
   if (f) S.inv['flower_' + p.sp] = (S.inv['flower_' + p.sp] || 0) + f; S.inv['seed_' + p.sp] = (S.inv['seed_' + p.sp] || 0) + s; S.tiles[i] = null; S.stats.harvests++;
-  if (p.sp === 'lavender' && !S.rackAvail) { S.rackAvail = true; setTimeout(() => { syncBlueprints(); hud(); tip('lavender'); }, 900); }
+  if (p.sp === 'lavender' && !S.rackAvail) { S.rackAvail = true; setTimeout(() => { syncBlueprints(); hud(); if (guideOpen()) afterGuide(() => tip('lavender'), 'lavender'); else tip('lavender'); }, 900); }
   return { sp: p.sp, f, s };
 }
 function harvest(i) {
@@ -1709,15 +1725,15 @@ function askRush() {
 }
 function syncJewelDock() {
   const d = $('#jeweldock'); if (!d) return;
-  const n = S.introDone ? bloomTargets().length : 0, rl = rushLeft(), rr = S.introDone && rushReady();
+  const guiding = guideOpen(), n = S.introDone && !guiding ? bloomTargets().length : 0, rl = rushLeft(), rr = S.introDone && !guiding && rushReady();
   const bb = $('#jd-bloom'), rb = $('#jd-rush'), ob = $('#jd-orders'), L = curLoc(); let oShow = false; try { oShow = !!(S.introDone && ordersShown(L) && orderSlots(L) && S.orders?.[L]); } catch (_) {}
   if (ob) { ob.classList.toggle('hidden', !oShow); const on = oShow ? S.orders[L].slots.filter((o) => o?.items).length : 0, em = ob.querySelector('em'); em.textContent = on || ''; em.classList.toggle('hidden', !on); }
   bb.classList.toggle('hidden', !n); if (n) { const j = bloomJewels(n); if (bb.dataset.j !== String(j)) { bb.dataset.j = j; bb.querySelector('em').innerHTML = `${j}<i data-icon="jewel"></i>`; fillIcons(bb); } }
-  rb.classList.toggle('hidden', !(rr || rl > 0)); rb.classList.toggle('active', rl > 0);
+  rb.classList.toggle('hidden', !(rr || (!guiding && rl > 0))); rb.classList.toggle('active', rl > 0);
   const em = rb.querySelector('em'), want = rl > 0 ? clock(rl) : `${RUSH.jewels}<i data-icon="jewel"></i>`; if (em.dataset.v !== want) { em.dataset.v = want; em.innerHTML = want; if (!rl) fillIcons(rb); }
   const pk = $('#jd-pack'), pShow = !!(S.introDone && S.freePacks > 0 && (!guideOn() || TUT_STEPS[S.tut.step]?.id === 'pack'));   // v0.8.7.2: a free Card Pack waits on the HUD
   if (pk) { pk.classList.toggle('hidden', !pShow); const pe = pk.querySelector('em'); pe.textContent = S.freePacks > 1 ? S.freePacks : ''; pe.classList.toggle('hidden', !(S.freePacks > 1)); }
-  d.classList.toggle('hidden', (!n && !(rr || rl > 0) && !oShow && !pShow) || !!placing || !!buildMode);   // out of the way while placing / building
+  d.classList.toggle('hidden', (!n && !(rr || (!guiding && rl > 0)) && !oShow && !pShow) || !!placing || !!buildMode);   // out of the way while placing / building
   // v0.65: Bloom / Rush sit on the LEFT edge, stacked above the tool dock (Sickle / Plow) when that is showing
   if (!d.classList.contains('hidden')) { const tb = $('#tabbar').getBoundingClientRect(), td = $('#tooldock'), th = td && !td.classList.contains('hidden') ? td.getBoundingClientRect().height + 8 : 0; if (tb.height) d.style.bottom = Math.round(innerHeight - tb.top + 56 + th) + 'px'; }
 }
@@ -2547,6 +2563,8 @@ function coinUnlock(id) {
   return true;
 }
 function projectCard(id) {
+  // During the guide the Build menu only offers the raised bed, plus the Farm Stand once that step starts.
+  if (guideOpen() && !(id === 'stand' && guideReached('stand'))) return '';
   const B = BUILDS[id];
   const status = (cls, txt) => `<span class="bstat ${cls}">${txt}</span>`;
   if (COIN_STANDS.has(id) && !standGot(id)) return coinUnlockCard(id);
@@ -2700,7 +2718,7 @@ function buildHTML() {
   const cards = here.map((id) => [id === 'treeirrig' ? treeIrrigCard() : id === 'ostand' ? ostandProjectCard() : projectCard(id), bCost(id), id === 'treeirrig' ? 'Tree-row Irrigation' : BUILD_NAMES[id] || FEATURES[id]?.name || BUILDS[id]?.name || id]).concat(loc === 'orchard' ? [] : [[null, coinEq({ wood: cost }), 'Raised Bed']]);
   const projects = cards.sort((a, b) => b[1] - a[1] || a[2].localeCompare(b[2])).map((c) => c[0] ?? bed).join('');   // v0.65: highest value first
   // v0.65: each location has its own Build menu — only what can be built HERE (no raised beds at the Orchard, no Home-only buildings there)
-  return `<div class="build-list" data-build-loc="${loc}">${projects}</div>${here.map((id) => (id === 'treeirrig' ? treeIrrigCard() : id === 'ostand' ? ostandProjectCard() : projectCard(id))).join('').trim() ? '' : `<p class="muted empty-hint" data-empty-hint>Open Card Packs to discover more to build.</p>`}
+  return `<div class="build-list" data-build-loc="${loc}">${projects}</div>${guideOpen() || here.map((id) => (id === 'treeirrig' ? treeIrrigCard() : id === 'ostand' ? ostandProjectCard() : projectCard(id))).join('').trim() ? '' : `<p class="muted empty-hint" data-empty-hint>Open Card Packs to discover more to build.</p>`}
     <div class="sec-title">Your land</div><div class="list">${(loc === 'orchard' ? ORCH_LOTS : LOT_FOR_SALE.concat(['home'])).filter((l) => S.lots[l]).map((l) => `<div class="row"><div class="ico"><i data-icon="sign" style="width:30px;height:30px"></i></div><div class="meta"><b>${LOTS[l].name}</b><small>${loc === 'orchard' ? '' : `${SITES.filter((s) => s.lot === l && S.beds.includes(s.id)).length}/${SITES.filter((s) => s.lot === l).length} beds · `}${S.barrels[l] ? `barrel ${S.barrels[l].w}/${regenMax(S.barrels[l])}` : 'no barrel'} · ${OBSTACLES.filter((o) => o.lot === l && obsState(o.id) !== 'gone').length} trees &amp; stumps left</small></div></div>`).join('')}</div>
     <p class="muted" style="margin:10px 4px 0">More land: tap a <b>For Sale</b> sign ${loc === 'orchard' ? 'in the meadow around the Orchard' : 'in the woods around you'}.</p>`;
 }
@@ -3140,7 +3158,7 @@ function syncOStand() { W.setOStandStock?.(ostandCount()); }
 function syncOShed(anim) {
   const on = !!(S.lots.orchard && S.oshedBuilt);
   if (on) { if (!building.oshed) W.appear(W.orchardShed, !!anim); } else W.orchardShed.visible = false;
-  W.setBlueprint('oshed', !!(S.lots.orchard && !S.oshedBuilt && !building.oshed));
+  W.setBlueprint('oshed', !!(S.lots.orchard && !S.oshedBuilt && !building.oshed && !guideOpen()));
   syncOStand();
 }
 function buildOStand() {
@@ -5052,6 +5070,8 @@ if (panel === 'build') return { text: 'Build your Farm Stand — drivers buy fro
       try { syncJewelDock(); } catch (_) {}
       return { text: 'Tap the Pack button to open your Card Pack.', el: $('#jd-pack:not(.hidden)') || null }; } },
 ];
+tutSteps = TUT_STEPS;
+syncBlueprints();
 // v0.8.7.2: "Goal X of N" — N drops by one when the pack goal is skipped (a pack was opened earlier)
 const tutTotal = () => TUT_STEPS.length - (S.tut?.packPre ? 1 : 0);
 function tutPackPre() { if (S.tut && !S.tut.done && S.tut.packPre == null && TUT_STEPS[S.tut.step]?.id !== 'pack' && (S.packs || 0) > 0) { S.tut.packPre = true; save(); } }
@@ -5085,7 +5105,7 @@ function tutFirstOrder() {   // an easy first order: flowers the player already 
 let tutEl = null, tutRing = null, tutCur = null, tutPulse = null, tutFinEl = null;
 function tutStep() { if (!tutActive()) return null; tutPackPre(); let did = null; while (S.tut.step < TUT_STEPS.length && TUT_STEPS[S.tut.step].done()) { did = TUT_STEPS[S.tut.step].id; S.tut.step++; save(); } if (did && tutEl) tutCheer(did); if (S.tut.step >= TUT_STEPS.length) { tutFinish(); return null; } return TUT_STEPS[S.tut.step]; }
 function tutFinish(skipped = false) {
-  if (!S.tut || S.tut.done) return; S.tut.done = true; if (skipped) S.tut.skipped = true; save(); tutClear(); flushAfterGuide(); try { v8Hud(); hud(); } catch (_) {}
+  if (!S.tut || S.tut.done) return; S.tut.done = true; if (skipped) S.tut.skipped = true; save(); tutClear(); syncBlueprints(); flushAfterGuide(); try { v8Hud(); hud(); } catch (_) {}
   if (!S.tut.replay) { S.guideDone = true; save(); checkGoals(); considerNativeAds(() => guideDone()); Ads.sync(); }
   if (skipped) return;
   tutFinEl?.remove(); tutFinEl = el('div', 'tut-card tut-fin', `<p><b>That’s the basics!</b> Sprig’s gift for finishing: a free <b>Tincture Stand</b>.</p><button class="btn btn-primary sm" type="button" data-tut="ok">Got it</button>`);
@@ -5097,9 +5117,12 @@ function tutCheer(id) {   // a small check + "Goal done" pop under the guide car
 }
 function tutClear() { tutGate = null; tutHole?.classList.add('hidden'); tutArrow?.classList.add('hidden'); tutEl?.classList.add('hidden'); tutRing?.classList.add('hidden'); tutPulse?.classList.remove('tut-pulse'); tutPulse = null; tutCur = null; }
 function tutReplay() { S.tut = { step: 0, replay: true }; save(); closePanel(); if (!tutStep()) { toast('You’ve already done every first step — happy gardening!'); } }
+let tutShownStep = '';
 function tutFrame() {
   document.body.classList.toggle('guide-on', guideOn());
   const st = tutStep();
+  const mark = st?.id || (S.tut?.done ? 'done' : '');
+  if (mark !== tutShownStep) { tutShownStep = mark; syncBlueprints(); try { hud(); } catch (_) {} }
   const blocked = !st || document.body.classList.contains('on-title') || modalOpen() || (!!placing && placing.what !== 'plow') || (!S.introDone) || curLoc() === 'orchard' || !!document.querySelector('#ui > .goals-closing');
   if (blocked) { tutGate = null; if (tutEl && !tutEl.classList.contains('hidden')) tutClear(); return; }
   const a = st.at() || { text: '' };
