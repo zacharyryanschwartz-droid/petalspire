@@ -467,7 +467,35 @@ i[data-icon] svg{width:100%;height:100%}
 
 /* ads (placeholders only — see js/ads.js) */
 body.ads-on{--sab:calc(env(safe-area-inset-bottom,0px) + 68px)}
-html.native-app body.ads-on{--sab:calc(env(safe-area-inset-bottom,0px) + 84px)}
+/* iPhone app: real safe-area insets (WKWebView often reports env() as 0). The tab bar stays
+   flush above the home indicator. The ad slot sits just above the tab bar, not under it. */
+html.native-app{
+  --sat:var(--native-sat, env(safe-area-inset-top, 0px));
+  --sab:var(--native-sab, env(safe-area-inset-bottom, 0px));
+  --sal:var(--native-sal, env(safe-area-inset-left, 0px));
+  --sar:var(--native-sar, env(safe-area-inset-right, 0px));
+}
+html.native-app, html.native-app body{
+  height:var(--app-h, 100dvh); min-height:var(--app-h, 100dvh);
+}
+html.native-app #scene, html.native-app #ui{
+  top:0; left:0; right:0; bottom:auto; height:var(--app-h, 100dvh);
+}
+html.native-app body.ads-on{--sab:var(--native-sab, env(safe-area-inset-bottom, 0px))}
+html.native-app #hud{z-index:30}
+html.native-app #tabbar{bottom:calc(var(--sab) + 8px); z-index:31}
+html.native-app .ad-banner{
+  bottom:calc(var(--sab) + var(--tabh) + 16px); height:50px; z-index:12;
+}
+html.native-app body.ads-on .tile-sheet,
+html.native-app body.ads-on .buildbar,
+html.native-app body.ads-on .toast,
+html.native-app body.ads-on .tut-fin{
+  bottom:calc(var(--sab) + var(--tabh) + 78px);
+}
+html.native-app .tut-card:not(.tut-fin):not(.tut-low){top:calc(var(--hud-h, calc(var(--sat) + 60px)) + 12px)}
+html.native-app .goal{top:calc(var(--hud-h, calc(var(--sat) + 60px)) + 8px)}
+html.native-app .gift-btn, html.native-app .spin-btn{top:calc(var(--sat) + 64px)}
 .ad-banner{position:absolute;left:calc(var(--sal) + 10px);right:calc(var(--sar) + 10px);bottom:calc(env(safe-area-inset-bottom,0px) + 5px);height:54px;z-index:8;
   display:flex;align-items:center;gap:8px;padding:0 8px 0 6px;border-radius:13px;font-family:'Nunito',sans-serif;color:var(--ink);text-align:left;
   background:linear-gradient(90deg,#FFF3F1 0%,#FFF9F0 55%,#EEF5EC 100%);border:1.5px solid var(--blush);box-shadow:0 2px 8px rgba(80,60,30,.12);pointer-events:auto;overflow:hidden}

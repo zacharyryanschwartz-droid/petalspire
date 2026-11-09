@@ -144,11 +144,33 @@ async function hideStatusBar() {
   try { await bar?.hide?.(); } catch { /* optional */ }
 }
 
+/** WKWebView often reports env(safe-area-inset-*) as 0. Tall iPhones still have an island and a home indicator. */
+export function syncNativeChrome() {
+  if (!isNative()) return;
+  const root = document.documentElement;
+  const vv = window.visualViewport;
+  const h = Math.round(vv?.height || window.innerHeight || 0);
+  if (h) root.style.setProperty('--app-h', h + 'px');
+  const hud = document.getElementById('hud');
+  if (hud) root.style.setProperty('--hud-h', Math.ceil(hud.getBoundingClientRect().height) + 'px');
+  if (root.style.getPropertyValue('--native-sat')) return;
+  const tall = Math.min(screen.width, screen.height) >= 360 && Math.max(screen.width, screen.height) >= 800;
+  if (!tall) return;
+  root.style.setProperty('--native-sat', '59px');
+  root.style.setProperty('--native-sab', '34px');
+  root.style.setProperty('--native-sal', '0px');
+  root.style.setProperty('--native-sar', '0px');
+}
+
 export async function prepareNativeApp() {
   if (!isNative()) return;
   document.documentElement.classList.add('native-app');
+  syncNativeChrome();
+  window.addEventListener('resize', syncNativeChrome);
+  window.visualViewport?.addEventListener('resize', syncNativeChrome);
   await restoreNativeSave();
   installSaveMirror();
   bumpLaunches();
   await hideStatusBar();
+  syncNativeChrome();
 }
