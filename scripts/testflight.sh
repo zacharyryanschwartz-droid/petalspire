@@ -8,6 +8,9 @@ umask 077
 : "${ASC_KEY_ID:?ASC_KEY_ID is not set}"
 : "${ASC_ISSUER_ID:?ASC_ISSUER_ID is not set}"
 : "${ASC_KEY_P8:?ASC_KEY_P8 is not set}"
+: "${DIST_CERT_P12:?DIST_CERT_P12 is not set. This workflow does not create or revoke certificates.}"
+: "${DIST_CERT_PASSWORD:?DIST_CERT_PASSWORD is not set. This workflow does not create or revoke certificates.}"
+: "${DIST_PROFILE:?DIST_PROFILE is not set. This workflow does not create or revoke certificates.}"
 
 KEY_DIR="${RUNNER_TEMP:-/tmp}/petalspire-asc"
 mkdir -p "$KEY_DIR" "$HOME/.appstoreconnect/private_keys" "$HOME/private_keys"
@@ -167,4 +170,5 @@ else
 fi
 
 node scripts/asc.mjs wait "$BUILD_NUM"
+node scripts/asc.mjs assign "$BUILD_NUM"
 echo "TestFlight has build $MARKETING_VERSION ($BUILD_NUM)"

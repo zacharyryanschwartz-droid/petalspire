@@ -1,5 +1,5 @@
 // App Store Connect helper. Reads the API key from the environment, never from argv, and never prints it.
-import { createSign, randomBytes } from 'crypto';
+import { createSign } from 'crypto';
 import { execFileSync } from 'child_process';
 import { mkdirSync, readFileSync, writeFileSync } from 'fs';
 import { dirname, join } from 'path';
@@ -93,7 +93,7 @@ async function cmdWait() {
     const row = rows.find((r) => String(r.attributes?.version) === build);
     const state = row?.attributes?.processingState || 'MISSING';
     console.log(`build ${build} processingState=${state}`);
-    if (state === 'PROCESSING' || state === 'VALID') return;
+    if (state === 'VALID') return;
     if (state === 'FAILED' || state === 'INVALID') throw new Error(`Build ${build} ${state}`);
     await new Promise((r) => setTimeout(r, 20000));
   }
@@ -104,82 +104,37 @@ function openssl(args, opts = {}) {
   return execFileSync('openssl', args, { encoding: 'utf8', ...opts });
 }
 
-async function bundleResourceId() {
-  const json = await api(`/v1/bundleIds?filter[identifier]=${encodeURIComponent(BUNDLE_ID)}&limit=5`);
-  const row = (json.data || []).find((d) => d.attributes?.identifier === BUNDLE_ID) || json.data?.[0];
-  if (!row?.id) throw new Error('Petalspire bundle id was not found in App Store Connect');
-  return row.id;
+function decodeB64(raw, name) {
+  const s = String(raw || '').replace(/\s+/g, '');
+  if (!s) throw new Error(`${name} is missing. This workflow does not create or revoke certificates. Add the saved signing secrets and run again.`);
+  const buf = Buffer.from(s, 'base64');
+  if (!buf.length) throw new Error(`${name} is empty. This workflow does not create or revoke certificates.`);
+  return buf;
 }
 
 async function cmdMaterialize() {
   const dir = process.env.ASC_SIGN_DIR;
   if (!dir) throw new Error('ASC_SIGN_DIR is not set');
   mkdirSync(dir, { recursive: true, mode: 0o700 });
-  const keyPath = join(dir, 'dist.key');
-  const csrPath = join(dir, 'dist.csr');
-  openssl(['req', '-new', '-newkey', 'rsa:2048', '-nodes', '-keyout', keyPath, '-out', csrPath, '-subj', '/CN=Petalspire CI/O=Schwarze Spiele/C=US']);
-  const csr = readFileSync(csrPath, 'utf8');
-  const existing = await api('/v1/certificates?limit=200&fields[certificates]=name,certificateType,displayName,expirationDate');
-  const dist = (existing.data || []).filter((c) => /DISTRIBUTION/.test(c.attributes?.certificateType || ''));
-  console.log(`existing distribution certificates: ${dist.length}`);
-  for (const c of dist) {
-    const a = c.attributes || {};
-    console.log(`distribution cert ${c.id} type ${a.certificateType || '?'} expires ${a.expirationDate || '?'} name ${a.displayName || a.name || '?'}`);
-  }
-  // Apple emails "null null has revoked" when this API key deletes a certificate. Do not delete one
-  // unless a person has approved that exact revocation. A full team (two distribution certs) stops here.
-  let created = null;
-  let lastErr = null;
-  for (const certificateType of ['DISTRIBUTION', 'IOS_DISTRIBUTION']) {
-    try {
-      created = await api('/v1/certificates', {
-        method: 'POST',
-        body: { data: { type: 'certificates', attributes: { certificateType, csrContent: csr } } },
-      });
-      console.log(`created certificate type ${certificateType} id ${created.data.id}`);
-      break;
-    } catch (err) {
-      lastErr = err;
-      console.log(`certificate type ${certificateType} was not created`);
-    }
-  }
-  if (!created?.data?.id) {
-    const why = lastErr?.message || 'Could not create a distribution certificate';
-    if (dist.length >= 2) throw new Error(`The team already has ${dist.length} distribution certificates. This workflow will not revoke one without approval. ${why}`);
-    throw new Error(why);
-  }
-  const certB64 = created.data.attributes?.certificateContent;
-  if (!certB64) throw new Error('Certificate response did not include certificate content');
-  const cerPath = join(dir, 'dist.cer');
-  const pemPath = join(dir, 'dist.pem');
-  writeFileSync(cerPath, Buffer.from(certB64, 'base64'));
-  try { openssl(['x509', '-inform', 'DER', '-in', cerPath, '-out', pemPath]); }
-  catch { openssl(['x509', '-inform', 'PEM', '-in', cerPath, '-out', pemPath]); }
-  const pass = randomBytes(24).toString('hex');
+  const pass = process.env.DIST_CERT_PASSWORD || '';
+  if (!pass) throw new Error('DIST_CERT_PASSWORD is missing. This workflow does not create or revoke certificates. Import the saved distribution certificate instead.');
   const p12 = join(dir, 'dist.p12');
-  const p12Args = ['pkcs12', '-export', '-inkey', keyPath, '-in', pemPath, '-out', p12, '-passout', `pass:${pass}`, '-keypbe', 'PBE-SHA1-3DES', '-certpbe', 'PBE-SHA1-3DES', '-macalg', 'sha1'];
-  try { openssl(p12Args); }
-  catch { openssl(['pkcs12', '-export', '-legacy', '-inkey', keyPath, '-in', pemPath, '-out', p12, '-passout', `pass:${pass}`]); }
+  const pemPath = join(dir, 'dist.pem');
+  writeFileSync(p12, decodeB64(process.env.DIST_CERT_P12, 'DIST_CERT_P12'), { mode: 0o600 });
+  writeFileSync(join(dir, 'profile.mobileprovision'), decodeB64(process.env.DIST_PROFILE, 'DIST_PROFILE'));
   writeFileSync(join(dir, 'p12.pass'), pass, { mode: 0o600 });
-  const bundleId = await bundleResourceId();
-  const profileName = `Petalspire App Store ${Date.now()}`;
-  const profile = await api('/v1/profiles', {
-    method: 'POST',
-    body: {
-      data: {
-        type: 'profiles',
-        attributes: { name: profileName, profileType: 'IOS_APP_STORE' },
-        relationships: {
-          bundleId: { data: { type: 'bundleIds', id: bundleId } },
-          certificates: { data: [{ type: 'certificates', id: created.data.id }] },
-        },
-      },
-    },
-  });
-  const profB64 = profile.data?.attributes?.profileContent;
-  if (!profB64) throw new Error('Profile response did not include profile content');
-  writeFileSync(join(dir, 'profile.mobileprovision'), Buffer.from(profB64, 'base64'));
-  writeFileSync(join(dir, 'profile-name.txt'), profileName);
+  try {
+    openssl(['pkcs12', '-in', p12, '-nokeys', '-passin', 'env:DIST_CERT_PASSWORD', '-out', pemPath]);
+  } catch {
+    throw new Error('The saved distribution certificate could not be read. Check DIST_CERT_P12 and DIST_CERT_PASSWORD. This workflow does not create or revoke certificates.');
+  }
+  let end = '';
+  try { end = openssl(['x509', '-enddate', '-noout', '-in', pemPath]).trim(); } catch { end = ''; }
+  let current = true;
+  try { openssl(['x509', '-checkend', '86400', '-noout', '-in', pemPath]); }
+  catch { current = false; }
+  if (!current) throw new Error(`The saved distribution certificate is expired or expires within a day (${end || 'no end date'}). This workflow does not create or revoke certificates.`);
+  console.log(`using saved distribution certificate ${end || 'end date unread'}`);
   console.log('signing materials ready');
 }
 
@@ -193,8 +148,30 @@ function cmdWriteKey() {
   console.log('API key file ready');
 }
 
+async function cmdAssign() {
+  const build = process.argv[3];
+  if (!/^\d+$/.test(build || '')) throw new Error('assign expects a numeric build');
+  const rows = await allBuilds();
+  const row = rows.find((r) => String(r.attributes?.version) === build);
+  if (!row?.id) throw new Error(`Build ${build} was not found, so it could not be added to the Internal group`);
+  const groups = await api(`/v1/betaGroups?filter[app]=${APP_ID}&limit=50&fields[betaGroups]=name,isInternalGroup`);
+  const internal = (groups.data || []).filter((g) => g.attributes?.isInternalGroup);
+  const group = internal.find((g) => /internal/i.test(g.attributes?.name || '')) || internal[0];
+  if (!group) throw new Error('No Internal TestFlight group was found');
+  try {
+    await api(`/v1/betaGroups/${group.id}/relationships/builds`, {
+      method: 'POST',
+      body: { data: [{ type: 'builds', id: row.id }] },
+    });
+  } catch (err) {
+    const msg = String(err.message || err);
+    if (!/already|409|exists/i.test(msg)) throw err;
+  }
+  console.log(`Internal group ${group.attributes?.name || 'Internal'} has build ${build}`);
+}
+
 const cmd = process.argv[2];
-const run = { 'write-key': cmdWriteKey, team: cmdTeam, 'next-build': cmdNextBuild, wait: cmdWait, 'materialize-signing': cmdMaterialize }[cmd];
+const run = { 'write-key': cmdWriteKey, team: cmdTeam, 'next-build': cmdNextBuild, wait: cmdWait, 'materialize-signing': cmdMaterialize, assign: cmdAssign }[cmd];
 if (!run) {
   console.error('usage: asc.mjs write-key|team|next-build|wait <build>');
   process.exit(2);
