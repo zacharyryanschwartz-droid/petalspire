@@ -1,9 +1,7 @@
-// Regression for the v0.8.7.5 launch rule: rain-barrel irrigation shares water across beds,
-// and one pour starts one thirsty plant. Live autoIrrigate does this. catchUpIrrigation
-// (the close/reload path) still pours the whole barrel into the first bed as a group,
-// so a short budget starts nothing and leaves the other beds dry.
+// Regression for the v0.8.7.6 launch rule: rain-barrel irrigation shares water across beds,
+// and one pour starts one thirsty plant — while the game is open and while it was closed.
+// Closed-time pours are dated at the moment the water landed, so that growth counts.
 //
-// This test fails on 0.8.7.5. It is the reproduction, not a fix.
 // Run from the repo root with Playwright installed:
 //   node tests/offline-irrigation.mjs
 
@@ -68,24 +66,39 @@ try {
     ps.autoIrrigate(() => 0);
     const live = { started: started(), water: S.barrels.home.w };
     reset();
-    ps.catchUpIrrigation();
+    ps.catchUpIrrigation(() => 0);
     const offline = { started: started(), water: S.barrels.home.w, credit: { ...(S.bedCredit || {}) } };
-    return { beds: S.beds.slice(), live, offline };
+    reset();
+    const past = Date.now() - 20000;
+    S.savedAt = past;
+    S.barrels.home.at = past;
+    S.barrels.home.w = 4;
+    ps.catchUpIrrigation(() => 0);
+    const aged = S.tiles.filter((p) => p && p.wateredAt).map((p) => Date.now() - p.wateredAt);
+    const grown = { started: started(), credit: { ...(S.bedCredit || {}) }, minAge: aged.length ? Math.min(...aged) : 0, n: aged.length };
+    return { beds: S.beds.slice(), live, offline, grown };
   });
 
   const liveOk = result.live.started.length === 2 && result.live.started.every((n) => n > 0) && result.live.started.reduce((a, b) => a + b, 0) === 4;
   const offlineOk = result.offline.started.length === 2 && result.offline.started.every((n) => n > 0) && result.offline.started.reduce((a, b) => a + b, 0) === 4;
+  const credit = Object.values(result.offline.credit || {}).reduce((a, b) => a + b, 0);
+  const grownOk = result.grown.n === 4 && result.grown.started.every((n) => n > 0) && result.grown.minAge >= 15000 && Object.values(result.grown.credit || {}).reduce((a, b) => a + b, 0) === 0;
   console.log(JSON.stringify(result, null, 2));
   if (!liveOk) {
     console.error('FAIL live autoIrrigate did not spread 4 water across both beds');
     process.exitCode = 1;
   }
-  if (!offlineOk) {
+  if (!offlineOk || credit !== 0) {
     console.error('FAIL catchUpIrrigation did not spread 4 water into one plant per pour across both beds');
-    console.error('expected both beds to start some of the 4 plants; got ' + JSON.stringify(result.offline));
+    console.error('expected both beds to start some of the 4 plants and leave no unused credit; got ' + JSON.stringify(result.offline));
     process.exitCode = 1;
   }
-  if (liveOk && offlineOk) console.log('PASS offline irrigation matches the live pour');
+  if (!grownOk) {
+    console.error('FAIL closed-time growth was not dated from the pour during the offline window');
+    console.error(JSON.stringify(result.grown));
+    process.exitCode = 1;
+  }
+  if (liveOk && offlineOk && credit === 0 && grownOk) console.log('PASS offline irrigation matches the live pour');
 } finally {
   await browser.close();
   server.close();

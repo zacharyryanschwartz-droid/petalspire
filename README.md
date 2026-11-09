@@ -1,4 +1,4 @@
-# Petalspire v0.8.5
+# Petalspire v0.8.7.6
 
 A cozy 3D flower-garden prototype for iPhone Safari (portrait, one thumb). Also plays on desktop with a mouse.
 This is a **prototype**: version numbers stay below 1.0 until the first official release.
@@ -20,6 +20,14 @@ This is a **prototype**: version numbers stay below 1.0 until the first official
 7. **Land for sale.** Five wooded plots, each with a floating For Sale sign: 450 → 900 → 1800 → 3000 → 4500 coins (v0.7.2; was 150 → 1500).
 
 Drag with one finger to pan, pinch to zoom, and twist with two fingers to turn. On desktop, right-drag or shift-drag turns the view.
+
+## New in v0.8.7.6
+
+Rain-barrel irrigation follows the same rule while the game is closed as it does while you play. Each pour goes to a dry plant in the irrigated bed that needs it most, so one bed cannot drink the barrel dry, and plants that got water start growing from that moment.
+
+A save the game cannot read is copied to `petalspire.v03.bak` before a fresh garden starts. A save with a missing plant list still opens, and the coins and other good fields stay.
+
+Sprig’s Orders tip says a Bonus Wheel spin comes every 4 orders you fill. The Starter Pack and the Daily Gift wait until you have left the title screen.
 
 ## New in v0.8.7.5: 1 spin per 4 orders
 
