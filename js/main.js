@@ -9,6 +9,8 @@ import { ROAD, LOTS, SIGNS, LOT_FOR_SALE, LOT_PRICES, SITES, OBSTACLES, SPOTS, P
 import { ICONS, itemIcon, FEATURE_ART, findIcon, decorIcon } from './icons.js';
 import { Payments } from './payments.js';
 import { createAds, gameArt } from './ads.js';
+import { isNative } from './native.js';
+import { considerNativeAds } from './admob.js';
 import { initTracker } from './games-tracker.js';
 import { createReferral, cleanCode } from './referral.js';
 import { shadeAt, speedFor, sunLabel, rebaseStart } from './shade.js';
@@ -18,7 +20,7 @@ import { createAudio, MUSIC_CREDITS } from './audio.js';
 // v0.3 / v0.31 saves (no `build`, no per-plot barrels) are migrated on load (migrate04 below); v0.4 saves load as-is and are re-tagged. Prototype builds stay below 1.0.
 export const BUILD = '0.8.7.6';
 // v0.65: anonymous player tracking (Games Backend on Appwrite; no API key in the game, nothing personal). Skipped for automated runs (navigator.webdriver).
-try { if (!navigator.webdriver) initTracker({ endpoint: 'https://nyc.cloud.appwrite.io/v1', projectId: '6ae0a41a002ce0a48fac', gameId: 'petalspire', platform: 'web', appVersion: BUILD }); } catch (_) {}
+try { if (!navigator.webdriver) initTracker({ endpoint: 'https://nyc.cloud.appwrite.io/v1', projectId: '6ae0a41a002ce0a48fac', gameId: 'petalspire', platform: isNative() ? 'ios' : 'web', appVersion: BUILD }); } catch (_) {}
 const SAVE_KEY = 'petalspire.v03', V02_KEY = 'petalspire.v02', OLD_KEYS = ['petalspire.v01'], SAVE_BAK = 'petalspire.v03.bak';
 const QS = new URLSearchParams(location.search);
 const TREE_MS = Math.max(0.05, +QS.get('treeMin') || TREE.growMin) * 60000;   // ?treeMin=1 for quick testing
@@ -187,6 +189,7 @@ const writeSave = () => { if (frozen || preserveCorrupt) return; try { S.savedAt
 function save() { clearTimeout(saveTimer); saveTimer = setTimeout(writeSave, 150); }
 window.addEventListener('visibilitychange', () => { if (document.hidden) writeSave(); });
 window.addEventListener('pagehide', writeSave);
+window.addEventListener('petalspire-ads', () => { try { hud(); } catch { /* hud is defined later in this module */ } });
 
 // ---------------- Ads (placeholders only — see js/ads.js; ADS_MODE in js/data.js) ----------------
 const Ads = createAds({ root: $('#ui'), noAds: () => S.noAds, onRemoveAds: () => openPanel('jewels'), onHouseAd: () => openPanel('settings'),
@@ -834,7 +837,7 @@ function hud() {
   { let ab = document.getElementById('coin-plus'); const pc = document.getElementById('pill-coins');   // v0.8.6: a small + on the coin counter opens the watch-an-ad offer, after the guide
     if (!ab && pc) { ab = document.createElement('em'); ab.id = 'coin-plus'; ab.className = 'coin-plus hidden'; ab.setAttribute('role', 'button'); ab.setAttribute('aria-label', 'Watch an ad for coins'); ab.textContent = '+';
       ab.addEventListener('click', (e) => { e.stopPropagation(); watchAd(); }); pc.appendChild(ab); }
-    if (ab) { const on = !!(Ads.rewardOn && adRowShown() && S.introDone); ab.classList.toggle('hidden', !on); pc.classList.toggle('has-plus', on); } }
+    if (ab) { const on = !!(Ads.rewardOn && Ads.rewardReady && adRowShown() && S.introDone); ab.classList.toggle('hidden', !on); pc.classList.toggle('has-plus', on); } }
   syncMapBtn(); v8Hud();   // v0.8: level badge + spin button
   const hc = (n) => (n >= 1e6 ? (n / 1e6).toFixed(n < 1e7 ? 1 : 0).replace(/\.0$/, '') + 'M' : n >= 1e4 ? (n / 1e3).toFixed(n < 1e5 ? 1 : 0).replace(/\.0$/, '') + 'k' : String(n));   // v0.8.6: short HUD counts so the bar fits a phone
   $('#coin-count').textContent = hc(S.coins); const tw = totalWater(); $('#water-count').textContent = hc(tw); $('#wood-count').textContent = hc(S.wood); $('#jewel-count').textContent = hc(S.jewels);
@@ -2252,7 +2255,7 @@ function renderPanel_() {
   if (panel === 'lot') { title.innerHTML = LOTS[panelArg].name; body.innerHTML = lotHTML(panelArg); }
   if (panel === 'worker') { title.innerHTML = `${locLabel(workerLoc(panelArg)).replace(/^t/, 'T')} · ${wkName(panelArg)}`; body.innerHTML = workerHTML(panelArg); }
   if (panel === 'settings') { title.innerHTML = 'Settings'; body.innerHTML = settingsHTML(); }
-  if (panel === 'jewels') { title.innerHTML = `Jewel Shop${Payments.isTest ? ' <span class="test-tag">Test mode</span>' : ''}`; body.innerHTML = jewelsHTML(); }
+  if (panel === 'jewels') { title.innerHTML = `Jewel Shop${Payments.isTest && !isNative() ? ' <span class="test-tag">Test mode</span>' : ''}`; body.innerHTML = jewelsHTML(); }
   const ck = CONS_PANEL[panel] || (CRAFT[panel] ? panel : null); if (ck && consLeft(ck) > 0) body.innerHTML = consHTML(ck);   // v0.63
   fillIcons(body); fillIcons(title); body.scrollTop = st;
 }
@@ -2298,7 +2301,7 @@ function settingsHTML() {
   const games = OTHER_GAMES.filter((g) => g.id !== CROSS_PROMO.gameId).map((g) => `<div class="game-row" data-game="${g.id}"><div class="game-art">${gameArt(g.id)}</div>
     <div class="meta"><b>${g.name}${g.status === 'soon' ? ' <span class="soon-tag">Coming soon</span>' : ''}</b><small class="gr-tag">${g.tagline}</small><small>${g.blurb}</small></div>
     ${g.status === 'live' && g.url ? `<a class="btn btn-primary sm" href="${g.url}" target="_blank" rel="noopener">Play</a>` : ''}</div>`).join('');
-  const adsRow = ADS_MODE === 'off' ? '' : S.noAds
+  const adsRow = isNative() ? (S.noAds ? `<div class="row"><div class="ico"><i data-icon="heart" style="width:34px;height:34px"></i></div><div class="meta"><b>No More Ads · Owned</b><small>Thank you! Banners and partner ads are switched off.</small></div></div>` : '') : ADS_MODE === 'off' ? '' : S.noAds
     ? `<div class="row"><div class="ico"><i data-icon="heart" style="width:34px;height:34px"></i></div><div class="meta"><b>No More Ads · Owned</b><small>Thank you! Banners and partner ads are switched off.</small></div></div>`
     : `<div class="row"><div class="ico"><i data-icon="jewel" style="width:34px;height:34px"></i></div><div class="meta"><b>No More Ads + ${NO_ADS_BUNDLE.n} Jewels</b><small>Removes the banner and partner ads · ${NO_ADS_BUNDLE.price}</small></div><div class="acts"><button class="btn btn-blush sm" data-act="open-jewels">View</button></div></div>`;
   const follow = SOCIALS.map((p) => { const got = !!S.follows?.[p.id];
@@ -2314,7 +2317,7 @@ function settingsHTML() {
     <div class="sec-title">Your save</div><div class="list"><div class="row"><div class="meta"><b>Autosaves on this device</b><small>Progress is kept in this browser, even while the game is closed.</small></div></div>
     <button class="row set-btn danger" data-act="reset"><b>Reset garden…</b><small>Erase all progress and start again in the woods</small></button></div>
     <div class="studio-credit-set" data-studio-credit><img src="${STUDIO.logo}" alt="${STUDIO.name}" /><small>Petalspire is made by ${STUDIO.name}</small></div>
-    <p class="muted" style="margin:14px 4px 0;text-align:center">Petalspire v${BUILD} · prototype${Payments.isTest ? ' · <span class="test-tag" style="margin:0">Test mode</span>' : ''}</p>`;
+    <p class="muted" style="margin:14px 4px 0;text-align:center">Petalspire v${BUILD} · prototype${Payments.isTest && !isNative() ? ' · <span class="test-tag" style="margin:0">Test mode</span>' : ''}</p>`;
 }
 function bagHTML() {
   const nf = Object.values(S.finds).reduce((a, v) => a + v, 0) + S.restoring.length;
@@ -2704,7 +2707,7 @@ function bedSvg() { return `<svg viewBox="0 0 64 44"><path d="M4 22h56v14H4z" fi
 const AD_PICK = { coins: ['coin', 'Coins'], wood: ['wood', 'Wood'], scrap: ['scrap', 'Scrap Metal'] };
 const adRowShown = () => !S.tut || !!S.tut.done;   // v0.8.6: the ad bonus lives in the Market, after the first-steps guide
 function rewardHTML() {
-  if (!Ads.rewardOn) return '';
+  if (isNative() || !Ads.rewardOn) return '';
   const P = adPicks();
   return `<div class="ad-reward" data-watch-row data-ad-mult="${adMult()}"><span class="ad-tag">Ad</span><div class="meta"><b>Watch an ad for a bonus</b><small>Pick ${coin(P.coins)}${scrapUsable() ? `, ${P.wood} Wood or ${P.scrap} Scrap` : ` or ${P.wood} Wood`} · grows as your garden grows · as often as you like</small></div>
     <button class="btn btn-gold sm ad-btn" data-act="watch-ad" data-ad-coins="${P.coins}">▶ Watch · +${coin(P.coins)}</button></div>`;
@@ -2723,6 +2726,7 @@ let adPickEl = null;
 function closeAdPicker() { adPickEl?.remove(); adPickEl = null; }
 function watchAd() {
   if (!Ads.rewardOn || Ads.showing) return;
+  if (isNative() && !Ads.rewardReady) { toast('No ad right now'); return; }
   closeAdPicker();
   const P = adPicks(), el = adPickEl = document.createElement('div');
   el.id = 'ad-picker'; el.className = 'cozy-modal';
@@ -2738,11 +2742,12 @@ function watchAd() {
 }
 function playRewardAd(r) {
   const amt = adPicks()[r]; if (!amt || (r === 'scrap' && !scrapUsable())) return false;   // v0.7.2.2: no Scrap until it has a use here
+  if (isNative() && !Ads.rewardReady) { toast('No ad right now'); return false; }
   return Ads.rewarded(() => {
     S[r] += amt; S.stats.adRewards = (S.stats.adRewards || 0) + 1; const st = (S.stats.adPicks ||= { coins: 0, wood: 0, scrap: 0 }); st[r] += amt;
     const ex = adExtras(S.stats.adRewards); let xt = ''; if (ex.wood) { S.wood += ex.wood; xt += ` · bonus +${ex.wood} Wood`; } if (ex.card) { try { const id = drawPlant(); applyPackCard(id, new Set()); xt += ` · bonus card: ${CARDS[id]?.name || id}`; } catch (_) {} }
     save(); hud(); toast(`<i data-icon="${AD_PICK[r][0]}"></i> +${amt} ${AD_PICK[r][1]}${xt} · thanks for watching`); if (panel) renderPanel();
-  });
+  }, (finished) => { if (isNative() && !finished) toast('No ad right now'); });
 }
 // v0.66: Schwarze Spiele studio splash — a short logo card on load (tap to skip). Automated browsers skip it unless the URL has ?splash.
 (() => { const sp = $('#studio-splash'); if (!sp) return;
@@ -2764,7 +2769,7 @@ function boostText(kind, d) {
   return `${SPECIES[d.sp].name} ready now`;
 }
 function maybeBoost(kind, d, force = false) {
-  const B = BOOSTS, K = B.kinds[kind]; if (guideOn() || !K || !Ads.rewardOn || !monetOn() || !S.introDone || boostEl || adBlocked() || modalOpen()) return false;
+  const B = BOOSTS, K = B.kinds[kind]; if (guideOn() || !K || !Ads.rewardOn || (isNative() && !Ads.rewardReady) || !monetOn() || !S.introDone || boostEl || adBlocked() || modalOpen()) return false;
   if (!force) {
     if ((S.stats.harvests || 0) < B.minHarvests) return false;
     if (now() - (M().boostAt || 0) < B.cooldownMs) return false;
@@ -2781,7 +2786,10 @@ function showBoost(kind, d) {
   const tb = $('#tabbar').getBoundingClientRect(); e.style.bottom = (innerHeight - tb.top + 12) + 'px';
   $('#ui').appendChild(e); fillIcons(e);
   e.querySelector('[data-boost-x]').addEventListener('click', (ev) => { ev.stopPropagation(); hideBoost(); });
-  e.querySelector('[data-boost-go]').addEventListener('click', (ev) => { ev.stopPropagation(); hideBoost(); Ads.rewarded(() => applyBoost(kind, d)); });
+  e.querySelector('[data-boost-go]').addEventListener('click', (ev) => { ev.stopPropagation(); hideBoost();
+    if (isNative() && !Ads.rewardReady) { toast('No ad right now'); return; }
+    const started = Ads.rewarded(() => applyBoost(kind, d), (finished) => { if (isNative() && !finished) toast('No ad right now'); });
+    if (isNative() && !started) toast('No ad right now'); });
   boostTimer = setTimeout(hideBoost, BOOSTS.showMs);
   return e;
 }
@@ -2865,7 +2873,7 @@ const starterCardHTML = (compact = false) => offerCardHTML(STARTER_PACK, compact
 // one popup, the moment the beginning goals are done (S.goalsClosed is set when the closing card is dismissed)
 function starterReady() { const st = M().starter; return !st.bought && !st.shows && starterUnlocked(); }
 const titleUp = () => document.body.classList.contains('on-title');   // v0.8.7.6: offers wait until Continue / Begin has been pressed
-function maybeStarter() { if (titleUp() || guideOn() || !monetOn() || !S.introDone || panel || placing || buildMode || modalOpen() || closingEl || !starterReady()) return; showStarter(true); }
+function maybeStarter() { if (isNative() || titleUp() || guideOn() || !monetOn() || !S.introDone || panel || placing || buildMode || modalOpen() || closingEl || !starterReady()) return; showStarter(true); }
 // v0.67 migration: the old $1.99 offer's timed popups don't count — the new Starter Pack gets its one popup after the goals
 // v0.68: Rosehip Oil is Home-press only, Almond Oil/Butter Orchard-press only. A press still working on a recipe that no longer
 // belongs there gives the ingredients back to that place's Bag; finished jars stay ready to collect, so nothing is lost.
@@ -2880,6 +2888,7 @@ syncTreeRows();
 { const st = M().starter; if (!st.v067) { st.v067 = true; st.shows = 0; delete st.until; delete st.lastShow; } }
 setInterval(maybeStarter, 3000);
 function showStarter(auto = false) {
+  if (isNative()) return null;
   const st = M().starter; if (st.bought) return null;
   if (auto) { st.shows = (st.shows || 0) + 1; st.lastShow = now(); save(); }
   starterEl?.remove(); const e = starterEl = el('div', 'cozy-modal starter-modal'); e.id = 'starter';
@@ -2889,6 +2898,7 @@ function showStarter(auto = false) {
   return e;
 }
 async function buyOffer(id, root) {
+  if (isNative()) return false;
   const o = offerById(id); if (!o || offerOwned(o)) return false;
   const r = await Payments.purchaseOffer(o);
   if (r.ok) return grantOffer(id, r.receipt);
@@ -4126,24 +4136,28 @@ function tradeJewel(what) {
   toast(what === 'coins' ? `Traded 1 Jewel for ${JEWEL_EXCHANGE.coins} coins` : `Traded 1 Jewel for ${JEWEL_EXCHANGE.wood} Wood`);
 }
 function jewelsHTML() {
-  const cards = JEWEL_BUNDLES.map((b) => `<button class="jewel-card${b.best ? ' best' : ''}" data-jewels="${b.id}">${b.best ? '<span class="best-tag">Best value</span>' : ''}
+  const native = isNative();
+  const cards = native ? '' : JEWEL_BUNDLES.map((b) => `<button class="jewel-card${b.best ? ' best' : ''}" data-jewels="${b.id}">${b.best ? '<span class="best-tag">Best value</span>' : ''}
     <span class="jc-art">${'<i data-icon="jewel"></i>'.repeat(b.n >= 50 ? 3 : b.n >= 10 ? 2 : 1)}</span><b>${b.n} Jewel${b.n > 1 ? 's' : ''}</b><em>${b.price}</em></button>`).join('');
-  const offers = offersSorted().filter((o) => !o.starter || starterUnlocked() || M().starter.bought);   // v0.67: highest value first; the Starter Pack once the beginning goals are done
+  const offers = native ? [] : offersSorted().filter((o) => !o.starter || starterUnlocked() || M().starter.bought);   // v0.67: highest value first; the Starter Pack once the beginning goals are done
+  const shop = native ? '' : `<div class="jewel-grid">${cards}</div><div class="sec-title">Packs</div><div class="shop-offers" data-shop-starter>${offers.map((o) => offerCardHTML(o, true)).join('')}</div>`;
+  const priceTag = S.noAds ? '<em class="owned-tag">Owned</em>' : '<em>' + NO_ADS_BUNDLE.price + '</em>';
+  const noads = native || ADS_MODE === 'off' ? '' : `<button class="noads-card${S.noAds ? ' owned' : ''}" data-jewels="${NO_ADS_BUNDLE.id}" ${S.noAds ? 'disabled' : ''}>
+      <span class="na-art"><svg viewBox="0 0 48 48"><rect x="5" y="11" width="38" height="26" rx="7" fill="#FFF9F0" stroke="#3D5A40" stroke-width="2.6"/><text x="24" y="29" text-anchor="middle" font-family="Nunito" font-weight="900" font-size="12" fill="#3D5A40">AD</text><path d="M8 40L40 8" stroke="#E07F86" stroke-width="4.2" stroke-linecap="round"/></svg></span>
+      <span class="na-meta"><b>No More Ads + ${NO_ADS_BUNDLE.n} Jewels</b><small>Removes every ad for good, and adds ${NO_ADS_BUNDLE.n} <i data-icon="jewel"></i></small></span>
+      ${priceTag}</button>`;
+  const note = !native && Payments.isTest ? '<p class="test-note"><span class="test-tag">Test mode</span> Prototype only — purchases are simulated and nothing is charged.</p>' : '';
   return `<div class="jewel-hero"><i data-icon="jewel"></i><div><b>${S.jewels}</b><small>Jewels</small></div></div>
     <p class="muted" style="margin:6px 4px 12px">Jewels open Card Packs (${PACK_JEWELS} each), finish a restoration instantly (${RESTORE_HURRY_JEWELS}), grow a planted tree by a stage (${TREE.hurryJewels}) or complete the market rebuild (${BUILDS.market.hurryJewels}).</p>
-    <div class="jewel-grid">${cards}</div>
-    <div class="sec-title">Packs</div><div class="shop-offers" data-shop-starter>${offers.map((o) => offerCardHTML(o, true)).join('')}</div>
+    ${shop}
     <div class="sec-title">Spend Jewels</div>
     <div class="list jewel-trades">
       <div class="row"><div class="ico">${ICONS.pack}</div><div class="meta"><b>${PACKS.standard.name}</b><small>${PACKS.standard.cards} cards · ${PACK_JEWELS} Jewel each, in Market › Card Packs</small></div><button class="btn btn-gold sm" data-act="go-packs">Packs</button></div>
       <div class="row"><div class="ico"><i data-icon="coin" style="width:36px;height:36px"></i></div><div class="meta"><b>${JEWEL_EXCHANGE.coins} coins</b><small>Trade 1 Jewel</small></div><button class="btn btn-gold sm" data-act="trade-coins" ${S.jewels < 1 ? 'disabled' : ''}>${jewelPrice(1)}</button></div>
       <div class="row"><div class="ico"><i data-icon="wood" style="width:36px;height:36px"></i></div><div class="meta"><b>${JEWEL_EXCHANGE.wood} Wood</b><small>Trade 1 Jewel</small></div><button class="btn btn-gold sm" data-act="trade-wood" ${S.jewels < 1 ? 'disabled' : ''}>${jewelPrice(1)}</button></div>
     </div>
-    ${ADS_MODE !== 'off' ? `<button class="noads-card${S.noAds ? ' owned' : ''}" data-jewels="${NO_ADS_BUNDLE.id}" ${S.noAds ? 'disabled' : ''}>
-      <span class="na-art"><svg viewBox="0 0 48 48"><rect x="5" y="11" width="38" height="26" rx="7" fill="#FFF9F0" stroke="#3D5A40" stroke-width="2.6"/><text x="24" y="29" text-anchor="middle" font-family="Nunito" font-weight="900" font-size="12" fill="#3D5A40">AD</text><path d="M8 40L40 8" stroke="#E07F86" stroke-width="4.2" stroke-linecap="round"/></svg></span>
-      <span class="na-meta"><b>No More Ads + ${NO_ADS_BUNDLE.n} Jewels</b><small>Removes every ad for good, and adds ${NO_ADS_BUNDLE.n} <i data-icon="jewel"></i></small></span>
-      ${S.noAds ? '<em class="owned-tag">Owned</em>' : `<em>${NO_ADS_BUNDLE.price}</em>`}</button>` : ''}
-    ${Payments.isTest ? `<p class="test-note"><span class="test-tag">Test mode</span> Prototype only — purchases are simulated and nothing is charged.</p>` : ''}`;
+    ${noads}
+    ${note}`;
 }
 function confirmBox(html, okText, onOk) {
   const C = $('#confirm'); C.innerHTML = `<div class="confirm-card">${html}<div class="confirm-acts"><button class="btn" data-c="no">Cancel</button><button class="btn btn-gold" data-c="ok">${okText}</button></div></div>`;
@@ -4151,6 +4165,7 @@ function confirmBox(html, okText, onOk) {
   C.onclick = (e) => { const b = e.target.closest('[data-c]'); if (!b && e.target !== C) return; C.classList.add('hidden'); C.innerHTML = ''; if (b?.dataset.c === 'ok') onOk(); };
 }
 function askBuyJewels(id) {
+  if (isNative()) return;
   const b = id === NO_ADS_BUNDLE.id ? NO_ADS_BUNDLE : JEWEL_BUNDLES.find((x) => x.id === id); if (!b || (b.noAds && S.noAds)) return;
   const test = Payments.isTest;
   confirmBox(`<i data-icon="jewel" class="confirm-ico"></i><h3>${b.noAds ? `No More Ads + ${b.n} Jewels` : `${b.n} Jewel${b.n > 1 ? 's' : ''}`} · ${b.price}</h3>
@@ -5023,7 +5038,7 @@ let tutEl = null, tutRing = null, tutCur = null, tutPulse = null, tutFinEl = nul
 function tutStep() { if (!tutActive()) return null; tutPackPre(); let did = null; while (S.tut.step < TUT_STEPS.length && TUT_STEPS[S.tut.step].done()) { did = TUT_STEPS[S.tut.step].id; S.tut.step++; save(); } if (did && tutEl) tutCheer(did); if (S.tut.step >= TUT_STEPS.length) { tutFinish(); return null; } return TUT_STEPS[S.tut.step]; }
 function tutFinish(skipped = false) {
   if (!S.tut || S.tut.done) return; S.tut.done = true; if (skipped) S.tut.skipped = true; save(); tutClear(); flushAfterGuide(); try { v8Hud(); hud(); } catch (_) {}
-  if (!S.tut.replay) { S.guideDone = true; save(); checkGoals(); }
+  if (!S.tut.replay) { S.guideDone = true; save(); checkGoals(); considerNativeAds(() => guideDone()); Ads.sync(); }
   if (skipped) return;
   tutFinEl?.remove(); tutFinEl = el('div', 'tut-card tut-fin', `<p><b>That’s the basics!</b> Sprig’s gift for finishing: a free <b>Tincture Stand</b>.</p><button class="btn btn-primary sm" type="button" data-tut="ok">Got it</button>`);
   $('#ui').appendChild(tutFinEl); tutFinEl.querySelector('button').onclick = () => { tutFinEl?.remove(); tutFinEl = null; }; setTimeout(() => { tutFinEl?.remove(); tutFinEl = null; }, 9000);
@@ -5640,6 +5655,7 @@ function v8Tick() {
   setTimeout(() => { if (S.refPending && canEnterCode()) refJoin(S.refPending); }, 4000);
   setInterval(() => { refProgress(); if (S.myCode) refClaim(); }, 10 * 60000); setTimeout(() => { refProgress(); if (S.myCode) refClaim(); }, 15000);
 })();
+considerNativeAds(() => guideDone());
 Object.defineProperties(window.__ps, Object.getOwnPropertyDescriptors({   // descriptors, so the getters stay live
   v8Tick, statXP, xpNeed, gainXP, get lvl() { return S.lvl; }, get xp() { return S.xp; }, get spins() { return S.spins; }, set spins(v) { S.spins = v; v8Hud(); },
   orderSlots, orderPool, makeOrder, fillOrder, skipOrder, ordersTick, orderPay, get orders() { return S.orders; }, managerAt,

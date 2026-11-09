@@ -5,11 +5,14 @@
 //   'apple-iap'  -> reserved for a native StoreKit bridge (e.g. a WKWebView message handler) that a
 //                   wrapped iOS build would provide. Until then it refuses, so nothing is ever granted for free by accident.
 import { PAYMENTS_MODE } from './data.js';
+import { isNative } from './native.js';
 
 export const Payments = {
   mode: PAYMENTS_MODE,
   get isTest() { return this.mode === 'simulated'; },
   async purchase(bundle) {
+    // The iOS app must not grant jewels for a simulated charge. StoreKit wires in later.
+    if (isNative()) return { ok: false, reason: 'Purchases aren’t available in this version yet.' };
     if (this.mode === 'simulated') return { ok: true, simulated: true, jewels: bundle.n, receipt: `sim-${bundle.id}-${Date.now()}` };
     if (this.mode === 'apple-iap') {
       const bridge = window.webkit?.messageHandlers?.iap;
@@ -24,6 +27,7 @@ export const Payments = {
   // A wrapped iOS build: post { productId } to window.webkit.messageHandlers.iap, wait for StoreKit's verified
   // transaction, then resolve { ok: true, receipt } — main.js then calls grantOffer(id, receipt) to hand out the contents.
   async purchaseOffer(offer) {
+    if (isNative()) return { ok: false, productId: offer.productId, reason: 'Purchases aren’t available in this version yet.' };
     if (this.mode === 'apple-iap' && window.webkit?.messageHandlers?.iap) {
       return { ok: false, reason: 'Apple IAP bridge not implemented yet.', productId: offer.productId };
     }
