@@ -9,7 +9,7 @@ import { ROAD, LOTS, SIGNS, LOT_FOR_SALE, LOT_PRICES, SITES, OBSTACLES, SPOTS, P
 import { ICONS, itemIcon, FEATURE_ART, findIcon, decorIcon } from './icons.js';
 import { Payments } from './payments.js';
 import { createAds, gameArt } from './ads.js';
-import { isNative, openExternal } from './native.js';
+import { isNative, openExternal, syncNativeChrome } from './native.js';
 import { considerNativeAds } from './admob.js';
 import { PRIVACY_URL, finishProduct, listenForTransactions, loadStore, purchasesVisible, restoreProducts, storePrice } from './store.js';
 import { initTracker } from './games-tracker.js';
@@ -5706,6 +5706,8 @@ function v8Tick() {
 considerNativeAds(() => guideDone());
 listenForTransactions((tx) => { deliverVerified(tx); });
 loadStore();
+syncNativeChrome();
+requestAnimationFrame(syncNativeChrome);
 window.addEventListener('petalspire-store', () => { try { if (panel === 'jewels' || panel === 'settings') renderPanel(); } catch { /* panel not open */ } });
 Object.defineProperties(window.__ps, Object.getOwnPropertyDescriptors({   // descriptors, so the getters stay live
   v8Tick, statXP, xpNeed, gainXP, get lvl() { return S.lvl; }, get xp() { return S.xp; }, get spins() { return S.spins; }, set spins(v) { S.spins = v; v8Hud(); },

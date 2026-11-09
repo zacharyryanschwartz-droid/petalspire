@@ -15,6 +15,14 @@ export const gameArt = (id) => (id === 'books' ? BOOK_ART : MP_ART);
 
 const ROTATE_MS = 45000;
 
+/** Native AdMob banner sits just above the tab bar, clear of the home indicator. */
+function bannerMargin() {
+  const sab = parseFloat(getComputedStyle(document.body).getPropertyValue('--sab')) || safeBottomPx();
+  const tab = document.getElementById('tabbar');
+  const tabH = tab ? tab.offsetHeight : 64;
+  return Math.round(sab + 8 + tabH + 8);
+}
+
 function marketGame() {
   const id = ADS.houseAds[0];
   return OTHER_GAMES.find((g) => g.id === id) || OTHER_GAMES[0];
@@ -81,7 +89,7 @@ export function createAds({ root, noAds, onHouseAd, onRemoveAds, onEvent = () =>
       if (slot.kind === 'admob') {
         banner.classList.add('admob-slot');
         banner.classList.remove('book-slot');
-        const ok = await nativeAds.showBanner(safeBottomPx() + 6);
+        const ok = await nativeAds.showBanner(bannerMargin());
         if (!ok) { shownKey = ''; slotIdx = (slotIdx + 1) % slots.length; presenting = false; present(true); return; }
       } else {
         await nativeAds.hideBanner();

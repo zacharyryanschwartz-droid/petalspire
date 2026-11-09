@@ -163,5 +163,42 @@ private enum StoreError: Error { case unverified }
 class PetalspireBridgeViewController: CAPBridgeViewController {
     override open func capacitorDidLoad() {
         bridge?.registerPluginInstance(PetalspireStore())
+        webView?.scrollView.contentInsetAdjustmentBehavior = .never
+        webView?.scrollView.contentInset = .zero
+        publishSafeArea()
+    }
+
+    override open func viewDidLayoutSubviews() {
+        super.viewDidLayoutSubviews()
+        webView?.scrollView.contentInsetAdjustmentBehavior = .never
+        webView?.scrollView.contentInset = .zero
+        publishSafeArea()
+    }
+
+    override open func viewSafeAreaInsetsDidChange() {
+        super.viewSafeAreaInsetsDidChange()
+        publishSafeArea()
+    }
+
+    /// Hiding the status bar can make WebKit report a 0 inset while the island still covers the glass.
+    private func publishSafeArea() {
+        guard let webView = webView else { return }
+        var top = view.safeAreaInsets.top
+        var bottom = view.safeAreaInsets.bottom
+        var left = view.safeAreaInsets.left
+        var right = view.safeAreaInsets.right
+        let height = max(view.bounds.height, UIScreen.main.bounds.height)
+        if top < 20 && height >= 800 {
+            top = 59
+            if bottom < 20 { bottom = 34 }
+        }
+        let js = """
+        document.documentElement.style.setProperty('--native-sat','\(top)px');
+        document.documentElement.style.setProperty('--native-sab','\(bottom)px');
+        document.documentElement.style.setProperty('--native-sal','\(left)px');
+        document.documentElement.style.setProperty('--native-sar','\(right)px');
+        document.documentElement.classList.add('native-app');
+        """
+        webView.evaluateJavaScript(js, completionHandler: nil)
     }
 }
