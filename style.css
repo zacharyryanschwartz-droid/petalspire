@@ -1125,6 +1125,13 @@ body.modal-open .tooldock, body.modal-open .jeweldock, body.bar-open .jeweldock,
 .starter-card .sp-val{font:800 11px 'Nunito',system-ui;font-style:normal;color:#3D5A40;background:#B7D4B5;border-radius:999px;padding:3px 8px;white-space:nowrap;display:inline-block;margin-top:4px}
 .starter-card .sp-head small{display:block}
 .starter-modal h3{padding:0 34px}
+.bundle-show{padding:calc(var(--sat) + 10px) 12px calc(var(--sab) + 12px)}
+.bundle-show .cozy-card{max-height:calc(var(--app-h, 100dvh) - var(--sat) - var(--sab) - 28px);overflow:auto;text-align:left}
+.bundle-show h3,.bundle-show .sp-sub{text-align:center}
+.bundle-show .offer-card{margin:0 0 10px;padding:8px 8px 10px;border:1.5px solid #E7D7B4;border-radius:16px;background:#FFFBF3}
+.bundle-show .sp-chips{grid-template-columns:repeat(3,1fr)}
+.bundle-show .sp-later{width:100%;min-height:44px;margin-top:2px}
+html.native-app #mkt-tut.tut-card{top:calc(var(--hud-h, calc(var(--sat) + 60px)) + 12px)}
 .starter-card .sp-items li.wide{grid-column:1/-1}
 .starter-card.is-starter{border-color:#F7C5C5;background:linear-gradient(180deg,#FFEDEB,#FFF9F0)}
 .starter-card .sp-owned{margin:4px 0;text-align:center;font:800 14px 'Nunito',system-ui;color:#3D5A40}

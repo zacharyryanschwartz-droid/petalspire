@@ -1663,7 +1663,8 @@ function startMarket() {
 function finishMarket() {
   if (!S.marketProj) return; S.marketProj = null; S.marketBuilt = true; save();
   W.setMarketState('open'); W.poof(spotV('market', 1.0).setZ(SPOTS.market[1] + 0.9), '#A8744A', 20, 1.6); W.poof(spotV('market', 1.6), '#F5D07A', 24, 2.2); W.poof(spotV('market', 2.2), '#F7C5C5', 14, 1.8);
-  popAt(spotV('market', 2.8), 'Supply Market rebuilt!'); tip('market'); hud(); checkGoals(); if (panel === 'market' || panel === 'build') renderPanel();
+  popAt(spotV('market', 2.8), 'Supply Market rebuilt!'); hud(); checkGoals(); if (panel === 'market' || panel === 'build') renderPanel();
+  beginMarketWelcome(); if (!welcomeBusy()) tip('market');
 }
 function hurryMarket() { if (!S.marketProj || !spendJewels(BUILDS.market.hurryJewels)) return; S.marketProj.start = now() - S.marketProj.ms; finishMarket(); }
 
@@ -2000,6 +2001,7 @@ function openPanel(name, tab) {
   $('#tile-sheet').classList.add('hidden'); if (selected != null || focus) { selected = null; focus = null; W.select(null); }
   document.querySelectorAll('#tabbar button').forEach((b) => b.classList.toggle('on', b.dataset.panel === name || (name === 'ostand' && b.dataset.panel === 'stand')));
   panelAt = performance.now(); $('#panel').classList.remove('hidden'); $('#panel').dataset.name = name; renderPanel(); $('#panel-body').scrollTop = 0;
+  if (name === 'market' && S.marketBuilt) beginMarketWelcome();
 }
 function closePanel() { sprigHide(); panel = null; $('#panel').classList.add('hidden'); document.querySelectorAll('#tabbar button').forEach((b) => b.classList.remove('on')); }
 $('#panel-close').addEventListener('click', closePanel);
@@ -2638,7 +2640,7 @@ function satchelHTML() {
   const ids = ['seed_', 'flower_', 'dried_'].flatMap((p) => Object.keys(SPECIES).map((sp) => p + sp)).filter((id) => ITEMS[id]);   // v0.5: every plant
   const res = (icon, name, n) => `<div class="inv"><i data-icon="${icon}" style="width:38px;height:38px"></i><b>${name}</b><small>×${n}</small></div>`;
   const cells = res('wood', 'Wood', S.wood) + res('scrap', 'Scrap Metal', S.scrap || 0) + (S.inv.sapling ? res('sapling', 'Tree sapling', S.inv.sapling) : '') +
-    byValue(ids.filter((id) => S.inv[id] > 0)).map((id) => `<div class="inv">${itemSvg(id)}<b>${ITEMS[id].name}</b><small>×${S.inv[id]}</small>${locTagCell(id)}</div>`).join('') +
+    byValue(ids.filter((id) => S.inv[id] > 0)).map((id) => `<div class="inv" data-bag-item="${id}">${itemSvg(id)}<b>${ITEMS[id].name}</b><small>×${S.inv[id]}</small>${locTagCell(id)}</div>`).join('') +
     // v0.65: rain barrels are installed fixtures — never in the Bag (tap one in the garden to see its water and upgrade it with coins)
     byValue(['glycerin', 'vinegar'].filter((id) => S.inv[id] > 0 || (S.tinctureBuilt && S.inv === bagOf('home')))).map((id) => `<div class="inv">${itemSvg(id)}<b>${BASES[id].name}</b><small>×${S.inv[id]}</small></div>`).join('') +
     byValue(SELL_ORDER.filter((id) => ['tinc_', 'oil_', 'hydro_', 'tea_', 'press_', 'jar_', 'fruit_', 'bag'].some((p) => id.startsWith(p)) && S.inv[id] > 0)).map((id) => `<div class="inv">${itemSvg(id)}<b>${ITEMS[id].name}</b><small>×${S.inv[id]}</small>${locTagCell(id)}</div>`).join('');
@@ -3030,7 +3032,7 @@ function playRewardAd(r) {
 // Automated test browsers see none of these unless a test opts in (localStorage 'petalspire.monetTest'), so older tests are untouched.
 const monetOn = () => !(navigator.webdriver && !localStorage.getItem('petalspire.monetTest'));
 const M = () => (S.monet ||= { playMs: 0, boostAt: 0, starter: {}, promo: {}, wish: {} });
-const modalOpen = () => !!(adPickEl || dailyEl || starterEl || promoEl || Ads.showing) || ['#reveal', '#confirm', '#map'].some((q) => { const e = $(q); return !!e && !e.classList.contains('hidden'); });
+const modalOpen = () => !!(adPickEl || dailyEl || starterEl || promoEl || showcaseEl || Ads.showing) || ['#reveal', '#confirm', '#map'].some((q) => { const e = $(q); return !!e && !e.classList.contains('hidden'); });
 setInterval(() => { if (S.introDone && !document.hidden) { M().playMs += 5000; } }, 5000);   // play time (saved with the 5 s autosave)
 // ---- boosts ----
 let boostEl = null, boostTimer = 0;
@@ -3041,7 +3043,7 @@ function boostText(kind, d) {
   return `${SPECIES[d.sp].name} ready now`;
 }
 function maybeBoost(kind, d, force = false) {
-  const B = BOOSTS, K = B.kinds[kind]; if (guideOn() || !K || !Ads.rewardOn || (isNative() && !Ads.rewardReady) || !monetOn() || !S.introDone || boostEl || adBlocked() || modalOpen()) return false;
+  const B = BOOSTS, K = B.kinds[kind]; if (guideOn() || welcomeBusy() || !K || !Ads.rewardOn || (isNative() && !Ads.rewardReady) || !monetOn() || !S.introDone || boostEl || adBlocked() || modalOpen()) return false;
   if (!force) {
     if ((S.stats.harvests || 0) < B.minHarvests) return false;
     if (now() - (M().boostAt || 0) < B.cooldownMs) return false;
@@ -3145,7 +3147,7 @@ const starterCardHTML = (compact = false) => offerCardHTML(STARTER_PACK, compact
 // one popup, the moment the beginning goals are done (S.goalsClosed is set when the closing card is dismissed)
 function starterReady() { const st = M().starter; return !st.bought && !st.shows && starterUnlocked(); }
 const titleUp = () => document.body.classList.contains('on-title');   // v0.8.7.6: offers wait until Continue / Begin has been pressed
-function maybeStarter() { if (!purchasesVisible() || titleUp() || guideOn() || !monetOn() || !S.introDone || panel || placing || buildMode || modalOpen() || closingEl || !starterReady()) return; showStarter(true); }
+function maybeStarter() { if (!purchasesVisible() || titleUp() || guideOn() || welcomeBusy() || !monetOn() || !S.introDone || panel || placing || buildMode || modalOpen() || closingEl || !starterReady()) return; showStarter(true); }
 // v0.67 migration: the old $1.99 offer's timed popups don't count — the new Starter Pack gets its one popup after the goals
 // v0.68: Rosehip Oil is Home-press only, Almond Oil/Butter Orchard-press only. A press still working on a recipe that no longer
 // belongs there gives the ingredients back to that place's Bag; finished jars stay ready to collect, so nothing is lost.
@@ -3204,10 +3206,123 @@ function grantOffer(id, receipt) {
     applyPackCard(sp.id); S.bags.home['seed_' + sp.id] = (S.bags.home['seed_' + sp.id] || 0) + (o.seedsPerPlant || 0); plants.push(sp.id);
   }
   m.lastGrant = { id: o.id, plants, tiers: plants.map((p) => SPECIES[p].tier), subs };
-  save(); hud(); syncTools(); starterEl?.remove(); starterEl = null; if (panel) renderPanel();
+  save(); hud(); syncTools(); starterEl?.remove(); starterEl = null;
+  if (showcaseEl) dismissMarketShowcase('bought');
+  if (panel) renderPanel();
   toast(`<i data-icon="gift"></i> ${o.name} added · thank you!`); return true;
 }
 const grantStarter = (receipt) => grantOffer(STARTER_PACK.id, receipt);
+// The Supply Market's first opening: a one-time bundle showcase on iOS, then a short Sprig lesson on buying a seed.
+let showcaseEl = null, mktTutEl = null, mktPulse = null;
+const bundleOwned = (o) => !!(M().owned?.[o.id] || (o.starter && M().starter?.bought) || M().receipts?.[o.id]?.length);
+const welcomeBusy = () => !!(showcaseEl || (S.marketWelcome?.started && !S.marketWelcome?.done));
+function showcaseOffers() { return OFFER_PACKS.filter((o) => !bundleOwned(o)); }
+function showcaseCard(o) {
+  return `<div class="starter-card offer-card compact${o.starter ? ' is-starter' : ''}${o.id === 'collector_bundle' ? ' is-collector' : ''}" data-offer-card="${o.id}">
+    <div class="sp-head"><div><b>${o.name}</b><small>${o.blurb}</small></div></div>
+    <ul class="sp-chips">${offerChips(o).map(([ic, n, l, k]) => `<li data-chip="${k}"><span class="ci">${ic}</span><b>${n}</b><small>${l}</small></li>`).join('')}</ul>
+    <button class="btn btn-gold" data-offer-buy="${o.id}">Buy · ${storePrice(o.productId, o.price)}</button></div>`;
+}
+function showMarketShowcase() {
+  const offers = showcaseOffers();
+  if (!purchasesVisible() || !offers.length) return false;
+  showcaseEl?.remove();
+  const e = showcaseEl = el('div', 'cozy-modal starter-modal bundle-show'); e.id = 'bundle-showcase';
+  e.innerHTML = `<div class="cozy-card"><button class="close-btn" data-bundle-x aria-label="Close">×</button><h3>The Market is open</h3><p class="muted sp-sub">Two bundles, once. Take one, or come back to the Jewel Shop later.</p>${offers.map(showcaseCard).join('')}<button class="btn sp-later" data-bundle-x>Maybe later</button></div>`;
+  $('#ui').appendChild(e); fillIcons(e);
+  e.addEventListener('click', (ev) => {
+    if (ev.target === e || ev.target.closest('[data-bundle-x]')) { dismissMarketShowcase('later'); return; }
+    const b = ev.target.closest('[data-offer-buy]'); if (b) buyOffer(b.dataset.offerBuy, e);
+  });
+  return true;
+}
+function dismissMarketShowcase(why) {
+  const w = S.marketWelcome ||= {};
+  w.showcase = why || 'later';
+  showcaseEl?.remove(); showcaseEl = null; save();
+  if (!w.done) startMktGuide();
+}
+function beginMarketWelcome() {
+  if (!S.marketBuilt) return;
+  const w = S.marketWelcome ||= {};
+  if (w.done || w.started) return;
+  if (titleUp() || !S.introDone) return;
+  if (guideOn()) { afterGuide(() => beginMarketWelcome(), 'mktwelcome'); return; }
+  w.started = true; save();
+  if (!showMarketShowcase()) startMktGuide();
+}
+const MKT_GUIDE = [
+  { id: 'open', title: 'Open the Market', why: 'Seeds and supplies are sold here now.',
+    done: () => panel === 'market' && marketTab !== 'packs',
+    at() { if (panel && panel !== 'market') return { text: 'Close this menu, then tap Market.', el: '#panel-close' }; return { text: 'Tap Market.', el: '#tab-market' }; } },
+  { id: 'pick', title: 'Pick a seed', why: 'Choose one you can grow.',
+    done: () => !!S.marketWelcome?.seed,
+    at() { ensureSeedCoins(); if (panel !== 'market') return { text: 'Tap Market.', el: '#tab-market' };
+      if (marketTab !== 'buy') return { text: 'Tap Supplies.', el: '#panel-body [data-tab="buy"]' };
+      return { text: 'Tap a seed to choose it.', el: '#panel-body [data-seed-pick]' }; } },
+  { id: 'buy', title: 'Buy it', why: 'The coins come from your pocket. The seeds go to your Bag.',
+    done: () => { const w = S.marketWelcome, id = w?.seed; return !!(id && w.had != null && inBag('home', () => S.inv[id] || 0) > w.had); },
+    at() { const id = S.marketWelcome.seed || 'seed_lavender'; ensureSeedCoins(id);
+      if (S.marketWelcome.had == null) { S.marketWelcome.had = inBag('home', () => S.inv[id] || 0); save(); }
+      if (panel !== 'market') return { text: 'Tap Market.', el: '#tab-market' };
+      return { text: 'Tap the price to buy it.', el: `#panel-body [data-buy="${id}"]` }; } },
+  { id: 'bag', title: 'See it in your Bag', why: 'Everything you buy waits in your Bag.',
+    done: () => { const id = S.marketWelcome?.seed; return panel === 'bag' && bagTab === 'satchel' && !!id && !!document.querySelector(`#panel-body [data-bag-item="${id}"]`); },
+    at() { const id = S.marketWelcome?.seed;
+      if (panel !== 'bag') return { text: 'Tap Bag.', el: '#tab-bag' };
+      if (bagTab !== 'satchel') return { text: 'Tap Satchel.', el: '#panel-body [data-bag="satchel"]' };
+      return { text: 'There it is — your new seeds.', el: id ? `#panel-body [data-bag-item="${id}"]` : '#panel-body .inv' }; } },
+];
+function ensureSeedCoins(id = S.marketWelcome?.seed || 'seed_lavender') {
+  const sp = String(id).replace(/^seed_/, '');
+  if (SPECIES[sp] && !S.unlocked[sp]) { S.unlocked[sp] = S.discovered[sp] = true; }
+  const price = SPECIES[sp]?.seedPrice || 18; if (S.coins >= price) return;
+  const add = price - S.coins; S.coins = price; const w = S.marketWelcome ||= {}; w.topped = (w.topped || 0) + add;
+  save(); hud(); if (panel === 'market') renderPanel();
+  toast(`<i data-icon="coin"></i> Sprig tucked ${add} coins in your pocket so you can buy a seed`);
+}
+function noteMktSeed(id) {
+  const w = S.marketWelcome; if (!w || w.done || !String(id).startsWith('seed_')) return;
+  if (!w.seed) w.seed = id;
+  if (w.had == null) w.had = inBag('home', () => (S.inv[id] || 0));
+}
+function startMktGuide() {
+  const w = S.marketWelcome ||= {}; if (w.done) return;
+  if (curLoc() !== 'home') { try { setLoc('home'); } catch (_) {} }
+  w.step = 0; w.guide = true; save(); mktGuideFrame();
+}
+function finishMktGuide() {
+  const w = S.marketWelcome ||= {}; w.done = true; w.step = MKT_GUIDE.length; save();
+  mktPulse?.classList.remove('tut-pulse'); mktPulse = null; mktTutEl?.remove(); mktTutEl = null;
+  if (!guideOn() && lvlPend) { const p = lvlPend; lvlPend = null; levelToast(p.L, p.c, p.extra); }
+}
+function mktGuideFrame() {
+  const w = S.marketWelcome;
+  if (!w?.guide || w.done || showcaseEl || titleUp() || guideOn() || !S.introDone) {
+    if (!w?.guide || w.done || showcaseEl) { mktPulse?.classList.remove('tut-pulse'); mktPulse = null; mktTutEl?.classList.add('hidden'); }
+    return;
+  }
+  while (w.step < MKT_GUIDE.length && MKT_GUIDE[w.step].done()) { w.step++; save(); }
+  if (w.step >= MKT_GUIDE.length) { finishMktGuide(); return; }
+  const st = MKT_GUIDE[w.step], a = st.at() || {};
+  if (!mktTutEl) { mktTutEl = el('div', 'tut-card', `${SPRIG_SVG}<p></p>`); mktTutEl.id = 'mkt-tut'; $('#ui').appendChild(mktTutEl); }
+  const key = st.id + '|' + (a.text || '');
+  if (mktTutEl.dataset.key !== key) { mktTutEl.dataset.key = key; mktTutEl.dataset.step = st.id;
+    mktTutEl.querySelector('p').innerHTML = `<b class="tut-goal">Step ${w.step + 1} of ${MKT_GUIDE.length}: ${st.title}</b><span class="tut-why">${st.why}</span><span class="tut-do">👉 ${a.text || ''}</span>`; }
+  mktTutEl.classList.toggle('over-panel', !!panel); mktTutEl.classList.remove('hidden');
+  const target = typeof a.el === 'string' ? $(a.el) : a.el || null;
+  if (target !== mktPulse) { mktPulse?.classList.remove('tut-pulse'); mktPulse = target; if (target) { target.classList.add('tut-pulse'); target.scrollIntoView?.({ block: 'nearest' }); } }
+}
+const mktGuideOn = () => !!(S.marketWelcome?.guide && !S.marketWelcome?.done && !showcaseEl);
+const mktGuard = (e) => {
+  if (!mktGuideOn() || guideOn()) return; const t = e.target; if (!(t instanceof Element)) return;
+  if (t.tagName === 'CANVAS' || t.closest('#mkt-tut')) return;
+  if (mktPulse && (mktPulse === t || mktPulse.contains(t))) return;
+  if (t.closest('#panel-close')) return;
+  if (t.closest('.panel-body') && e.type !== 'click') return;
+  e.preventDefault(); e.stopPropagation(); e.stopImmediatePropagation?.();
+};
+for (const ev of ['pointerdown', 'pointerup', 'click']) document.addEventListener(ev, mktGuard, { capture: true, passive: false });
 // ---- More from Schwarze Spiele ----
 let promoEl = null;
 const promoGame = () => OTHER_GAMES.find((g) => g.id === CROSS_PROMO.gameId) || OTHER_GAMES[0];
@@ -3231,6 +3346,7 @@ function promoMilestone(tag, force = false) {
   setTimeout(go, force ? 0 : 3500); return true;
 }
 function showPromo(tag = '') {
+  if (welcomeBusy()) return;
   if (afterGuide(() => showPromo(tag))) return;
   const pr = M().promo; pr.shows = (pr.shows || 0) + 1; pr.last = now(); pr.tag = tag; save();
   promoEl?.remove(); const e = promoEl = el('div', 'cozy-modal promo-modal'); e.id = 'promo';
@@ -3304,7 +3420,7 @@ function showDaily(auto = false) {
 }
 // first open each day: show the popup once the intro is done and nothing else is on screen (not in automated tests unless asked)
 function maybeDaily() {
-  if (titleUp() || guideOn() || !S.introDone || dailyEl || adPickEl || Ads.showing || panel || !$('#reveal').classList.contains('hidden')) return;
+  if (titleUp() || guideOn() || welcomeBusy() || !S.introDone || dailyEl || adPickEl || Ads.showing || panel || !$('#reveal').classList.contains('hidden')) return;
   if (navigator.webdriver && !localStorage.getItem('petalspire.dailyTest')) return;
   const st = dailyStatus(); if (st.can && S.daily.seen !== st.today) showDaily(true);
 }
@@ -3598,7 +3714,7 @@ function marketHTML() {
   if (more) rows.push(`<p class="muted empty-hint" data-empty-hint>Open Card Packs to discover more.</p>`);
   return h + `<button class="jewel-strip" data-act="open-jewels"><i data-icon="jewel"></i><span><b>${S.jewels} Jewels</b><small>Jewel Shop</small></span><em>Shop</em></button><div class="list">${sortRows(rows).join('')}</div>${workersSection(curLoc())}`;   // v0.8.1: hiring lives in the Market (Supplies tab), not the Build menu
 }
-const buyRow = (id, icon, name, sub, price) => `<div class="row"><div class="ico">${icon}</div><div class="meta"><b>${name}</b><small>${sub}</small></div><div class="acts"><button class="btn btn-primary sm" data-buy="${id}" data-price="${price}" ${S.coins < price ? 'disabled' : ''}>${coin(price)}</button></div></div>`;
+const buyRow = (id, icon, name, sub, price) => `<div class="row"${String(id).startsWith('seed_') ? ` data-seed-pick="${id}"` : ''}><div class="ico">${icon}</div><div class="meta"><b>${name}</b><small>${sub}</small></div><div class="acts"><button class="btn btn-primary sm" data-buy="${id}" data-price="${price}" ${S.coins < price ? 'disabled' : ''}>${coin(price)}</button></div></div>`;
 const mktTag = (id) => (STAND_IDS.has(id) ? `<em class="loc-tag sm" data-mkt-loc="${id}">${whereTag(id)}</em>` : '');
 const placeRow = (id, sub) => { const c = buyCost(id); return `<div class="row place-buy${!STAND_IDS.has(id) || standOkAt(id, curLoc()) ? '' : ' dim'}"><div class="ico">${FEATURE_ART[id]}</div><div class="meta"><b>${FEATURES[id].name}</b><small>${sub}</small>${mktTag(id)}</div><div class="acts"><button class="btn btn-primary sm buy-place" data-buy="${id}" data-price="${c.coins}" ${canPay(c) ? '' : 'disabled'}>${[coin(c.coins), c.wood && woodTag(c.wood), c.scrap && scrapTag(c.scrap)].filter(Boolean).join('')}</button></div></div>`; };
 const lockedRow = (icon, name) => !SHOW_LOCKED ? '' : `<div class="row locked"><div class="ico">${icon}</div><div class="meta"><b>${name}</b><small>Discover it in a Card Pack to unlock</small></div><i data-icon="lock" style="width:22px;height:22px"></i></div>`;
@@ -3714,6 +3830,7 @@ function deliverOverdue() {
 function buy(id, price) {
   if (PLACE_BUY[id]) return startBuy(id);   // v0.52: one step — place it, pay on confirm
   if (S.coins < price || !S.marketBuilt) return;
+  noteMktSeed(id);
   if (id === 'scrap5' && !scrapUsable()) return;   // v0.7.2.2: no Scrap from the Market before a Windmill here
   { const b = BASES[id] ? id : BASES[id.slice(0, -1)] ? id.slice(0, -1) : null; if (b && !baseOpen(b)) { toast(baseNeeds(b).join(' · ')); return; } }   // v0.52
   if (TRAF[id] && (S.owned[id] || S[TRAF[id].key])) return;   // v0.7.2.2: a Parking Lot / Billboard is bought once per location
@@ -4495,6 +4612,8 @@ function askBuyJewels(id) {
 }
 
 $('#panel-body').addEventListener('click', (e) => {
+  const seedRow = e.target.closest('[data-seed-pick]');
+  if (seedRow && !e.target.closest('[data-buy]') && mktGuideOn() && MKT_GUIDE[S.marketWelcome?.step]?.id === 'pick') { noteMktSeed(seedRow.dataset.seedPick); mktGuideFrame(); return; }
   const fl = e.target.closest('[data-follow]'); if (fl) { claimFollow(fl.dataset.follow); return; }   // the link itself opens the page in a new tab
   const b = e.target.closest('button, .coll .card'); if (!b) return;
   if (b.dataset.tab) { marketTab = b.dataset.tab; renderPanel(); return; }
@@ -5468,7 +5587,7 @@ const revealEl = $('#reveal');
 function tick() {
   requestAnimationFrame(tick);
   const t = performance.now();
-  try { tutFrame(); plantTagFrame(); } catch (e) { console.error(e); }
+  try { tutFrame(); mktGuideFrame(); plantTagFrame(); } catch (e) { console.error(e); }
   W.setPaused(revealEl && !revealEl.classList.contains('hidden') && revealEl.dataset.stage !== 'none');   // v0.63: no 3D redraws under the pack reveal
   if (t - lastTick > 250) { syncBedTargets();
     roadScrapTick(Math.min(1, (t - lastTick) / 1000));
@@ -5531,7 +5650,7 @@ window.__ps = {
   setClock: (t) => { clockAt = t; },
   BUILD, adMult, adPicks, standHTML, itemVal, byValue, sortRows, rewardHTML, get fromBuild() { return fromBuild; }, get bags() { return S.bags; }, get migBags() { return migBags; }, inBag, bagOf, sendGoods, tileLoc, standLoc, splitOrchardGoods, buildHTML, marketHTML, satchelHTML, billboardHTML, bbStatusText, bbReadyIn, BILLBOARD, CHARMS, CHARM_IDS, charmV, charmLv, charmText, craftK, shiftH, standPrice, ostandPrice, custGap, harvestCore, setCharmRoll(v) { charmRoll = v; }, freeGFSpot, bulkSell, bulkAll, bulkPrice, bulkItems, bulkHTML, rollWants, STAND_BUY, BULK, GF_IDS, gfOn, gfPlaced, placeGF, storeGF, onMapOnly, charmAt, oGap, TRUCK, orderDelivery, deliverTrip, syncDeliv, inTransit, vanOn, VAN_LOT, rowOfTree, exitPlace, startMove, commitMove, canDemolish, doDemolish, askDemolish, moveSpotOk, buyCopy, mktDest, MKT_ONE_TIME, MKT_STACK, MKT_CONSUMABLE, MKT_REPEAT, tabPanel, get deliv() { return S.deliv; }, get vanOut() { return vanOut.size; }, migGF065, get mig065() { return mig065; }, regenNow: () => regenS(), SWAP_TIERS, swapPool, get bagTab() { return bagTab; }, setBagTab(t) { bagTab = t; }, shelfMig063, rollIds, rollPackLoot, catTierOdds, drawPlant, drawOther, isPlantCard, PACK_LOOT, OWNED_K, setForcedLoot(L) { forcedLoot = L; }, consLeft, finishCons, hurryCons, startCons, plantTile: plant, syncTile, bloomTargets, instantBloom, askBloom, customerRush, askRush, rushLeft, rushReady, syncJewelDock, get rush() { return S.rush; }, get nextCustAt() { return nextCust; }, get nextOCustAt() { return nextOCust; }, swapCard, swapIn, swapPool, swapTierOdds, SWAP, setSwapForced(id) { swapForced = id; }, get revealCards() { return revealCards; }, upgLeft, finishUpg, hurryUpg, deselect, get upg() { return S.upg; }, toolLeft, get cons() { return S.cons; }, dailyStatus, claimDaily, showDaily, maybeDaily, dayKey, watchAd, playRewardAd, DAILY, upgradeBuilding, get standLv() { return S.standLv; }, cardFix063, normalizeCards,
   TIPS, JEWEL_DROP, obsState, PACKS,
-  hud, guideOn: () => guideOn(), tutFinish: (k) => tutFinish(k), afterGuideN: () => afterGuideQ.length, handleTap: (x, y, l) => handleTap(x, y, l), dailyGift: (n) => dailyGift(n), syncBarrels, lotRoofs, standsLine, buildBarrelAt: (lot, x, z) => buildBarrel(lot, x, z), openMap, closeMap, mapLocked, syncMapBtn, maybeBoost, showBoost, applyBoost, hideBoost, showStarter, grantStarter, buyStarter, starterLive, grantOffer, buyOffer, offerValue, offersSorted, maybeStarter, starterReady, maybeStarter, promoMilestone, showPromo, wish, settingsHTML, jewelsHTML, unlockMapIfReady, travel, buyOrchard, claimFollow, SOCIALS, setLoc, loc: () => curLoc(), orchardLocked, mapPlaces: () => MAP_PLACES.map((p) => ({ id: p.id, name: p.name, soon: !!p.soon, state: placeState(p) })), ORCHARD_PRICE, casterIds: () => casters().map((c) => c.id + (c.h != null ? ":box" : ":tree")), checkGoals, regenBarrels, feedLot, reachLots,  get barrelReachTargets() { return W.bedTargets.children.map((g) => ({ b: g.userData.b, ok: g.userData.ok })); }, barrelRoof, lotRoofs, barrelStands, barrelPerTick, get gutterLots() { return [...W.gutters.keys()]; }, gutterPipes(lot) { return W.gutters.get(lot)?.userData.pipes || 0; },
+  hud, guideOn: () => guideOn(), tutFinish: (k) => tutFinish(k), afterGuideN: () => afterGuideQ.length, handleTap: (x, y, l) => handleTap(x, y, l), dailyGift: (n) => dailyGift(n), syncBarrels, lotRoofs, standsLine, buildBarrelAt: (lot, x, z) => buildBarrel(lot, x, z), openMap, closeMap, mapLocked, syncMapBtn, maybeBoost, showBoost, applyBoost, hideBoost, showStarter, grantStarter, buyStarter, starterLive, grantOffer, buyOffer, beginMarketWelcome, offerValue, offersSorted, maybeStarter, starterReady, maybeStarter, promoMilestone, showPromo, wish, settingsHTML, jewelsHTML, unlockMapIfReady, travel, buyOrchard, claimFollow, SOCIALS, setLoc, loc: () => curLoc(), orchardLocked, mapPlaces: () => MAP_PLACES.map((p) => ({ id: p.id, name: p.name, soon: !!p.soon, state: placeState(p) })), ORCHARD_PRICE, casterIds: () => casters().map((c) => c.id + (c.h != null ? ":box" : ":tree")), checkGoals, regenBarrels, feedLot, reachLots,  get barrelReachTargets() { return W.bedTargets.children.map((g) => ({ b: g.userData.b, ok: g.userData.ok })); }, barrelRoof, lotRoofs, barrelStands, barrelPerTick, get gutterLots() { return [...W.gutters.keys()]; }, gutterPipes(lot) { return W.gutters.get(lot)?.userData.pipes || 0; },
   get tincGrandfathered() { return tincGrandfathered; }, tincProblem, tincSpots, buildTincture, placeTincture, buildStill, placeStill, distill, collectOil, STILL, TEA, teaInfo, teaId, teaSps, registerTea, buildTea, placeTea, brewTea, collectTea, teaAdd, teaRemove, get teaPick() { return [...teaPick]; }, set teaPick(v) { teaPick = [...v]; }, teaHTML, syncTea, DRY_TIER_S,
   CRAFT, PRESS, FRUITSTAND, TREES, TREE_IDS, SEED_BAGS, bagId, bagSeeds, buildCraft, placeCraft, craftMake, craftCollect, craftHTML, syncCraft, orchardSpots, orchardProblem, plantOrchard, pickTree, syncOrchard, orchStage, orchRipe, waterTree, autoWaterTrees, buyTreeRow, ORCH_ROWS, rowsOwned, rowIrrigated, nextIrrigRow, syncTreeRows, TREE_IRRIG, orchardTreeHTML, startTreePlace, orchardLocked, packW, cardOdds, tierOdds, featureOdds, drawNonBasic, collIds, get sunflowerRefund() { return sunflowerRefund; }, LOTS, ORCHARD_TREE_SPOTS,
   RESALE, sellPlaced, stockAntique, sellRestored, installShelf, uninstallShelf, shelfOn, syncShelf, SHELF_BONUS, STAND_CAP, focusThing, get atmosphere() { return atmosphere(); }, get standCap() { return standCap(); },
@@ -5656,7 +5775,7 @@ function levelUp() {
 function gainXP(n) { if (!(n > 0)) return; S.xp += n; if (navigator.webdriver && window.__v8NoLevel) return;   // older automated tests: XP adds up, but no level-up coins land mid-measurement
   let k = 0; while (S.xp >= xpNeed(S.lvl) && k++ < 200) { S.xp -= xpNeed(S.lvl); levelUp(); } }
 function levelToast(L, c, extra) {
-  if (guideOn()) { lvlPend = { L, c: (lvlPend?.c || 0) + c, extra: (lvlPend?.extra || []).concat(extra) }; afterGuide(() => { const p = lvlPend; lvlPend = null; if (p) levelToast(p.L, p.c, p.extra); }, 'lvl'); return; }
+  if (guideOn() || welcomeBusy()) { lvlPend = { L, c: (lvlPend?.c || 0) + c, extra: (lvlPend?.extra || []).concat(extra) }; if (guideOn()) afterGuide(() => { const p = lvlPend; lvlPend = null; if (p) levelToast(p.L, p.c, p.extra); }, 'lvl'); return; }
   sfx('levelup'); if (quiet) return;
   const t = el('div', 'lvl-toast', `<div class="lvl-leaf">${L}</div><div><b>Garden Level ${L}!</b><small>+${fmtC(c)} <i data-icon="coin"></i> · +1 bonus spin${extra.length ? ' · ' + extra.join(' · ') : ''}</small></div>`);
   $('#ui').appendChild(t); fillIcons(t); try { petals(t, 14); } catch (_) {} setTimeout(() => t.remove(), 3600);
