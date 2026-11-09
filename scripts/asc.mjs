@@ -147,7 +147,9 @@ async function cmdMaterialize() {
   catch { openssl(['x509', '-inform', 'PEM', '-in', cerPath, '-out', pemPath]); }
   const pass = randomBytes(24).toString('hex');
   const p12 = join(dir, 'dist.p12');
-  openssl(['pkcs12', '-export', '-inkey', keyPath, '-in', pemPath, '-out', p12, '-passout', `pass:${pass}`]);
+  const p12Args = ['pkcs12', '-export', '-inkey', keyPath, '-in', pemPath, '-out', p12, '-passout', `pass:${pass}`, '-keypbe', 'PBE-SHA1-3DES', '-certpbe', 'PBE-SHA1-3DES', '-macalg', 'sha1'];
+  try { openssl(p12Args); }
+  catch { openssl(['pkcs12', '-export', '-legacy', '-inkey', keyPath, '-in', pemPath, '-out', p12, '-passout', `pass:${pass}`]); }
   writeFileSync(join(dir, 'p12.pass'), pass, { mode: 0o600 });
   const bundleId = await bundleResourceId();
   const profileName = `Petalspire App Store ${Date.now()}`;
