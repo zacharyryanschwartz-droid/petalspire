@@ -1,9 +1,10 @@
 name: iOS TestFlight
 
 on:
+  workflow_dispatch:
   push:
-    branches:
-      - cursor/bouquet-hero-da06
+    tags:
+      - "v*"
 
 permissions:
   contents: read
