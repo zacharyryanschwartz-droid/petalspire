@@ -1,0 +1,66 @@
+name: Save distribution cert once
+
+on:
+  push:
+    branches:
+      - cursor/dist-cert-once-da06
+
+permissions:
+  contents: read
+
+jobs:
+  once:
+    name: Revoke the older cert and save the new one
+    runs-on: macos-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Confirm this token can store Actions secrets
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: printf 'ok' | gh secret set DIST_SIGNING_PROBE
+
+      - name: Skip when the saved certificate is already stored
+        id: have
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if gh secret list | awk '{print $1}' | grep -qx DIST_CERT_P12; then
+            echo "already=true" >> "$GITHUB_OUTPUT"
+            echo "DIST_CERT_P12 is already stored. Nothing will be revoked."
+          else
+            echo "already=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Mint one distribution certificate
+        if: steps.have.outputs.already != 'true'
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          ASC_KEY_P8: ${{ secrets.ASC_KEY_P8 }}
+          ASC_SIGN_DIR: ${{ runner.temp }}/petalspire-mint
+        run: node scripts/mint-dist-once.mjs
+
+      - name: Store the certificate, password, and profile
+        if: steps.have.outputs.already != 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ASC_SIGN_DIR: ${{ runner.temp }}/petalspire-mint
+        run: |
+          set -euo pipefail
+          gh secret set DIST_CERT_P12 < "$ASC_SIGN_DIR/p12.b64"
+          gh secret set DIST_CERT_PASSWORD < "$ASC_SIGN_DIR/p12.pass"
+          gh secret set DIST_PROFILE < "$ASC_SIGN_DIR/profile.b64"
+          echo "stored DIST_CERT_P12, DIST_CERT_PASSWORD, and DIST_PROFILE"
+          if [ -f "$ASC_SIGN_DIR/revoked.txt" ]; then
+            echo "revoked record: $(cat "$ASC_SIGN_DIR/revoked.txt")"
+          fi
+          rm -rf "$ASC_SIGN_DIR"
+          gh secret delete DIST_SIGNING_PROBE || true
