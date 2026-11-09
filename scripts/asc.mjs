@@ -154,10 +154,14 @@ async function cmdAssign() {
   const rows = await allBuilds();
   const row = rows.find((r) => String(r.attributes?.version) === build);
   if (!row?.id) throw new Error(`Build ${build} was not found, so it could not be added to the Internal group`);
-  const groups = await api(`/v1/betaGroups?filter[app]=${APP_ID}&limit=50&fields[betaGroups]=name,isInternalGroup`);
+  const groups = await api(`/v1/betaGroups?filter[app]=${APP_ID}&limit=50&fields[betaGroups]=name,isInternalGroup,hasAccessToAllBuilds`);
   const internal = (groups.data || []).filter((g) => g.attributes?.isInternalGroup);
   const group = internal.find((g) => /internal/i.test(g.attributes?.name || '')) || internal[0];
   if (!group) throw new Error('No Internal TestFlight group was found');
+  if (group.attributes?.hasAccessToAllBuilds) {
+    console.log(`Internal group ${group.attributes?.name || 'Internal'} gets every build automatically, including ${build}`);
+    return;
+  }
   try {
     await api(`/v1/betaGroups/${group.id}/relationships/builds`, {
       method: 'POST',
