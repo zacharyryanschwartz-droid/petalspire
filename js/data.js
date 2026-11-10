@@ -945,14 +945,24 @@ export const DECO8 = {
   d8_glasshouse:  { name: 'Aurora Glasshouse',             tier: 'otherworld', price: 0,    atm: 8 },
   d8_arbor:       { name: 'Friendship Arbor',              tier: 'legendary',  price: 0,    atm: 3, special: true },   // referral reward (5 friends)
   d8_lovebug:     { name: 'Love Bug',                      tier: 'epic',       price: 0,    atm: 0, special: true, cosmetic: true },   // v0.8.5: redeem code LOVEBUG · pure cosmetic
+  // Book codes. Keepsakes only: atmosphere stays 0, they never enter the Market or card packs.
+  d8_snowfinch:   { name: 'Snowfinch Pair',                 tier: 'epic',       price: 0,    atm: 0, special: true, cosmetic: true },
+  d8_holly:       { name: 'Holly Cluster',                  tier: 'epic',       price: 0,    atm: 0, special: true, cosmetic: true },
+  d8_ornament:    { name: 'Winter Ornament',                tier: 'epic',       price: 0,    atm: 0, special: true, cosmetic: true },
+  d8_quiltstar:   { name: 'Star Quilt',                     tier: 'epic',       price: 0,    atm: 0, special: true, cosmetic: true },
+  d8_logcabin:    { name: 'Log Cabin Quilt',                tier: 'epic',       price: 0,    atm: 0, special: true, cosmetic: true },
+  d8_compass:     { name: 'Quilt Compass',                  tier: 'epic',       price: 0,    atm: 0, special: true, cosmetic: true },
 };
 export const DECO8_IDS = Object.keys(DECO8);
 export const DECO8_SHOP = DECO8_IDS.filter((k) => !DECO8[k].special);   // the 14 (the Friendship Arbor only comes from referrals)
 export const DECO8_LOCS = ['home', 'orchard'];
 // v0.8.5 redeem codes (Settings › Help › Redeem code). Typed case-insensitively; each one can be claimed once per save
-// (S.codes). Add more rows here: { deco: id } gives that decoration (one for Home + one for the Orchard).
+// (S.codes). { deco: id } or { decos: [ids] } gives those decorations (one for Home + one for the Orchard).
 export const REDEEM_CODES = {
   LOVEBUG: { deco: 'd8_lovebug', toast: '🐞 A Love Bug crawled into your Bag! Place it at Home and at the Orchard.' },
+  // KDP book bonuses, about a dollar of keepsakes. One claim per save. No coins, growth, or atmosphere.
+  SNOWFINCH: { book: 'Holly & Wing', decos: ['d8_snowfinch', 'd8_holly', 'd8_ornament'], toast: 'Snowfinch set from <b>Holly &amp; Wing</b> is in your Bag: Snowfinch Pair, Holly Cluster, and Winter Ornament. Place them at Home and the Orchard — just for looks.' },
+  QUILTBEE: { book: 'Pieced & Puzzled', decos: ['d8_quiltstar', 'd8_logcabin', 'd8_compass'], toast: 'Quilt Bee set from <b>Pieced &amp; Puzzled</b> is in your Bag: Star Quilt, Log Cabin Quilt, and Quilt Compass. Place them at Home and the Orchard — just for looks.' },
 };
 // chance that a Card Pack ALSO holds a decoration card (a bonus 4th card — the 3 normal cards and their odds are unchanged)
 export const DECO8_PACK = { chance: 0.06, w: { legendary: 50, rare: 30, superrare: 13, ultra: 5, otherworld: 2 } };
