@@ -5365,7 +5365,8 @@ function redeemCode(raw) {
   S.codes[code] = now();
   const decos = R.decos || (R.deco ? [R.deco] : []);
   for (const id of decos) if (DECO8[id]) S.decorInv[id] = (S.decorInv[id] || 0) + DECO8_LOCS.length;   // one for Home, one for the Orchard
-  save(); hud(); const inp = $('#redeem-in'); if (inp) inp.value = ''; toast(R.toast || 'Code redeemed!'); if (panel === 'bag') renderPanel(); return true;
+  if (R.jewels) S.jewels += R.jewels;
+  save(); hud(); const inp = $('#redeem-in'); if (inp) inp.value = ''; toast(R.toast || 'Code redeemed!'); if (panel === 'bag' || panel === 'settings' || panel === 'jewels') renderPanel(); return true;
 }
 document.addEventListener('keydown', (e) => { if (e.key === 'Enter' && e.target?.id === 'redeem-in') { e.preventDefault(); redeemCode(e.target.value); } });
 

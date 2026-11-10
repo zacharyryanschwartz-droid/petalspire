@@ -57,7 +57,10 @@ await page.evaluate(() => {
 });
 
 async function redeem(typed) {
-  if (!(await page.locator('#redeem-in').isVisible())) await page.click('#btn-settings');
+  if (!(await page.locator('#redeem-in').isVisible())) {
+    if (await page.locator('#panel:not(.hidden)').count()) await page.click('#panel-close');
+    await page.click('#btn-settings');
+  }
   await page.fill('#redeem-in', typed);
   await page.click('[data-act="redeem"]');
   const text = (await page.locator('.toast').last().innerText()).replace(/\s+/g, ' ');
@@ -147,6 +150,20 @@ await page.screenshot({ path: '/opt/cursor/artifacts/book-codes-quilt.png' });
 const love = await page.evaluate(() => ({ ok: window.__ps.redeemCode('LOVEBUG'), n: window.__ps.state.decorInv.d8_lovebug || 0 }));
 ok('LOVEBUG still grants its own keepsake', love.ok === true && love.n === 2, love);
 
+const jewelsBefore = await page.evaluate(() => window.__ps.state.jewels);
+const bloom = await redeem('early bloom');
+ok('EARLYBLOOM thanks the tester for 25 jewels', /Thanks for testing Petalspire!/.test(bloom) && /\+25 jewels/.test(bloom), bloom);
+await page.screenshot({ path: '/opt/cursor/artifacts/earlybloom-thanks.png' });
+const bloomed = await page.evaluate(() => {
+  const raw = JSON.parse(localStorage.getItem('petalspire.v03'));
+  return { jewels: window.__ps.state.jewels, hud: document.getElementById('jewel-count')?.textContent, saved: raw.jewels, strip: document.querySelector('#panel .jewel-strip b')?.textContent || '' };
+});
+ok('EARLYBLOOM adds 25 jewels on the HUD and in the save', bloomed.jewels === jewelsBefore + 25 && bloomed.saved === bloomed.jewels && bloomed.hud === String(bloomed.jewels), bloomed);
+const bloomAgain = await redeem('EARLYBLOOM');
+ok('a second EARLYBLOOM says already claimed', /already claimed/i.test(bloomAgain), bloomAgain);
+const bloomStill = await page.evaluate(() => window.__ps.state.jewels);
+ok('a second EARLYBLOOM adds nothing', bloomStill === jewelsBefore + 25, bloomStill);
+
 await page.reload({ waitUntil: 'domcontentloaded' });
 await page.waitForFunction(() => window.__ps && window.__ps.state?.codes?.SNOWFINCH, { timeout: 20000 });
 const kept = await page.evaluate((ids) => {
@@ -160,13 +177,16 @@ const kept = await page.evaluate((ids) => {
     codes: raw.codes,
     coins: s.coins,
     wood: s.wood,
+    jewels: s.jewels,
+    jewelsSaved: raw.jewels,
     atm: window.__ps.atmosphereAt('home'),
   };
 }, [...SNOW, ...QUILT, 'd8_lovebug']);
 ok('keepsakes persist in the save after reload', SNOW.concat(QUILT).every((id) => kept.inv[id] === (id === 'd8_snowfinch' ? 1 : 2) && kept.saved[id] === kept.inv[id]) && kept.inv.d8_lovebug === 2, kept.inv);
 ok('a placed Snowfinch Pair is still in the garden', kept.placed === 1 && kept.placedSaved === 1);
 ok('redeeming changes neither coins nor wood nor atmosphere', kept.coins === before.coins && kept.wood === before.wood && kept.atm === before.atm, kept);
-ok('both codes stay claimed', !!(kept.codes?.SNOWFINCH && kept.codes?.QUILTBEE && kept.codes?.LOVEBUG));
+ok('both codes stay claimed', !!(kept.codes?.SNOWFINCH && kept.codes?.QUILTBEE && kept.codes?.LOVEBUG && kept.codes?.EARLYBLOOM));
+ok('the 25 tester jewels persist after reload', kept.jewels === jewelsBefore + 25 && kept.jewelsSaved === jewelsBefore + 25, { jewels: kept.jewels, saved: kept.jewelsSaved, before: jewelsBefore });
 ok('the page stays free of script errors', errors.length === 0, errors);
 
 await browser.close();
