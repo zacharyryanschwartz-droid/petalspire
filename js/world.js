@@ -1446,6 +1446,24 @@ export function createWorld(canvas) {
         const pl = M(canopyGeo, mat('#9DC48F'), 0, 0.35); pl.scale.set(0.35, 0.25, 0.3); g.add(pl);
         const gl = glowSprite('#B7F0D0', 1.6, 0.4); gl.position.set(0, 0.7, 0); g.add(gl); glows.push(gl);
         const gl2 = glowSprite('#F7C5E8', 1.2, 0.3); gl2.position.set(0.3, 1.1, 0); g.add(gl2); glows.push(gl2); hitH = 1.4; break; }
+      // Book keepsakes. Soft botanical colors only; nothing here changes growth or sales.
+      case 'd8_snowfinch': { const br = mat('#8E6040'); g.add(M(new THREE.CylinderGeometry(0.03, 0.045, 0.9, 6), br, 0, 0.42, 0, 0, 0, 0.5));
+        const bird = (x, y, z, body, belly) => { const b = M(new THREE.SphereGeometry(0.09, 10, 8), mat(body), x, y, z); b.scale.set(1.25, 0.9, 0.85); g.add(b, M(new THREE.SphereGeometry(0.045, 8, 6), mat(belly), x + 0.06, y + 0.02, z + 0.04), M(new THREE.ConeGeometry(0.025, 0.06, 5), mat('#F5D07A'), x + 0.14, y, z + 0.02, 0, 0, -Math.PI / 2)); };
+        bird(-0.12, 0.62, 0.02, '#E07A7A', '#FFF9F0'); bird(0.16, 0.5, -0.02, '#C9C3B4', '#FFF9F0');
+        for (const [x, z] of [[-0.22, 0.08], [0.28, 0.06], [0.05, -0.08]]) g.add(M(new THREE.SphereGeometry(0.035, 7, 5), mat('#E07A7A'), x, 0.34, z));
+        g.add(M(leafGeo, mat('#3D5A40'), -0.18, 0.38, 0.06, 0.4, 0.2, 0.6)); hitH = 0.8; break; }
+      case 'd8_holly': { const leaf = mat('#3D5A40'); for (let k = 0; k < 5; k++) { const a = k * 1.25; const l = M(leafGeo, leaf, Math.cos(a) * 0.16, 0.12, Math.sin(a) * 0.12, 0.3, a, 0.8); l.scale.set(1.3, 1, 1.6); g.add(l); }
+        for (let k = 0; k < 6; k++) g.add(M(new THREE.SphereGeometry(0.045, 8, 6), mat('#E07A7A'), Math.cos(k) * 0.08, 0.16 + (k % 2) * 0.04, Math.sin(k) * 0.08)); hitH = 0.45; break; }
+      case 'd8_ornament': { const gold = mat('#F5D07A', { metalness: 0.35, roughness: 0.35 }); g.add(M(new THREE.CylinderGeometry(0.08, 0.1, 0.06, 10), mat('#FFF9F0'), 0, 0.03), M(new THREE.SphereGeometry(0.16, 16, 12), gold, 0, 0.28), M(new THREE.TorusGeometry(0.07, 0.018, 6, 12), mat('#C8E0E8'), 0, 0.28, 0, Math.PI / 2), M(new THREE.CylinderGeometry(0.03, 0.03, 0.06, 8), mat('#FFF9F0'), 0, 0.46), M(new THREE.TorusGeometry(0.045, 0.012, 6, 10), mat('#F7C5C5'), 0, 0.52, 0, Math.PI / 2)); hitH = 0.7; break; }
+      case 'd8_quiltstar': { const cream = mat('#FFF9F0'), blush = mat('#F7C5C5'), honey = mat('#F5D07A'), sage = mat('#B7D4B5');
+        g.add(M(new THREE.BoxGeometry(0.9, 0.04, 0.9), cream, 0, 0.08));
+        for (let k = 0; k < 4; k++) g.add(M(new THREE.BoxGeometry(0.22, 0.05, 0.22), k % 2 ? blush : sage, Math.cos(k * Math.PI / 2) * 0.22, 0.11, Math.sin(k * Math.PI / 2) * 0.22, 0, k * 0.4, 0));
+        g.add(M(new THREE.BoxGeometry(0.16, 0.06, 0.16), honey, 0, 0.13, 0, 0, Math.PI / 4, 0)); hitH = 0.35; break; }
+      case 'd8_logcabin': { const bands = ['#FFF9F0', '#F7C5C5', '#F5D07A', '#B7D4B5', '#C8E0E8'];
+        bands.forEach((c, i) => { const w = 0.92 - i * 0.14; g.add(M(new THREE.BoxGeometry(w, 0.03, w), mat(c), 0, 0.04 + i * 0.025)); }); hitH = 0.3; break; }
+      case 'd8_compass': { const cream = mat('#FFF9F0'), moss = mat('#3D5A40'); g.add(M(new THREE.BoxGeometry(0.86, 0.04, 0.86), cream, 0, 0.08));
+        for (let k = 0; k < 4; k++) { const a = k * Math.PI / 2; g.add(M(new THREE.ConeGeometry(0.1, 0.28, 4), mat(k % 2 ? '#F7C5C5' : '#F5D07A'), Math.cos(a) * 0.16, 0.12, Math.sin(a) * 0.16, Math.PI / 2, a, 0)); }
+        g.add(M(new THREE.CylinderGeometry(0.06, 0.06, 0.05, 10), moss, 0, 0.12), M(new THREE.BoxGeometry(0.02, 0.05, 0.34), mat('#C8E0E8'), 0, 0.13, 0)); hitH = 0.35; break; }
     }
     const hit = new THREE.Mesh(new THREE.BoxGeometry(1.0, hitH, 0.9), new THREE.MeshBasicMaterial({ visible: false })); hit.position.y = hitH / 2; g.add(hit);
     return g;

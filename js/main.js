@@ -1142,7 +1142,7 @@ function placeIt(p, x, z) {
   const key = 'd' + S.uid++; S.decorInv[p.type]--; if (!S.decorInv[p.type]) delete S.decorInv[p.type];
   const r = Math.atan2(W.camera.position.x - x, W.camera.position.z - z);
   S.decor.push({ key, type: p.type, x, z, r }); W.addDecor(key, p.type, x, z, r, true);
-  popAt(V3(x, 1.6, z), `<i data-icon="heart"></i>+${DECOR_INFO[p.type].atm} atmosphere`); tip('decor'); sfx('build');
+  popAt(V3(x, 1.6, z), DECOR_INFO[p.type].cosmetic ? 'Just for looks' : `<i data-icon="heart"></i>+${DECOR_INFO[p.type].atm} atmosphere`); if (!DECOR_INFO[p.type].cosmetic) tip('decor'); sfx('build');
   save(); hud(); return true;
 }
 // v0.65: garden features (Sundial + charms) — place from the bag, tap on the map to put back in the bag
@@ -5363,7 +5363,8 @@ function redeemCode(raw) {
   const R = REDEEM_CODES[code]; if (!R) { toast('That code doesn’t match anything — check the spelling and try again'); return false; }
   S.codes ||= {}; if (S.codes[code]) { toast('You’ve already claimed this code — enjoy!'); return false; }
   S.codes[code] = now();
-  if (R.deco) S.decorInv[R.deco] = (S.decorInv[R.deco] || 0) + DECO8_LOCS.length;   // one for Home, one for the Orchard
+  const decos = R.decos || (R.deco ? [R.deco] : []);
+  for (const id of decos) if (DECO8[id]) S.decorInv[id] = (S.decorInv[id] || 0) + DECO8_LOCS.length;   // one for Home, one for the Orchard
   save(); hud(); const inp = $('#redeem-in'); if (inp) inp.value = ''; toast(R.toast || 'Code redeemed!'); if (panel === 'bag') renderPanel(); return true;
 }
 document.addEventListener('keydown', (e) => { if (e.key === 'Enter' && e.target?.id === 'redeem-in') { e.preventDefault(); redeemCode(e.target.value); } });
