@@ -958,11 +958,14 @@ export const DECO8_SHOP = DECO8_IDS.filter((k) => !DECO8[k].special);   // the 1
 export const DECO8_LOCS = ['home', 'orchard'];
 // v0.8.5 redeem codes (Settings › Help › Redeem code). Typed case-insensitively; each one can be claimed once per save
 // (S.codes). { deco: id } or { decos: [ids] } gives those decorations (one for Home + one for the Orchard).
+// { jewels: n } adds jewels. Nothing else.
 export const REDEEM_CODES = {
   LOVEBUG: { deco: 'd8_lovebug', toast: '🐞 A Love Bug crawled into your Bag! Place it at Home and at the Orchard.' },
   // KDP book bonuses, about a dollar of keepsakes. One claim per save. No coins, growth, or atmosphere.
   SNOWFINCH: { book: 'Holly & Wing', decos: ['d8_snowfinch', 'd8_holly', 'd8_ornament'], toast: 'Snowfinch set from <b>Holly &amp; Wing</b> is in your Bag: Snowfinch Pair, Holly Cluster, and Winter Ornament. Place them at Home and the Orchard — just for looks.' },
   QUILTBEE: { book: 'Pieced & Puzzled', decos: ['d8_quiltstar', 'd8_logcabin', 'd8_compass'], toast: 'Quilt Bee set from <b>Pieced &amp; Puzzled</b> is in your Bag: Star Quilt, Log Cabin Quilt, and Quilt Compass. Place them at Home and the Orchard — just for looks.' },
+  // Tester thank-you, announced with the TestFlight build. Once per save.
+  EARLYBLOOM: { jewels: 25, toast: 'Thanks for testing Petalspire! <i data-icon="jewel"></i> +25 jewels' },
 };
 // chance that a Card Pack ALSO holds a decoration card (a bonus 4th card — the 3 normal cards and their odds are unchanged)
 export const DECO8_PACK = { chance: 0.06, w: { legendary: 50, rare: 30, superrare: 13, ultra: 5, otherworld: 2 } };
