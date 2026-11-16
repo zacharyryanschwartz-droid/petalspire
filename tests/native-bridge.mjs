@@ -32,15 +32,12 @@ test('native banner leads with AdMob then the same house ads', () => {
   globalThis.__PETALSPIRE_NATIVE__ = false;
 });
 
-test('TestFlight requests Google demo units until the flag is flipped', () => {
-  assert.equal(ADMOB_TEST_ADS, true);
+test('release builds request the live Petalspire units', () => {
+  assert.equal(ADMOB_TEST_ADS, false);
   const ids = admobIds();
-  assert.equal(ids.rewarded, 'ca-app-pub-3940256099942544/1712485313');
-  assert.equal(ids.interstitial, 'ca-app-pub-3940256099942544/4411468910');
-  assert.equal(ids.banner, 'ca-app-pub-3940256099942544/2435281174');
-  assert.equal(ADMOB_LIVE.rewarded, 'ca-app-pub-7278113923202511/3300151917');
-  assert.equal(ADMOB_LIVE.interstitial, 'ca-app-pub-7278113923202511/2098750887');
-  assert.equal(ADMOB_LIVE.banner, 'ca-app-pub-7278113923202511/6967934189');
+  assert.equal(ids.rewarded, 'ca-app-pub-7278113923202511/3300151917');
+  assert.equal(ids.interstitial, 'ca-app-pub-7278113923202511/2098750887');
+  assert.equal(ids.banner, 'ca-app-pub-7278113923202511/6967934189');
   assert.equal(ADMOB_LIVE.appId, 'ca-app-pub-7278113923202511~9974526421');
 });
 

@@ -1,8 +1,8 @@
 // Single switch for TestFlight vs the App Store launch.
-// true  -> Google's iOS demo ad units (safe to click, no invalid traffic).
-// false -> the live Petalspire units below.
+// true  -> Google's iOS demo ad units (safe to click, no invalid traffic). Use for internal test builds only.
+// false -> the live Petalspire units below (App Store release, set Nov 16, 2026).
 // The Info.plist GADApplicationIdentifier stays the live app id either way.
-export const ADMOB_TEST_ADS = true;
+export const ADMOB_TEST_ADS = false;
 
 export const ADMOB_LIVE = {
   appId: 'ca-app-pub-7278113923202511~9974526421',
