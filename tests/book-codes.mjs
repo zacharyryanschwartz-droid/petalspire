@@ -80,6 +80,56 @@ async function redeem(typed) {
   return text;
 }
 
+async function openFinds() {
+  const bagOpen = await page.evaluate(() => window.__ps.panel === 'bag' && !document.getElementById('panel')?.classList.contains('hidden'));
+  if (!bagOpen) {
+    if (await page.locator('#panel:not(.hidden)').count()) {
+      try { await page.click('#panel-close', { timeout: 1000 }); } catch {}
+    }
+    await page.click('#tab-bag');
+  }
+  await page.locator('[data-bag="finds"]').click();
+}
+
+async function bagRow(id) {
+  return page.evaluate((id) => {
+    const row = document.querySelector(`[data-d8-bag="${id}"]`);
+    return row ? row.innerText.replace(/\s+/g, ' ') : null;
+  }, id);
+}
+
+async function goLoc(loc) {
+  await page.evaluate((loc) => {
+    window.__ps.state.lots.orchard = true;
+    window.__ps.setLoc(loc, true);
+  }, loc);
+}
+
+async function placeDecor(type, cx, cz, span = 6) {
+  const sel = `[data-d8-bag="${type}"] [data-place]`;
+  if (await page.locator(sel).count()) await page.click(sel);
+  else await page.evaluate((t) => window.__ps.enterPlace('decor', t), type);
+  return page.evaluate(async ({ cx, cz, span, type }) => {
+    const ps = window.__ps;
+    ps.camAt(cx, cz, 0.7);
+    await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+    let hit = null;
+    const tryAt = (x, z) => {
+      const before = ps.state.decor.length;
+      const p = ps.W.project(new ps.THREE.Vector3(x, 0, z));
+      if (p.behind) return;
+      ps.handleTap(p.x, p.y);
+      if (ps.state.decor.length > before) hit = ps.state.decor.at(-1);
+    };
+    tryAt(cx, cz);
+    for (let x = cx - span / 2; x <= cx + span / 2 && !hit; x += 0.6)
+      for (let z = cz - span / 2; z <= cz + span / 2 && !hit; z += 0.6) tryAt(x, z);
+    if (hit) ps.camAt(hit.x, hit.z, 0.55);
+    document.querySelectorAll('.toast').forEach((el) => el.remove());
+    return { hit, stillPlacing: !!ps.placing, inv: ps.state.decorInv[type] || 0 };
+  }, { cx, cz, span, type });
+}
+
 const before = await page.evaluate(() => ({ coins: window.__ps.state.coins, wood: window.__ps.state.wood, atm: window.__ps.atmosphereAt('home') }));
 const snowToast = await redeem('snow finch');
 ok('SNOWFINCH names the book and the three keepsakes', /Holly & Wing/.test(snowToast) && /Snowfinch Pair/.test(snowToast) && /Holly Cluster/.test(snowToast) && /Winter Ornament/.test(snowToast) && /just for looks/.test(snowToast), snowToast);
@@ -137,6 +187,10 @@ const placed = await page.evaluate(async () => {
 });
 ok('Snowfinch Pair can be placed in the garden', placed.hit?.type === 'd8_snowfinch' && !placed.stillPlacing, placed.hit);
 ok('placing a keepsake does not raise atmosphere', placed.atm === before.atm && /Just for looks/.test(placed.pop), { atm: placed.atm, pop: placed.pop });
+const snowInv = await page.evaluate(() => window.__ps.state.decorInv.d8_snowfinch || 0);
+ok('placing a Snowfinch Pair takes one out of the bag', snowInv === 1, snowInv);
+await openFinds();
+ok('a Snowfinch Pair already at Home leaves the Home bag', (await bagRow('d8_snowfinch')) == null);
 await page.screenshot({ path: `${ART}/book-codes-garden.png` });
 
 const models = await page.evaluate((ids) => {
@@ -199,6 +253,67 @@ await page.screenshot({ path: `${ART}/book-codes-new-sets.png` });
 const love = await page.evaluate(() => ({ ok: window.__ps.redeemCode('LOVEBUG'), n: window.__ps.state.decorInv.d8_lovebug || 0 }));
 ok('LOVEBUG still grants its own keepsake', love.ok === true && love.n === 2, love);
 
+await goLoc('home');
+await openFinds();
+const loveBag0 = await bagRow('d8_lovebug');
+ok('Love Bug shows as ×2 in the Home bag before placing', !!(loveBag0 && /Love Bug/.test(loveBag0) && /×2/.test(loveBag0)), loveBag0);
+const loveHome = await placeDecor('d8_lovebug', -1.5, 1.2);
+ok('placing a Love Bug takes one out of the bag', loveHome.hit?.type === 'd8_lovebug' && !loveHome.stillPlacing && loveHome.inv === 1, loveHome);
+await openFinds();
+ok('a Love Bug already at Home leaves the Home bag', (await bagRow('d8_lovebug')) == null);
+await goLoc('orchard');
+await openFinds();
+const loveBagOrch = await bagRow('d8_lovebug');
+ok('the leftover Love Bug stays in the Orchard bag', !!(loveBagOrch && /Love Bug/.test(loveBagOrch) && !/×2/.test(loveBagOrch)), loveBagOrch);
+const loveOrch = await placeDecor('d8_lovebug', 300, -2, 10);
+ok('placing the second Love Bug at the Orchard empties the bag', loveOrch.hit?.type === 'd8_lovebug' && !loveOrch.stillPlacing && loveOrch.inv === 0, loveOrch);
+await openFinds();
+ok('Love Bug leaves the Orchard bag once both are placed', (await bagRow('d8_lovebug')) == null);
+await goLoc('home');
+await openFinds();
+ok('Love Bug stays out of the Home bag when both are placed', (await bagRow('d8_lovebug')) == null);
+
+const moved = await page.evaluate(() => {
+  const d = window.__ps.state.decor.find((x) => x.type === 'd8_lovebug' && x.x < 100);
+  if (!d) return { ok: false };
+  const inv0 = window.__ps.state.decorInv.d8_lovebug || 0;
+  window.__ps.startMove('decor', d.key);
+  const x = d.x + 0.9, z = d.z + 0.4;
+  const ok = window.__ps.commitMove({ kind: 'decor', id: d.key }, x, z);
+  const again = window.__ps.state.decor.find((x) => x.key === d.key);
+  return { ok, inv0, inv: window.__ps.state.decorInv.d8_lovebug || 0, moved: !!(again && (Math.abs(again.x - d.x) > 0.2 || Math.abs(again.z - d.z) > 0.2)), stillPlaced: !!again };
+});
+ok('moving a placed Love Bug does not change the bag', moved.ok && moved.inv === moved.inv0 && moved.inv === 0 && moved.stillPlaced, moved);
+
+const demo = await page.evaluate(() => {
+  const d = window.__ps.state.decor.find((x) => x.type === 'd8_lovebug' && x.x < 100);
+  window.__ps.doDemolish('decor', d.key);
+  return { inv: window.__ps.state.decorInv.d8_lovebug || 0, placed: window.__ps.state.decor.filter((x) => x.type === 'd8_lovebug').length };
+});
+ok('demolishing a Love Bug returns one to the bag', demo.inv === 1 && demo.placed === 1, demo);
+await goLoc('home');
+await openFinds();
+ok('the returned Love Bug shows again in the Home bag', /Love Bug/.test((await bagRow('d8_lovebug')) || ''));
+await goLoc('orchard');
+await openFinds();
+ok('the Orchard Love Bug stays out of the Orchard bag after the Home one is returned', (await bagRow('d8_lovebug')) == null);
+await goLoc('home');
+
+for (const [id, name, x, z] of [['d8_fairticket', 'Midway Ticket', -0.4, 2.2], ['d8_bust', 'Marble Bust', 1.2, 1.6]]) {
+  const beforeInv = await page.evaluate((id) => window.__ps.state.decorInv[id] || 0, id);
+  await openFinds();
+  ok(`${name} is in the Home bag before placing`, !!(await bagRow(id)));
+  const hit = await placeDecor(id, x, z);
+  const afterInv = await page.evaluate((id) => window.__ps.state.decorInv[id] || 0, id);
+  ok(`placing a ${name} takes one out of the bag`, hit.hit?.type === id && afterInv === beforeInv - 1, { hit: hit.hit, beforeInv, afterInv });
+  await openFinds();
+  ok(`a ${name} already at Home leaves the Home bag`, (await bagRow(id)) == null);
+  await goLoc('orchard');
+  await openFinds();
+  ok(`the leftover ${name} stays in the Orchard bag`, !!(await bagRow(id)));
+  await goLoc('home');
+}
+
 const jewelsBefore = await page.evaluate(() => window.__ps.state.jewels);
 const bloom = await redeem('early bloom');
 ok('EARLYBLOOM thanks the tester for 25 jewels', /Thanks for testing Petalspire!/.test(bloom) && /\+25 jewels/.test(bloom), bloom);
@@ -231,12 +346,64 @@ const kept = await page.evaluate((ids) => {
     atm: window.__ps.atmosphereAt('home'),
   };
 }, [...SNOW, ...QUILT, ...NEW_IDS, 'd8_lovebug']);
-ok('keepsakes persist in the save after reload', SNOW.concat(QUILT, NEW_IDS).every((id) => kept.inv[id] === (id === 'd8_snowfinch' ? 1 : 2) && kept.saved[id] === kept.inv[id]) && kept.inv.d8_lovebug === 2, kept.inv);
+const placedBag = new Set(['d8_snowfinch', 'd8_lovebug', 'd8_fairticket', 'd8_bust']);
+ok('keepsakes persist in the save after reload', SNOW.concat(QUILT, NEW_IDS).every((id) => kept.inv[id] === (placedBag.has(id) ? 1 : 2) && kept.saved[id] === kept.inv[id]) && kept.inv.d8_lovebug === 1, kept.inv);
 ok('a placed Snowfinch Pair is still in the garden', kept.placed === 1 && kept.placedSaved === 1);
+ok('a returned Love Bug and the Orchard placement persist', kept.inv.d8_lovebug === 1 && kept.saved.d8_lovebug === 1, { inv: kept.inv.d8_lovebug, saved: kept.saved.d8_lovebug });
 ok('redeeming changes neither coins nor wood nor atmosphere', kept.coins === before.coins && kept.wood === before.wood && kept.atm === before.atm, kept);
 ok('all book codes stay claimed', !!(kept.codes?.SNOWFINCH && kept.codes?.QUILTBEE && kept.codes?.LOVEBUG && kept.codes?.EARLYBLOOM && BOOKS.every((b) => kept.codes?.[b.code])), kept.codes);
 ok('the 25 tester jewels persist after reload', kept.jewels === jewelsBefore + 25 && kept.jewelsSaved === jewelsBefore + 25, { jewels: kept.jewels, saved: kept.jewelsSaved, before: jewelsBefore });
 ok('the page stays free of script errors', errors.length === 0, errors);
+
+const broken = {
+  v: 3, coins: 40, wood: 40, jewels: 2, introDone: true, tut: { done: true }, guideDone: true,
+  lots: { home: true, orchard: true }, standBuilt: true, marketBuilt: true, marketAvail: true,
+  beds: ['home-0'], tiles: Array(9).fill(null),
+  barrels: { home: { x: -1.15, z: 4.25, w: 9, at: Date.now(), lv: 1 } },
+  codes: { LOVEBUG: 1, MIDWAY: 1, AFTERDARK: 1 },
+  decorInv: {
+    d8_lovebug: 2, d8_fairticket: 2, d8_carousel: 1, d8_prizeballoon: 2, d8_bust: 1, d8_arbor: 1,
+  },
+  decor: [
+    { key: 'd1', type: 'd8_lovebug', x: -2, z: 1.2, r: 0 },
+    { key: 'd2', type: 'd8_fairticket', x: -3, z: 1.2, r: 0 },
+    { key: 'd3', type: 'd8_fairticket', x: 300, z: -2, r: 0 },
+    { key: 'd4', type: 'd8_carousel', x: -2.8, z: 0.4, r: 0 },
+    { key: 'd5', type: 'd8_arbor', x: -1, z: 0.2, r: 0 },
+  ],
+};
+const ctx2 = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2 });
+const page2 = await ctx2.newPage();
+const errors2 = [];
+page2.on('pageerror', (e) => errors2.push(String(e)));
+await page2.addInitScript((raw) => { localStorage.setItem('petalspire.v03', raw); }, JSON.stringify(broken));
+await page2.goto(base, { waitUntil: 'domcontentloaded' });
+await page2.waitForFunction(() => window.__ps && window.__ps.state, { timeout: 20000 });
+const fixed = await page2.evaluate(() => {
+  const s = window.__ps.state;
+  const raw = JSON.parse(localStorage.getItem('petalspire.v03'));
+  const count = (id) => ({
+    inv: s.decorInv[id] || 0,
+    saved: raw.decorInv?.[id] || 0,
+    placed: s.decor.filter((d) => d.type === id).length,
+  });
+  return {
+    love: count('d8_lovebug'),
+    ticket: count('d8_fairticket'),
+    horse: count('d8_carousel'),
+    balloon: count('d8_prizeballoon'),
+    bust: count('d8_bust'),
+    arbor: count('d8_arbor'),
+  };
+});
+ok('a bugged Love Bug save keeps one bag copy for the free location', fixed.love.inv === 1 && fixed.love.saved === 1 && fixed.love.placed === 1, fixed.love);
+ok('two placed Midway Tickets drop the leftover bag copies', fixed.ticket.inv === 0 && fixed.ticket.saved === 0 && fixed.ticket.placed === 2, fixed.ticket);
+ok('a legit placed-plus-bag Carousel Horse is left alone', fixed.horse.inv === 1 && fixed.horse.saved === 1 && fixed.horse.placed === 1, fixed.horse);
+ok('unplaced Prize Balloons stay in the bag', fixed.balloon.inv === 2 && fixed.balloon.saved === 2 && fixed.balloon.placed === 0, fixed.balloon);
+ok('a single unplaced Marble Bust is left alone', fixed.bust.inv === 1 && fixed.bust.saved === 1 && fixed.bust.placed === 0, fixed.bust);
+ok('a placed Friendship Arbor does not keep a leftover bag copy', fixed.arbor.inv === 0 && fixed.arbor.saved === 0 && fixed.arbor.placed === 1, fixed.arbor);
+ok('the repair load stays free of script errors', errors2.length === 0, errors2);
+await ctx2.close();
 
 await browser.close();
 server.close();
