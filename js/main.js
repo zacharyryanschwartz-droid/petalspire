@@ -1932,15 +1932,14 @@ function dockAboveTab() {
   const banner = document.getElementById('ad-banner');
   const house = document.body.classList.contains('ads-on') && banner && !banner.classList.contains('hidden') && !banner.classList.contains('admob-slot');
   if (!house) return 56;
-  const fan = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--ad-fan')) || 32;
-  const h = banner.offsetHeight || 50;
-  return Math.max(56, 16 + h + fan + 10);
+  const h = banner.offsetHeight || 76;
+  return Math.max(56, 16 + h + 8);
 }
 function syncTools() {
   syncBedTargets();
   const d = $('#tooldock'); const any = S.owned.sickle || S.owned.plow; const bedsHere = S.beds.some((b) => lotLoc(lotOfSite(b)) === curLoc());   // v0.68: no Sickle / Plow where there is no bed to use them on (the Orchard)
   d.classList.toggle('hidden', !any || !S.introDone || !bedsHere);
-  if (any) { const tb = $('#tabbar').getBoundingClientRect(); if (tb.height) d.style.bottom = Math.round(innerHeight - tb.top + dockAboveTab()) + 'px'; }  // sit above the tab bar, house-ad banner, and fanned covers
+  if (any) { const tb = $('#tabbar').getBoundingClientRect(); if (tb.height) d.style.bottom = Math.round(innerHeight - tb.top + dockAboveTab()) + 'px'; }  // sit above the tab bar and the house-ad banner
   for (const t of ['sickle', 'plow']) { const b = $('#tool-' + t); b.classList.toggle('hidden', !S.owned[t]); b.classList.remove('resting'); b.classList.toggle('on', placing?.what === t); b.querySelector('em').textContent = ''; }
 }
 for (const t of ['sickle', 'plow']) $('#tool-' + t + ' .tool-art').innerHTML = FEATURE_ART[t];
