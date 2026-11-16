@@ -98,6 +98,9 @@ export function considerNativeAds(guideDone) {
   });
 }
 
+// js/audio.js holds the game audio while a full-screen ad plays and brings it back after (iOS audio session)
+function fullscreenAd(open) { try { window.dispatchEvent(new CustomEvent('petalspire-fullscreen-ad', { detail: { open } })); } catch { /* no window */ } }
+
 export const nativeAds = {
   get rewardReady() { return !!(state.allowed && state.rewardReady); },
   get interstitialReady() { return !!(state.allowed && state.interstitialReady); },
@@ -108,6 +111,7 @@ export const nativeAds = {
     if (!AdMob || !state.rewardReady) return Promise.resolve(false);
     state.rewardReady = false;
     notify();
+    fullscreenAd(true);
     return new Promise((resolve) => {
       let earned = false;
       let settled = false;
@@ -117,6 +121,7 @@ export const nativeAds = {
         settled = true;
         clearTimeout(timer);
         handles.forEach((h) => { try { h?.remove?.(); } catch { /* already gone */ } });
+        fullscreenAd(false);
         resolve(earned);
         preloadReward(AdMob);
       };
@@ -138,12 +143,14 @@ export const nativeAds = {
     const AdMob = plugin();
     if (!AdMob || !state.interstitialReady) return Promise.resolve(false);
     state.interstitialReady = false;
+    fullscreenAd(true);
     return new Promise((resolve) => {
       let settled = false;
       const finish = (ok) => {
         if (settled) return;
         settled = true;
         clearTimeout(timer);
+        fullscreenAd(false);
         resolve(!!ok);
         preloadInterstitial(AdMob);
       };
