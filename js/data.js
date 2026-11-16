@@ -970,6 +970,9 @@ export const DECO8 = {
   d8_velvetseat:  { name: 'Velvet Seat',                    tier: 'epic',       price: 0,    atm: 0, special: true, cosmetic: true },
   d8_marquee:     { name: 'Marquee Lamp',                   tier: 'epic',       price: 0,    atm: 0, special: true, cosmetic: true },
   d8_filmreel:    { name: 'Film Reel',                      tier: 'epic',       price: 0,    atm: 0, special: true, cosmetic: true },
+  d8_cellarcask:  { name: 'Cellar Cask',                    tier: 'epic',       price: 0,    atm: 0, special: true, cosmetic: true },
+  d8_vinbottle:   { name: 'Vintage Bottle',                 tier: 'epic',       price: 0,    atm: 0, special: true, cosmetic: true },
+  d8_grapevine:   { name: 'Grapevine Cluster',              tier: 'epic',       price: 0,    atm: 0, special: true, cosmetic: true },
 };
 export const DECO8_IDS = Object.keys(DECO8);
 export const DECO8_SHOP = DECO8_IDS.filter((k) => !DECO8[k].special);   // the 14 (the Friendship Arbor only comes from referrals)
@@ -988,6 +991,7 @@ export const REDEEM_CODES = {
   LEADLIGHT: { book: 'Leadlight', decos: ['d8_rosewindow', 'd8_leadpanel', 'd8_medallion'], toast: 'Leadlight set from <b>Leadlight</b> is in your Bag: Rose Window, Leadlight Panel, and Honey Medallion. Place them at Home and the Orchard — just for looks.' },
   CLOSEDSTACKS: { book: 'Closed Stacks', decos: ['d8_tomes', 'd8_brasslamp', 'd8_catalog'], toast: 'Library set from <b>Closed Stacks</b> is in your Bag: Stacked Tomes, Brass Lamp, and Card Catalog. Place them at Home and the Orchard — just for looks.' },
   PICTUREPALACE: { book: 'The Picture Palace', decos: ['d8_velvetseat', 'd8_marquee', 'd8_filmreel'], toast: 'Cinema set from <b>The Picture Palace</b> is in your Bag: Velvet Seat, Marquee Lamp, and Film Reel. Place them at Home and the Orchard — just for looks.' },
+  LASTVINTAGE: { book: 'The Last Vintage', decos: ['d8_cellarcask', 'd8_vinbottle', 'd8_grapevine'], toast: 'Vintage set from <b>The Last Vintage</b> is in your Bag: Cellar Cask, Vintage Bottle, and Grapevine Cluster. Place them at Home and the Orchard — just for looks.' },
   // Tester thank-you, announced with the TestFlight build. Once per save.
   EARLYBLOOM: { jewels: 25, toast: 'Thanks for testing Petalspire! <i data-icon="jewel"></i> +25 jewels' },
 };
