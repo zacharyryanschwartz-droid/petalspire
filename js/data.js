@@ -973,6 +973,12 @@ export const DECO8 = {
   d8_cellarcask:  { name: 'Cellar Cask',                    tier: 'epic',       price: 0,    atm: 0, special: true, cosmetic: true },
   d8_vinbottle:   { name: 'Vintage Bottle',                 tier: 'epic',       price: 0,    atm: 0, special: true, cosmetic: true },
   d8_grapevine:   { name: 'Grapevine Cluster',              tier: 'epic',       price: 0,    atm: 0, special: true, cosmetic: true },
+  d8_fairticket:  { name: 'Midway Ticket',                  tier: 'epic',       price: 0,    atm: 0, special: true, cosmetic: true },
+  d8_carousel:    { name: 'Carousel Horse',                 tier: 'epic',       price: 0,    atm: 0, special: true, cosmetic: true },
+  d8_prizeballoon:{ name: 'Prize Balloon',                  tier: 'epic',       price: 0,    atm: 0, special: true, cosmetic: true },
+  d8_bust:        { name: 'Marble Bust',                    tier: 'epic',       price: 0,    atm: 0, special: true, cosmetic: true },
+  d8_exhibit:     { name: 'Exhibit Case',                   tier: 'epic',       price: 0,    atm: 0, special: true, cosmetic: true },
+  d8_nightlamp:   { name: 'Night Lantern',                  tier: 'epic',       price: 0,    atm: 0, special: true, cosmetic: true },
 };
 export const DECO8_IDS = Object.keys(DECO8);
 export const DECO8_SHOP = DECO8_IDS.filter((k) => !DECO8[k].special);   // the 14 (the Friendship Arbor only comes from referrals)
@@ -992,6 +998,8 @@ export const REDEEM_CODES = {
   CLOSEDSTACKS: { book: 'Closed Stacks', decos: ['d8_tomes', 'd8_brasslamp', 'd8_catalog'], toast: 'Library set from <b>Closed Stacks</b> is in your Bag: Stacked Tomes, Brass Lamp, and Card Catalog. Place them at Home and the Orchard — just for looks.' },
   PICTUREPALACE: { book: 'The Picture Palace', decos: ['d8_velvetseat', 'd8_marquee', 'd8_filmreel'], toast: 'Cinema set from <b>The Picture Palace</b> is in your Bag: Velvet Seat, Marquee Lamp, and Film Reel. Place them at Home and the Orchard — just for looks.' },
   LASTVINTAGE: { book: 'The Last Vintage', decos: ['d8_cellarcask', 'd8_vinbottle', 'd8_grapevine'], toast: 'Vintage set from <b>The Last Vintage</b> is in your Bag: Cellar Cask, Vintage Bottle, and Grapevine Cluster. Place them at Home and the Orchard — just for looks.' },
+  MIDWAY: { book: 'The Locked Midway', decos: ['d8_fairticket', 'd8_carousel', 'd8_prizeballoon'], toast: 'Midway set from <b>The Locked Midway</b> is in your Bag: Midway Ticket, Carousel Horse, and Prize Balloon. Place them at Home and the Orchard — just for looks.' },
+  AFTERDARK: { book: 'The Museum After Dark', decos: ['d8_bust', 'd8_exhibit', 'd8_nightlamp'], toast: 'Museum set from <b>The Museum After Dark</b> is in your Bag: Marble Bust, Exhibit Case, and Night Lantern. Place them at Home and the Orchard — just for looks.' },
   // Tester thank-you, announced with the TestFlight build. Once per save.
   EARLYBLOOM: { jewels: 25, toast: 'Thanks for testing Petalspire! <i data-icon="jewel"></i> +25 jewels' },
 };
