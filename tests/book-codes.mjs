@@ -36,10 +36,10 @@ const NAMES = {
 const BOOKS = [
   { code: 'LAMPLIT', typed: 'lamp lit', book: 'Escape the Lighthouse', ids: ['d8_stormlantern', 'd8_spyglass', 'd8_tidekey'], names: ['Storm Lantern', "Keeper's Spyglass", 'Tide-Worn Key'] },
   { code: 'COZYCABIN', typed: 'cozy cabin', book: 'Woodsmoke & Wool', ids: ['d8_woolthrow', 'd8_woodstove', 'd8_honeymug'], names: ['Woolen Throw', 'Woodsmoke Stove', 'Honey Mug'] },
-  { code: 'GLASSHOUSE', typed: 'glass house', book: 'Under Glass', ids: ['d8_terrarium', 'd8_potting', 'd8_mister'], names: ['Fern Terrarium', 'Potting Bench', 'Copper Mister'] },
-  { code: 'LEADLIGHT', typed: 'lead light', book: 'Lead & Light', ids: ['d8_rosewindow', 'd8_leadpanel', 'd8_medallion'], names: ['Rose Window', 'Leadlight Panel', 'Honey Medallion'] },
+  { code: 'GLASSHOUSE', typed: 'glass house', book: 'The Locked Glasshouse', ids: ['d8_terrarium', 'd8_potting', 'd8_mister'], names: ['Fern Terrarium', 'Potting Bench', 'Copper Mister'] },
+  { code: 'LEADLIGHT', typed: 'lead light', book: 'Leadlight', ids: ['d8_rosewindow', 'd8_leadpanel', 'd8_medallion'], names: ['Rose Window', 'Leadlight Panel', 'Honey Medallion'] },
   { code: 'CLOSEDSTACKS', typed: 'closed stacks', book: 'Closed Stacks', ids: ['d8_tomes', 'd8_brasslamp', 'd8_catalog'], names: ['Stacked Tomes', 'Brass Lamp', 'Card Catalog'] },
-  { code: 'PICTUREPALACE', typed: 'picture palace', book: 'Picture Palace', ids: ['d8_velvetseat', 'd8_marquee', 'd8_filmreel'], names: ['Velvet Seat', 'Marquee Lamp', 'Film Reel'] },
+  { code: 'PICTUREPALACE', typed: 'picture palace', book: 'The Picture Palace', ids: ['d8_velvetseat', 'd8_marquee', 'd8_filmreel'], names: ['Velvet Seat', 'Marquee Lamp', 'Film Reel'] },
 ];
 const NEW_IDS = BOOKS.flatMap((b) => b.ids);
 const esc = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
