@@ -11,22 +11,36 @@ const MP_ART = `<svg viewBox="0 0 64 44" aria-hidden="true"><rect x="2" y="30" w
   <path d="M18 8l-2 10M28 8l-1 10M37 8l1 10M46 8l2 10" stroke="#FFF9F0" stroke-width="2.4"/><circle cx="20" cy="26" r="3.4" fill="#F5D07A"/><circle cx="28" cy="26" r="3.4" fill="#E07F86"/>
   <circle cx="36" cy="26" r="3.4" fill="#B7D4B5"/><path d="M44 21l3 6h-6z" fill="#F5D07A" stroke="#3D5A40" stroke-width="1.2"/></svg>`;
 const BOOK_ART = `<svg viewBox="0 0 64 44" aria-hidden="true"><path d="M8 8h30c8 0 14 3 14 8v20H20c-7 0-12-3-12-8V8z" fill="#FFF9F0" stroke="#3D5A40" stroke-width="2"/><path d="M20 8v24" stroke="#3D5A40" stroke-width="2"/><path d="M26 16h18M26 22h14" stroke="#F7C5C5" stroke-width="2.2" stroke-linecap="round"/><circle cx="46" cy="30" r="5" fill="#F5D07A" stroke="#3D5A40" stroke-width="1.4"/></svg>`;
-const ETSY_ART = `<svg viewBox="0 0 64 44" aria-hidden="true"><path d="M8 18h48l-5-9H13z" fill="#F7C5C5" stroke="#3D5A40" stroke-width="2" stroke-linejoin="round"/><path d="M13 18c2.4 3.2 6.2 3.2 8.4 0 2.4 3.2 6.2 3.2 8.4 0 2.4 3.2 6.2 3.2 8.4 0 2.4 3.2 6.2 3.2 8.4 0 2.4 3.2 6.2 3.2 8.4 0" fill="#F7C5C5" stroke="#3D5A40" stroke-width="1.5" stroke-linejoin="round"/><path d="M14 18h36v18H14z" fill="#FFF9F0" stroke="#3D5A40" stroke-width="2"/><rect x="27" y="24" width="10" height="12" rx="1.2" fill="#C8E0E8" stroke="#3D5A40" stroke-width="1.4"/><rect x="17" y="25" width="7" height="7" rx="1" fill="#F5D07A" stroke="#3D5A40" stroke-width="1.2"/><circle cx="45" cy="28" r="3.2" fill="#B7D4B5" stroke="#3D5A40" stroke-width="1.2"/><path d="M45 25.2v-3.2" stroke="#3D5A40" stroke-width="1.2" stroke-linecap="round"/></svg>`;
-export const gameArt = (id) => (id === 'books' ? BOOK_ART : id === 'etsy' ? ETSY_ART : MP_ART);
+export const gameArt = (id) => (id === 'books' ? BOOK_ART : MP_ART);
+
+// Front covers from the KDP Content Maker folder (cover_front_preview.png), compressed to ~200px.
+export const BOOK_COVERS = [
+  'assets/promo/cover-love-bug-critters.webp',
+  'assets/promo/cover-locked-midway.webp',
+  'assets/promo/cover-museum-after-dark.webp',
+];
+// In-game catalog copy for the books banner (the slot still links to the current book in js/books.js).
+export const BOOK_BANNER_TITLE = 'Our books';
+export const BOOK_BANNER_LINE = 'Bonus content in every copy';
+
+// Product renders from /workspace/3dprint/designs (Wyrmcoil, Gnashing Skull, Gearwork Gate).
+export const ETSY_PRODUCTS = [
+  'assets/promo/etsy-wyrmcoil.webp',
+  'assets/promo/etsy-gnashing-skull.webp',
+  'assets/promo/etsy-gearwork-gate.webp',
+];
 
 export const ETSY_SHOP = {
   id: 'etsy',
-  title: 'Schwarze Spiele',
-  line: '3D-printed goods and games',
+  title: 'Etsy shop',
+  line: '3D prints and games',
   url: 'https://www.etsy.com/shop/SchwarzeSpieleGames',
   cta: 'Visit our Etsy shop',
   label: 'Visit our Etsy shop',
 };
 
-function slotArt(slot) {
-  if (slot.kind === 'book') return BOOK_ART;
-  if (slot.kind === 'etsy') return ETSY_ART;
-  return gameArt(slot.id);
+function fanHTML(urls) {
+  return `<span class="hb-fan" aria-hidden="true">${urls.map((src) => `<img src="${src}" alt="">`).join('')}</span>`;
 }
 
 const ROTATE_MS = 45000;
@@ -73,9 +87,12 @@ export function createAds({ root, noAds, onHouseAd, onRemoveAds, onEvent = () =>
     banner.classList.toggle('book-slot', slot.kind === 'book');
     banner.classList.toggle('etsy-slot', slot.kind === 'etsy');
     banner.classList.remove('admob-slot');
-    const label = slot.label || `${slot.title}. ${slot.line}`;
+    const title = slot.kind === 'book' ? BOOK_BANNER_TITLE : slot.title;
+    const line = slot.kind === 'book' ? BOOK_BANNER_LINE : slot.line;
+    const label = slot.label || `${title}. ${line}`;
     banner.setAttribute('aria-label', label);
-    banner.innerHTML = `<span class="hb-art">${slotArt(slot)}</span><span class="hb-copy"><b>${slot.title}</b><small>${slot.line}</small></span>
+    const fan = fanHTML(slot.kind === 'etsy' ? ETSY_PRODUCTS : BOOK_COVERS);
+    banner.innerHTML = `${fan}<span class="hb-copy"><b>${title}</b><small>${line}</small></span>
       <span class="hb-action"><span class="hb-ad">Ad</span><span class="hb-cta">${slot.cta}</span></span>`;
   }
 
