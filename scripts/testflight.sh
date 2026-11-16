@@ -64,7 +64,7 @@ cp "$ASC_SIGN_DIR/profile.mobileprovision" "$HOME/Library/MobileDevice/Provision
 echo "profile installed"
 
 BUILD_NUM="$(node scripts/asc.mjs next-build)"
-MARKETING_VERSION="0.8.7"
+MARKETING_VERSION="${MARKETING_VERSION:-1.0}"   # App Store version 1.0
 echo "marketing=$MARKETING_VERSION build=$BUILD_NUM game=0.8.7.7"
 
 if [ -d ios/App/App.xcworkspace ]; then
