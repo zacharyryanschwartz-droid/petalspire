@@ -25,6 +25,8 @@ Drag with one finger to pan, pinch to zoom, and twist with two fingers to turn. 
 
 Every menu can be closed again on small iPhones. Sprig's goal card used to sit on top of a menu's header and catch the tap meant for its X, while the guide kept saying "Close this menu first". Taps now pass through the goal card, the menu gives up room at its top so the X stays in sight, and close buttons are bigger with a wider tap area. Tapping outside a menu or pressing Escape also closes it.
 
+A game saved part-way through the Market seed lesson no longer ignores taps after a restart (Continue on the title screen did nothing). The lesson only guards taps while its card and target are on screen, and Sprig's tip can always be tapped away.
+
 ## New in v0.8.7.6
 
 Rain-barrel irrigation follows the same rule while the game is closed as it does while you play. Each pour goes to a dry plant in the irrigated bed that needs it most, so one bed cannot drink the barrel dry, and plants that got water start growing from that moment.
