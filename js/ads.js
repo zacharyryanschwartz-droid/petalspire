@@ -1,7 +1,7 @@
 // Ads. The web build keeps house banners plus simulated rewarded/interstitial placeholders.
 // The iOS app (isNative) serves rewarded, interstitial, and a share of the bottom slot through AdMob.
-// House ads — Market Plot and each book in js/books.js — stay in the same bottom slot on both builds.
-import { ADS_MODE, ADS, OTHER_GAMES } from './data.js';
+// House ads — each book in js/books.js, plus the Schwarze Spiele Etsy shop — stay in the same bottom slot on both builds.
+import { ADS_MODE, ADS } from './data.js';
 import { BOOK_PROMO_LINE, promoBooks } from './books.js';
 import { isNative, openExternal } from './native.js';
 import { nativeAds, safeBottomPx } from './admob.js';
@@ -13,6 +13,36 @@ const MP_ART = `<svg viewBox="0 0 64 44" aria-hidden="true"><rect x="2" y="30" w
 const BOOK_ART = `<svg viewBox="0 0 64 44" aria-hidden="true"><path d="M8 8h30c8 0 14 3 14 8v20H20c-7 0-12-3-12-8V8z" fill="#FFF9F0" stroke="#3D5A40" stroke-width="2"/><path d="M20 8v24" stroke="#3D5A40" stroke-width="2"/><path d="M26 16h18M26 22h14" stroke="#F7C5C5" stroke-width="2.2" stroke-linecap="round"/><circle cx="46" cy="30" r="5" fill="#F5D07A" stroke="#3D5A40" stroke-width="1.4"/></svg>`;
 export const gameArt = (id) => (id === 'books' ? BOOK_ART : MP_ART);
 
+// Front covers from the KDP Content Maker folder (cover_front_preview.png), compressed to ~200px.
+export const BOOK_COVERS = [
+  'assets/promo/cover-love-bug-critters.webp',
+  'assets/promo/cover-locked-midway.webp',
+  'assets/promo/cover-museum-after-dark.webp',
+];
+// In-game catalog copy for the books banner (the slot still links to the current book in js/books.js).
+export const BOOK_BANNER_TITLE = 'Our books';
+export const BOOK_BANNER_LINE = 'Bonus content in every copy';
+
+// Product renders from /workspace/3dprint/designs (Wyrmcoil, Gnashing Skull, Gearwork Gate).
+export const ETSY_PRODUCTS = [
+  'assets/promo/etsy-wyrmcoil.webp',
+  'assets/promo/etsy-gnashing-skull.webp',
+  'assets/promo/etsy-gearwork-gate.webp',
+];
+
+export const ETSY_SHOP = {
+  id: 'etsy',
+  title: 'Etsy shop',
+  line: '3D prints and games',
+  url: 'https://www.etsy.com/shop/SchwarzeSpieleGames',
+  cta: 'Visit our Etsy shop',
+  label: 'Visit our Etsy shop',
+};
+
+function fanHTML(urls) {
+  return `<span class="hb-fan" aria-hidden="true">${urls.map((src) => `<img src="${src}" alt="">`).join('')}</span>`;
+}
+
 const ROTATE_MS = 45000;
 
 /** Native AdMob banner sits just above the tab bar, clear of the home indicator. */
@@ -23,18 +53,17 @@ function bannerMargin() {
   return Math.round(sab + 8 + tabH + 8);
 }
 
-function marketGame() {
-  const id = ADS.houseAds[0];
-  return OTHER_GAMES.find((g) => g.id === id) || OTHER_GAMES[0];
-}
-
 /** Bottom-slot order. Web: house ads only. iOS: AdMob, then the same house ads. */
 export function bannerSlots() {
   const slots = [];
   if (isNative()) slots.push({ kind: 'admob' });
-  const g = marketGame();
-  if (g) slots.push({ kind: 'house', id: g.id, title: g.name, line: g.tagline, tag: g.status === 'soon' ? 'Coming soon' : 'Play' });
-  for (const book of promoBooks()) slots.push({ kind: 'book', id: 'book:' + book.url, title: book.title, line: BOOK_PROMO_LINE, url: book.url, tag: 'Book' });
+  for (const book of promoBooks()) {
+    slots.push({ kind: 'book', id: 'book:' + book.url, title: book.title, line: BOOK_PROMO_LINE, url: book.url, cta: 'Get the book' });
+  }
+  const shop = ETSY_SHOP;
+  if (shop && shop.url) {
+    slots.push({ kind: 'etsy', id: shop.id, title: shop.title, line: shop.line, url: shop.url, cta: shop.cta, label: shop.label });
+  }
   return slots;
 }
 
@@ -56,10 +85,15 @@ export function createAds({ root, noAds, onHouseAd, onRemoveAds, onEvent = () =>
     banner.dataset.slot = slot.kind;
     banner.dataset.ref = slot.url || slot.id || '';
     banner.classList.toggle('book-slot', slot.kind === 'book');
+    banner.classList.toggle('etsy-slot', slot.kind === 'etsy');
     banner.classList.remove('admob-slot');
-    banner.setAttribute('aria-label', slot.kind === 'book' ? `${slot.title}. ${slot.line}` : slot.title);
-    banner.innerHTML = `<span class="hb-art">${slot.kind === 'book' ? BOOK_ART : gameArt(slot.id)}</span><span class="hb-copy"><b>${slot.title}</b><small>${slot.line}</small></span>
-      <span class="hb-tag">${slot.tag}</span><span class="hb-from">from the makers of Petalspire</span>`;
+    const title = slot.kind === 'book' ? BOOK_BANNER_TITLE : slot.title;
+    const line = slot.kind === 'book' ? BOOK_BANNER_LINE : slot.line;
+    const label = slot.label || `${title}. ${line}`;
+    banner.setAttribute('aria-label', label);
+    const fan = fanHTML(slot.kind === 'etsy' ? ETSY_PRODUCTS : BOOK_COVERS);
+    banner.innerHTML = `${fan}<span class="hb-copy"><b>${title}</b><small>${line}</small></span>
+      <span class="hb-action"><span class="hb-ad">Ad</span><span class="hb-cta">${slot.cta}</span></span>`;
   }
 
   async function present(force = false) {
@@ -88,7 +122,7 @@ export function createAds({ root, noAds, onHouseAd, onRemoveAds, onEvent = () =>
     try {
       if (slot.kind === 'admob') {
         banner.classList.add('admob-slot');
-        banner.classList.remove('book-slot');
+        banner.classList.remove('book-slot', 'etsy-slot');
         const ok = await nativeAds.showBanner(bannerMargin());
         if (!ok) { shownKey = ''; slotIdx = (slotIdx + 1) % slots.length; presenting = false; present(true); return; }
       } else {
@@ -98,12 +132,12 @@ export function createAds({ root, noAds, onHouseAd, onRemoveAds, onEvent = () =>
     } finally { presenting = false; }
   }
 
-  function advance() { slotIdx += 1; shownKey = ''; present(true); }
+  function advance() { slotIdx += 1; shownKey = ''; return present(true); }
 
   banner.addEventListener('click', () => {
     const slot = displayed;
     if (!slot || slot.kind === 'admob' || banner.classList.contains('admob-slot')) return;
-    if (slot.kind === 'book') { openExternal(slot.url); return; }
+    if (slot.url) { openExternal(slot.url); return; }
     onHouseAd(slot.id);
   });
 
@@ -178,6 +212,7 @@ export function createAds({ root, noAds, onHouseAd, onRemoveAds, onEvent = () =>
       return true;
     },
     registerProvider(name, impl) { providers[name] = impl; },
+    advance,
     _resetGap() { lastBreak = 0; },
   };
 }

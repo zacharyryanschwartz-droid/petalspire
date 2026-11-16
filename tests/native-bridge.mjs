@@ -3,7 +3,7 @@ import test from 'node:test';
 import { BOOKS, BOOKS_PROMO_ENABLED, BOOK_PROMO_LINE, promoBooks } from '../js/books.js';
 import { ADMOB_TEST_ADS, ADMOB_LIVE, admobIds } from '../js/admob-config.js';
 import { chooseSave, isNative } from '../js/native.js';
-import { bannerSlots } from '../js/ads.js';
+import { bannerSlots, ETSY_SHOP } from '../js/ads.js';
 import { Payments } from '../js/payments.js';
 import { purchasesVisible, storePrice } from '../js/store.js';
 
@@ -15,20 +15,26 @@ test('books list is the only promo source', () => {
   assert.match(BOOK_PROMO_LINE, /Buy any Schwarze Spiele book/);
 });
 
-test('web banner rotates house ad and each book, with no AdMob', () => {
+test('web banner rotates each book and the Etsy shop, with no AdMob', () => {
   globalThis.__PETALSPIRE_NATIVE__ = false;
   const slots = bannerSlots();
-  assert.deepEqual(slots.map((s) => s.kind), ['house', 'book']);
-  assert.equal(slots[1].title, 'Love Bug Critters');
-  assert.equal(slots[1].url, BOOKS[0].url);
-  assert.equal(slots[1].line, BOOK_PROMO_LINE);
+  assert.deepEqual(slots.map((s) => s.kind), ['book', 'etsy']);
+  assert.equal(slots[0].title, 'Love Bug Critters');
+  assert.equal(slots[0].url, BOOKS[0].url);
+  assert.equal(slots[0].line, BOOK_PROMO_LINE);
+  assert.equal(slots[0].cta, 'Get the book');
+  assert.equal(slots[1].id, 'etsy');
+  assert.equal(slots[1].url, ETSY_SHOP.url);
+  assert.equal(slots[1].url, 'https://www.etsy.com/shop/SchwarzeSpieleGames');
+  assert.equal(slots[1].cta, 'Visit our Etsy shop');
   assert.equal(slots.some((s) => s.kind === 'admob'), false);
+  assert.equal(slots.some((s) => s.kind === 'house' || s.id === 'market_plot'), false);
 });
 
 test('native banner leads with AdMob then the same house ads', () => {
   globalThis.__PETALSPIRE_NATIVE__ = true;
   const slots = bannerSlots();
-  assert.deepEqual(slots.map((s) => s.kind), ['admob', 'house', 'book']);
+  assert.deepEqual(slots.map((s) => s.kind), ['admob', 'book', 'etsy']);
   globalThis.__PETALSPIRE_NATIVE__ = false;
 });
 

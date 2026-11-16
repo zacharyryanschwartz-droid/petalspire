@@ -1928,11 +1928,18 @@ function useTool(t) {
   toolBar(); $('#buildbar').classList.remove('hidden'); syncBedTargets();
 }
 $('#buildbar').addEventListener('click', (e) => { const b = e.target.closest('[data-plowseed]'); if (!b || placing?.what !== 'plow') return; placing.sp = b.dataset.plowseed; toolBar(); });
+function dockAboveTab() {
+  const banner = document.getElementById('ad-banner');
+  const house = document.body.classList.contains('ads-on') && banner && !banner.classList.contains('hidden') && !banner.classList.contains('admob-slot');
+  if (!house) return 56;
+  const h = banner.offsetHeight || 76;
+  return Math.max(56, 16 + h + 8);
+}
 function syncTools() {
   syncBedTargets();
   const d = $('#tooldock'); const any = S.owned.sickle || S.owned.plow; const bedsHere = S.beds.some((b) => lotLoc(lotOfSite(b)) === curLoc());   // v0.68: no Sickle / Plow where there is no bed to use them on (the Orchard)
   d.classList.toggle('hidden', !any || !S.introDone || !bedsHere);
-  if (any) { const tb = $('#tabbar').getBoundingClientRect(); if (tb.height) d.style.bottom = Math.round(innerHeight - tb.top + 56) + 'px'; }  // sit above the tab bar and the toast line
+  if (any) { const tb = $('#tabbar').getBoundingClientRect(); if (tb.height) d.style.bottom = Math.round(innerHeight - tb.top + dockAboveTab()) + 'px'; }  // sit above the tab bar and the house-ad banner
   for (const t of ['sickle', 'plow']) { const b = $('#tool-' + t); b.classList.toggle('hidden', !S.owned[t]); b.classList.remove('resting'); b.classList.toggle('on', placing?.what === t); b.querySelector('em').textContent = ''; }
 }
 for (const t of ['sickle', 'plow']) $('#tool-' + t + ' .tool-art').innerHTML = FEATURE_ART[t];
@@ -1985,7 +1992,7 @@ function syncJewelDock() {
   if (pk) { pk.classList.toggle('hidden', !pShow); const pe = pk.querySelector('em'); pe.textContent = S.freePacks > 1 ? S.freePacks : ''; pe.classList.toggle('hidden', !(S.freePacks > 1)); }
   d.classList.toggle('hidden', (!n && !(rr || (!guiding && rl > 0)) && !oShow && !pShow) || !!placing || !!buildMode);   // out of the way while placing / building
   // v0.65: Bloom / Rush sit on the LEFT edge, stacked above the tool dock (Sickle / Plow) when that is showing
-  if (!d.classList.contains('hidden')) { const tb = $('#tabbar').getBoundingClientRect(), td = $('#tooldock'), th = td && !td.classList.contains('hidden') ? td.getBoundingClientRect().height + 8 : 0; if (tb.height) d.style.bottom = Math.round(innerHeight - tb.top + 56 + th) + 'px'; }
+  if (!d.classList.contains('hidden')) { const tb = $('#tabbar').getBoundingClientRect(), td = $('#tooldock'), th = td && !td.classList.contains('hidden') ? td.getBoundingClientRect().height + 8 : 0; if (tb.height) d.style.bottom = Math.round(innerHeight - tb.top + dockAboveTab() + th) + 'px'; }
 }
 $('#jd-bloom')?.addEventListener('click', askBloom);
 $('#jd-rush')?.addEventListener('click', askRush);

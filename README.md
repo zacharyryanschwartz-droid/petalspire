@@ -945,7 +945,7 @@ Garden-feature cards keep their v0.41 odds exactly (41.5% of all cards together)
   - **No More Ads + 10 Jewels** costs $8.99. It removes the banner and partner ads and then shows as Owned.
   - Purchases are **simulated**: a "Prototype: purchase simulated, no charge" confirm appears, then the items are granted. `PAYMENTS_MODE` in `js/data.js` is the single switch (`'simulated'`, or a future `'apple-iap'` bridge in `js/payments.js`).
 - **Ads (placeholders, no ad SDK):**
-  - The bottom banner is a **house ad** for our own games. Right now that's *Market Plot, coming soon*; tapping it opens Settings → Play Other Games. It sits below the tab bar, and the UI moves up to make room.
+  - The bottom banner is a **house ad** for Schwarze Spiele books (Amazon, from `js/books.js`, with real covers fanned out) and the [Schwarze Spiele Etsy shop](https://www.etsy.com/shop/SchwarzeSpieleGames). On iOS those rotate with the AdMob banner in the same slot. It sits above the tab bar with the covers kept inside the card, and the UI moves up to make room.
   - **Partner ad** interstitials appear after every 3rd sale and after opening a bought Card Pack, at most once per 90 s. They can be skipped after 3 s.
   - An opt-in "watch an ad for +10 coins" placeholder is at the stand (3 min cooldown).
   - `ADS_MODE` and `ADS` in `js/data.js` control all of this. `ADS.partner` is the hook for a future partner SDK.
