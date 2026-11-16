@@ -90,8 +90,20 @@ export const SFX = {
 };
 
 // ---------- the player ----------
+// v0.8.7.8 (iOS 1.0 build 10): two iOS app fixes.
+// 1) Music. Capacitor's iOS file server answers bundled .mp3 files with a non-HTTP response, so fetch() reports
+//    status 0 / ok=false even though the bytes are all there. The old `if (!r.ok) throw` marked every track as failed,
+//    so the app never played music. Status 0 with a non-empty body is accepted now (decodeAudioData still rejects junk).
+// 2) Coming back to the app. iOS can leave the AudioContext 'interrupted', stuck 'suspended', or 'running' with a
+//    frozen clock after the app was in the background, after a call, or after a full-screen ad, and resume() only
+//    works from a tap. On every return (visibilitychange, Capacitor's 'resume', pageshow, focus, ad closed) we try
+//    resume() and check that the clock really moves; on the next tap we resume again, and if the context is still not
+//    healthy we close it and build a fresh one, then restart the music (if it's on). Settings stay in S.audio.
+export function audioResponseOk(r) { return !!r && (r.ok || r.status === 0); }
+
 export function createAudio({ prefs, playlist = PLAYLIST }) {
   let ctx = null, music = null, sfx = null, scene = null, cur = null, nextT = null, unlocked = false, bag = [], tick = null, plays = 0;
+  let paused = false, adOpen = false, stale = false, broken = false, wakeAt = 0, wakeT0 = 0, lastT = -1, frozen = 0, rebuilds = 0;
   const bufs = {}, loading = {}, failed = new Set();
   const DEF = { music: 0.6, sfx: 0.8, musicMute: false, sfxMute: false }, P = () => prefs() || DEF;
   const mv = () => (P().musicMute ? 0 : P().music) * 0.4, sv = () => (P().sfxMute ? 0 : P().sfx) * 0.9;   // v0.7.2: 0.4 (was 0.55) for the recorded tracks
@@ -107,9 +119,9 @@ export function createAudio({ prefs, playlist = PLAYLIST }) {
   }
   function load(t) {
     if (!t || !ctx) return Promise.resolve(null); if (bufs[t.id]) return Promise.resolve(bufs[t.id]);
-    if (!loading[t.id]) loading[t.id] = fetch(t.src).then((r) => { if (!r.ok) throw new Error(r.status); return r.arrayBuffer(); })
-      .then((a) => new Promise((res, rej) => { const p = ctx.decodeAudioData(a, res, rej); if (p?.then) p.then(res, rej); }))
-      .then((b) => { bufs[t.id] = b; return b; }).catch(() => { failed.add(t.id); return null; }).finally(() => { delete loading[t.id]; });
+    if (!loading[t.id]) { const c = ctx; loading[t.id] = fetch(t.src).then((r) => { if (!audioResponseOk(r)) throw new Error(r.status); return r.arrayBuffer(); })
+      .then((a) => { if (!a || !a.byteLength) throw new Error('empty'); return new Promise((res, rej) => { const p = c.decodeAudioData(a, res, rej); if (p?.then) p.then(res, rej); }); })
+      .then((b) => { bufs[t.id] = b; return b; }).catch(() => { if (c === ctx) failed.add(t.id); return null; }).finally(() => { delete loading[t.id]; }); }
     return loading[t.id];
   }
   // keep only the playing track and the preloaded next one decoded (a decoded minute of stereo audio is ~20 MB)
@@ -123,28 +135,75 @@ export function createAudio({ prefs, playlist = PLAYLIST }) {
       if (!b || !ctx) return;
       const now = ctx.currentTime, g = ctx.createGain(), s = ctx.createBufferSource(), lv = t.gain ?? 1;
       s.buffer = b; g.gain.setValueAtTime(0, now); g.gain.linearRampToValueAtTime(lv, now + XFADE_S); s.connect(g).connect(music); s.start(now + 0.02);
-      if (cur) { const o = cur; o.g.gain.cancelScheduledValues(now); o.g.gain.setValueAtTime(o.g.gain.value, now); o.g.gain.linearRampToValueAtTime(0, now + XFADE_S); try { o.s.stop(now + XFADE_S + 0.1); } catch (_) {} }
-      cur = { id: t.id, title: t.title, s, g, start: now + 0.02, end: now + 0.02 + b.duration }; plays++;
+      if (cur && cur.ctx === ctx) { const o = cur; o.g.gain.cancelScheduledValues(now); o.g.gain.setValueAtTime(o.g.gain.value, now); o.g.gain.linearRampToValueAtTime(0, now + XFADE_S); try { o.s.stop(now + XFADE_S + 0.1); } catch (_) {} }
+      cur = { id: t.id, title: t.title, s, g, ctx, start: now + 0.02, end: now + 0.02 + b.duration }; plays++;
       nextT = pick(); trim(); setTimeout(() => load(nextT), 3000);   // preload the next track quietly
-    } finally { starting = false; }
+    } catch (_) { /* a context that was closed mid-load: the next tick or tap starts over */ } finally { starting = false; }
   }
   // the crossfade is driven by the AudioContext clock, so a paused (hidden) tab never skips ahead
-  function loop() { if (!ctx || ctx.state !== 'running' || mv() <= 0 && !cur) return; if (!cur) return void playNext(); if (ctx.currentTime >= cur.end - XFADE_S) playNext(); }
-  function unlock() {
-    if (unlocked) { if (ctx?.state === 'suspended' && !document.hidden) ctx.resume(); return; }
-    const AC = window.AudioContext || window.webkitAudioContext; if (!AC) return;
-    try { ctx = new AC({ latencyHint: 'playback' }); } catch (_) { ctx = new AC(); }
-    unlocked = true; music = ctx.createGain(); sfx = ctx.createGain(); music.gain.value = 0; sfx.gain.value = sv(); music.connect(ctx.destination); sfx.connect(ctx.destination);
-    ctx.resume?.(); apply(); playNext(); tick = setInterval(loop, 500);
+  function loop() {
+    if (!ctx || paused || adOpen || document.hidden) { lastT = -1; frozen = 0; return; }
+    if (ctx.state !== 'running') { if (ctx.state !== 'closed') ctx.resume?.().catch?.(() => {}); lastT = -1; return; }
+    // a 'running' context whose clock stopped (iOS after a lock or an interruption): rebuild it on the next tap
+    const t = ctx.currentTime; if (lastT >= 0 && t <= lastT) { if (++frozen >= 3) broken = true; } else frozen = 0; lastT = t;
+    if (mv() <= 0 && !cur) return; if (!cur || cur.ctx !== ctx) return void playNext(); if (t >= cur.end - XFADE_S) playNext();
   }
-  document.addEventListener('visibilitychange', () => { if (!ctx) return; if (document.hidden) ctx.suspend?.(); else if (unlocked) ctx.resume?.(); });
+  function build() {
+    const AC = window.AudioContext || window.webkitAudioContext; if (!AC) return false;
+    try { ctx = new AC({ latencyHint: 'playback' }); } catch (_) { ctx = new AC(); }
+    music = ctx.createGain(); sfx = ctx.createGain(); music.gain.value = 0; sfx.gain.value = sv(); music.connect(ctx.destination); sfx.connect(ctx.destination);
+    const me = ctx; ctx.onstatechange = () => { if (me === ctx && me.state === 'running') loop(); };
+    stale = broken = false; lastT = -1; frozen = 0; wakeAt = performance.now(); wakeT0 = ctx.currentTime;
+    try { ctx.resume?.()?.catch?.(() => {}); } catch (_) {}
+    apply(); return true;
+  }
+  // close the old context and start a fresh one (must run inside a tap so iOS lets it start)
+  function rebuild() {
+    const old = ctx; ctx = null; cur = null; starting = false;
+    if (old) { try { old.onstatechange = null; old.close?.()?.catch?.(() => {}); } catch (_) {} }
+    for (const id of Object.keys(bufs)) delete bufs[id];   // decode again in the new context (sample rate may differ)
+    if (!build()) return; rebuilds++; playNext();
+  }
+  const healthy = () => ctx && ctx.state === 'running' && (performance.now() - wakeAt < 350 || ctx.currentTime > wakeT0 + 0.05);
+  // back in the app (no tap yet): resume and note the clock so the first tap can tell if it really runs
+  function wake() {
+    paused = false; if (!unlocked || !ctx || document.hidden || adOpen) return;
+    if (failed.size >= playlist.length) failed.clear();   // all tracks failed once (e.g. no storage at the time): try again
+    wakeAt = performance.now(); wakeT0 = ctx.currentTime; lastT = -1; frozen = 0;
+    if (ctx.state !== 'running' && ctx.state !== 'closed') { try { ctx.resume?.()?.catch?.(() => {}); } catch (_) {} }
+    loop();
+  }
+  function sleep() { paused = true; stale = stale || !!ctx; if (ctx && ctx.state === 'running') { try { ctx.suspend?.()?.catch?.(() => {}); } catch (_) {} } }
+  // every tap: first tap creates the context; later taps resume it, and rebuild it if iOS left it broken
+  function unlock() {
+    if (document.hidden) return;
+    if (!unlocked) { if (!build()) return; unlocked = true; playNext(); tick = setInterval(loop, 500); return; }
+    if (adOpen) return;
+    paused = false;
+    if (!ctx || ctx.state === 'closed' || ctx.state === 'interrupted') return rebuild();
+    if (ctx.state === 'suspended') { try { ctx.resume?.()?.catch?.(() => {}); } catch (_) {} }
+    if (broken || (stale && !healthy())) return rebuild();
+    stale = false;
+    loop();
+  }
+  document.addEventListener('visibilitychange', () => { if (document.hidden) sleep(); else wake(); });
+  document.addEventListener('pause', sleep);      // Capacitor (iOS/Android): app went to the background
+  document.addEventListener('resume', wake);      // Capacitor: app came back
+  window.addEventListener('pagehide', sleep);
+  window.addEventListener('pageshow', wake);
+  window.addEventListener('focus', () => { if (!document.hidden) wake(); });
+  // full-screen native ads (js/admob.js) take over the audio session: hold the game audio, then bring it back
+  window.addEventListener('petalspire-fullscreen-ad', (e) => {
+    if (e.detail?.open) { adOpen = true; stale = stale || !!ctx; if (ctx && ctx.state === 'running') { try { ctx.suspend?.()?.catch?.(() => {}); } catch (_) {} } }
+    else { adOpen = false; wake(); }
+  });
   return {
-    unlock, apply,
+    unlock, apply, wake, sleep,
     // one playlist everywhere: travelling keeps the current track going (scene only matters for tracks limited by `scenes`)
     setScene(id) { scene = id === 'orchard' ? 'orchard' : 'home'; if (nextT?.scenes && !nextT.scenes.includes(scene)) nextT = null; },
     skip() { return playNext(); },   // tests / a future "next track" button
     play(name) { if (!ctx || !SFX[name] || sv() <= 0 || ctx.state !== 'running') return false; try { SFX[name](ctx, sfx, ctx.currentTime + 0.01); } catch (_) {} return true; },
     get state() { return { unlocked, ctx: ctx?.state || 'none', scene, playing: cur?.id || null, title: cur?.title || null, next: nextT?.id || null, pos: cur && ctx ? +(ctx.currentTime - cur.start).toFixed(1) : 0, dur: cur ? +(cur.end - cur.start).toFixed(1) : 0, plays, tracks: playlist.length,
-      music: +mv().toFixed(3), sfx: +sv().toFixed(3), musicGain: music ? +music.gain.value.toFixed(3) : null, rendered: Object.keys(bufs), failed: [...failed] }; },
+      music: +mv().toFixed(3), sfx: +sv().toFixed(3), musicGain: music ? +music.gain.value.toFixed(3) : null, rendered: Object.keys(bufs), failed: [...failed], stale, broken, rebuilds, adOpen }; },
   };
 }
