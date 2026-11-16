@@ -729,12 +729,12 @@ export const NO_ADS_BUNDLE = { id: 'no_ads', n: 10, price: '$8.99', productId: '
 //   'placeholder' -> house banner + brand-styled 'Partner ad' placeholders; no ad SDK, nothing is loaded from the network
 //   'sdk'         -> reserved for a real partner-network SDK bridge (see js/ads.js); until one exists no partner ads show
 //   'off'         -> no ads at all
-// Banners are HOUSE ADS only (they promote our own games, see OTHER_GAMES). Full-screen interstitials and the opt-in
+// House banners promote the Schwarze Spiele books (js/books.js) and the Etsy shop (see ETSY_SHOP in js/ads.js).
+// On iOS they rotate with the AdMob banner in the same bottom slot. Full-screen interstitials and the opt-in
 // rewarded ad come from an ad partner network: ADS.partner.network names the future SDK (null = placeholder).
 export const ADS_MODE = 'placeholder';
 export const ADS = {
   banner: true,                 // small bottom house-ad banner under the tab bar (the UI is lifted so nothing is covered)
-  houseAds: ['market_plot'],    // which of OTHER_GAMES the banner promotes, in rotation
   partner: { network: null, interstitialUnit: null, rewardedUnit: null },   // e.g. { network: 'admob', interstitialUnit: 'ca-app-pub-…' }
   interstitialEverySales: 3,    // a full-screen ad break after every 3rd customer sale…
   interstitialAfterPack: true,  // …and after opening a bought Card Pack

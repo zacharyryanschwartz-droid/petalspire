@@ -1,7 +1,7 @@
 // Ads. The web build keeps house banners plus simulated rewarded/interstitial placeholders.
 // The iOS app (isNative) serves rewarded, interstitial, and a share of the bottom slot through AdMob.
-// House ads — Market Plot and each book in js/books.js — stay in the same bottom slot on both builds.
-import { ADS_MODE, ADS, OTHER_GAMES } from './data.js';
+// House ads — each book in js/books.js, plus the Schwarze Spiele Etsy shop — stay in the same bottom slot on both builds.
+import { ADS_MODE, ADS } from './data.js';
 import { BOOK_PROMO_LINE, promoBooks } from './books.js';
 import { isNative, openExternal } from './native.js';
 import { nativeAds, safeBottomPx } from './admob.js';
@@ -11,7 +11,23 @@ const MP_ART = `<svg viewBox="0 0 64 44" aria-hidden="true"><rect x="2" y="30" w
   <path d="M18 8l-2 10M28 8l-1 10M37 8l1 10M46 8l2 10" stroke="#FFF9F0" stroke-width="2.4"/><circle cx="20" cy="26" r="3.4" fill="#F5D07A"/><circle cx="28" cy="26" r="3.4" fill="#E07F86"/>
   <circle cx="36" cy="26" r="3.4" fill="#B7D4B5"/><path d="M44 21l3 6h-6z" fill="#F5D07A" stroke="#3D5A40" stroke-width="1.2"/></svg>`;
 const BOOK_ART = `<svg viewBox="0 0 64 44" aria-hidden="true"><path d="M8 8h30c8 0 14 3 14 8v20H20c-7 0-12-3-12-8V8z" fill="#FFF9F0" stroke="#3D5A40" stroke-width="2"/><path d="M20 8v24" stroke="#3D5A40" stroke-width="2"/><path d="M26 16h18M26 22h14" stroke="#F7C5C5" stroke-width="2.2" stroke-linecap="round"/><circle cx="46" cy="30" r="5" fill="#F5D07A" stroke="#3D5A40" stroke-width="1.4"/></svg>`;
-export const gameArt = (id) => (id === 'books' ? BOOK_ART : MP_ART);
+const ETSY_ART = `<svg viewBox="0 0 64 44" aria-hidden="true"><path d="M8 18h48l-5-9H13z" fill="#F7C5C5" stroke="#3D5A40" stroke-width="2" stroke-linejoin="round"/><path d="M13 18c2.4 3.2 6.2 3.2 8.4 0 2.4 3.2 6.2 3.2 8.4 0 2.4 3.2 6.2 3.2 8.4 0 2.4 3.2 6.2 3.2 8.4 0 2.4 3.2 6.2 3.2 8.4 0" fill="#F7C5C5" stroke="#3D5A40" stroke-width="1.5" stroke-linejoin="round"/><path d="M14 18h36v18H14z" fill="#FFF9F0" stroke="#3D5A40" stroke-width="2"/><rect x="27" y="24" width="10" height="12" rx="1.2" fill="#C8E0E8" stroke="#3D5A40" stroke-width="1.4"/><rect x="17" y="25" width="7" height="7" rx="1" fill="#F5D07A" stroke="#3D5A40" stroke-width="1.2"/><circle cx="45" cy="28" r="3.2" fill="#B7D4B5" stroke="#3D5A40" stroke-width="1.2"/><path d="M45 25.2v-3.2" stroke="#3D5A40" stroke-width="1.2" stroke-linecap="round"/></svg>`;
+export const gameArt = (id) => (id === 'books' ? BOOK_ART : id === 'etsy' ? ETSY_ART : MP_ART);
+
+export const ETSY_SHOP = {
+  id: 'etsy',
+  title: 'Schwarze Spiele',
+  line: '3D-printed goods and games',
+  url: 'https://www.etsy.com/shop/SchwarzeSpieleGames',
+  cta: 'Visit our Etsy shop',
+  label: 'Visit our Etsy shop',
+};
+
+function slotArt(slot) {
+  if (slot.kind === 'book') return BOOK_ART;
+  if (slot.kind === 'etsy') return ETSY_ART;
+  return gameArt(slot.id);
+}
 
 const ROTATE_MS = 45000;
 
@@ -23,18 +39,17 @@ function bannerMargin() {
   return Math.round(sab + 8 + tabH + 8);
 }
 
-function marketGame() {
-  const id = ADS.houseAds[0];
-  return OTHER_GAMES.find((g) => g.id === id) || OTHER_GAMES[0];
-}
-
 /** Bottom-slot order. Web: house ads only. iOS: AdMob, then the same house ads. */
 export function bannerSlots() {
   const slots = [];
   if (isNative()) slots.push({ kind: 'admob' });
-  const g = marketGame();
-  if (g) slots.push({ kind: 'house', id: g.id, title: g.name, line: g.tagline, tag: g.status === 'soon' ? 'Coming soon' : 'Play' });
-  for (const book of promoBooks()) slots.push({ kind: 'book', id: 'book:' + book.url, title: book.title, line: BOOK_PROMO_LINE, url: book.url, tag: 'Book' });
+  for (const book of promoBooks()) {
+    slots.push({ kind: 'book', id: 'book:' + book.url, title: book.title, line: BOOK_PROMO_LINE, url: book.url, cta: 'Get the book' });
+  }
+  const shop = ETSY_SHOP;
+  if (shop && shop.url) {
+    slots.push({ kind: 'etsy', id: shop.id, title: shop.title, line: shop.line, url: shop.url, cta: shop.cta, label: shop.label });
+  }
   return slots;
 }
 
@@ -56,10 +71,12 @@ export function createAds({ root, noAds, onHouseAd, onRemoveAds, onEvent = () =>
     banner.dataset.slot = slot.kind;
     banner.dataset.ref = slot.url || slot.id || '';
     banner.classList.toggle('book-slot', slot.kind === 'book');
+    banner.classList.toggle('etsy-slot', slot.kind === 'etsy');
     banner.classList.remove('admob-slot');
-    banner.setAttribute('aria-label', slot.kind === 'book' ? `${slot.title}. ${slot.line}` : slot.title);
-    banner.innerHTML = `<span class="hb-art">${slot.kind === 'book' ? BOOK_ART : gameArt(slot.id)}</span><span class="hb-copy"><b>${slot.title}</b><small>${slot.line}</small></span>
-      <span class="hb-tag">${slot.tag}</span><span class="hb-from">from the makers of Petalspire</span>`;
+    const label = slot.label || `${slot.title}. ${slot.line}`;
+    banner.setAttribute('aria-label', label);
+    banner.innerHTML = `<span class="hb-art">${slotArt(slot)}</span><span class="hb-copy"><b>${slot.title}</b><small>${slot.line}</small></span>
+      <span class="hb-action"><span class="hb-ad">Ad</span><span class="hb-cta">${slot.cta}</span></span>`;
   }
 
   async function present(force = false) {
@@ -88,7 +105,7 @@ export function createAds({ root, noAds, onHouseAd, onRemoveAds, onEvent = () =>
     try {
       if (slot.kind === 'admob') {
         banner.classList.add('admob-slot');
-        banner.classList.remove('book-slot');
+        banner.classList.remove('book-slot', 'etsy-slot');
         const ok = await nativeAds.showBanner(bannerMargin());
         if (!ok) { shownKey = ''; slotIdx = (slotIdx + 1) % slots.length; presenting = false; present(true); return; }
       } else {
@@ -98,12 +115,12 @@ export function createAds({ root, noAds, onHouseAd, onRemoveAds, onEvent = () =>
     } finally { presenting = false; }
   }
 
-  function advance() { slotIdx += 1; shownKey = ''; present(true); }
+  function advance() { slotIdx += 1; shownKey = ''; return present(true); }
 
   banner.addEventListener('click', () => {
     const slot = displayed;
     if (!slot || slot.kind === 'admob' || banner.classList.contains('admob-slot')) return;
-    if (slot.kind === 'book') { openExternal(slot.url); return; }
+    if (slot.url) { openExternal(slot.url); return; }
     onHouseAd(slot.id);
   });
 
@@ -178,6 +195,7 @@ export function createAds({ root, noAds, onHouseAd, onRemoveAds, onEvent = () =>
       return true;
     },
     registerProvider(name, impl) { providers[name] = impl; },
+    advance,
     _resetGap() { lastBreak = 0; },
   };
 }
