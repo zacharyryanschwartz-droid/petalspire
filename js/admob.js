@@ -1,7 +1,8 @@
-// AdMob for the iOS app only. The web build never calls into the native plugin.
+// AdMob for the iOS and Android apps only. The web build never calls into the native plugin.
 // Rewards are granted only after the rewarded callback. A failed load never pays and never hangs.
 import { admobIds } from './admob-config.js';
-import { isNative, launchCount } from './native.js';
+import { androidAdmobIds } from './admob-config-android.js';
+import { isAndroid, isNative, launchCount } from './native.js';
 
 const REWARD_EVENT = 'onRewardedVideoAdReward';
 const REWARD_DISMISS = 'onRewardedVideoAdDismissed';
@@ -38,7 +39,7 @@ const state = {
   bannerUp: false,
 };
 
-function ids() { return admobIds(); }
+function ids() { return isAndroid() ? androidAdmobIds() : admobIds(); }
 
 async function listen(AdMob, name, fn) {
   try { return await AdMob.addListener(name, fn); } catch { return null; }

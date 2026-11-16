@@ -1,6 +1,6 @@
-// StoreKit 2 bridge. The web build never loads a store, so real-money buttons stay hidden there.
+// Store bridge: StoreKit 2 on iOS, Google Play Billing on Android (same PetalspireStore plugin interface). The web build never loads a store, so real-money buttons stay hidden there.
 import { JEWEL_BUNDLES, NO_ADS_BUNDLE, OFFER_PACKS } from './data.js';
-import { isNative } from './native.js';
+import { isAndroid, isNative } from './native.js';
 
 export const PRIVACY_URL = 'https://zacharyryanschwartz-droid.github.io/petalspire/privacy.html';
 
@@ -57,7 +57,7 @@ export async function buyProduct(productId) {
   try { res = await Store.purchase({ productId }); }
   catch { return { ok: false, reason: 'Purchase didn’t go through' }; }
   if (!res || res.status === 'cancelled') return { ok: false, cancelled: true };
-  if (res.status === 'pending') return { ok: false, pending: true, reason: 'Waiting for approval from the App Store.' };
+  if (res.status === 'pending') return { ok: false, pending: true, reason: isAndroid() ? 'Waiting for payment to finish in Google Play.' : 'Waiting for approval from the App Store.' };
   if (res.status !== 'purchased' || res.verified !== true || !res.transactionId) {
     return { ok: false, reason: res.reason || 'Purchase didn’t go through' };
   }

@@ -10,6 +10,16 @@ export function isNative() {
   return globalThis.__PETALSPIRE_NATIVE__ === true;
 }
 
+/** 'ios', 'android' or 'web'. */
+export function nativePlatform() {
+  if (!isNative()) return 'web';
+  try { return globalThis.Capacitor?.getPlatform?.() || 'ios'; } catch { return 'ios'; }
+}
+
+export function isAndroid() {
+  return nativePlatform() === 'android';
+}
+
 export function saveTimestamp(raw) {
   if (typeof raw !== 'string' || !raw) return null;
   try {
@@ -154,6 +164,8 @@ export function syncNativeChrome() {
   const hud = document.getElementById('hud');
   if (hud) root.style.setProperty('--hud-h', Math.ceil(hud.getBoundingClientRect().height) + 'px');
   if (root.style.getPropertyValue('--native-sat')) return;
+  // Android: Capacitor's SystemBars passes real insets to env(safe-area-inset-*) or pads the WebView, so no iPhone guess.
+  if (isAndroid()) return;
   const tall = Math.min(screen.width, screen.height) >= 360 && Math.max(screen.width, screen.height) >= 800;
   if (!tall) return;
   root.style.setProperty('--native-sat', '59px');

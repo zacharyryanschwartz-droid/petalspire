@@ -1,0 +1,88 @@
+name: Android Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version_code:
+        description: "Play versionCode (must go up with every upload)"
+        required: false
+        default: "1"
+  push:
+    tags:
+      - "v*"
+  pull_request:
+    paths:
+      - "android/**"
+      - ".github/workflows/android-release.yml"
+      - "scripts/make-android-icons.mjs"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: android-release-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  bundle:
+    name: Build signed AAB
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+          cache: gradle
+
+      - name: Install
+        run: npm ci
+
+      - name: Bundle web and sync Capacitor
+        run: npm run cap:sync:android
+
+      - name: Tests
+        run: npm run test:android
+
+      - name: Upload keystore
+        env:
+          ANDROID_KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_B64 }}
+        run: |
+          test -n "$ANDROID_KEYSTORE_B64" || { echo "ANDROID_KEYSTORE_B64 secret missing"; exit 1; }
+          echo "$ANDROID_KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/upload-keystore.jks"
+
+      - name: Build release bundle
+        working-directory: android
+        env:
+          ANDROID_KEYSTORE_PATH: ${{ runner.temp }}/upload-keystore.jks
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          VERSION_CODE: ${{ github.event.inputs.version_code || '1' }}
+        run: |
+          chmod +x gradlew
+          ./gradlew --no-daemon bundleRelease -PpetalspireVersionCode="$VERSION_CODE"
+          jarsigner -verify app/build/outputs/bundle/release/app-release.aab
+          cp app/build/outputs/bundle/release/app-release.aab "$RUNNER_TEMP/petalspire-1.0.aab"
+
+      - name: Upload AAB
+        uses: actions/upload-artifact@v4
+        with:
+          name: petalspire-android-aab
+          path: ${{ runner.temp }}/petalspire-1.0.aab
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Remove keystore
+        if: always()
+        run: rm -f "$RUNNER_TEMP/upload-keystore.jks"

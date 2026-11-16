@@ -7,10 +7,14 @@
     "bundle:www": "node scripts/bundle-www.mjs",
     "icons": "node scripts/make-icons.mjs",
     "cap:sync": "npm run bundle:www && cap sync ios",
-    "test:native": "node --test --test-concurrency=1 tests/native-bridge.mjs"
+    "test:native": "node --test --test-concurrency=1 tests/native-bridge.mjs",
+    "icons:android": "node scripts/make-android-icons.mjs",
+    "cap:sync:android": "npm run bundle:www && cap sync android",
+    "test:android": "node --test --test-concurrency=1 tests/android-bridge.mjs"
   },
   "dependencies": {
     "@capacitor-community/admob": "8.3.0",
+    "@capacitor/android": "^8.6.0",
     "@capacitor/browser": "^8.0.0",
     "@capacitor/core": "8.6.0",
     "@capacitor/ios": "8.6.0",
