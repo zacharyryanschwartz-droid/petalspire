@@ -1,4 +1,4 @@
-# Petalspire v0.8.7.6
+# Petalspire v0.8.7.7
 
 A cozy 3D flower-garden prototype for iPhone Safari (portrait, one thumb). Also plays on desktop with a mouse.
 This is a **prototype**: version numbers stay below 1.0 until the first official release.
@@ -20,6 +20,10 @@ This is a **prototype**: version numbers stay below 1.0 until the first official
 7. **Land for sale.** Five wooded plots, each with a floating For Sale sign: 450 → 900 → 1800 → 3000 → 4500 coins (v0.7.2; was 150 → 1500).
 
 Drag with one finger to pan, pinch to zoom, and twist with two fingers to turn. On desktop, right-drag or shift-drag turns the view.
+
+## New in v0.8.7.7
+
+Every menu can be closed again on small iPhones. Sprig's goal card used to sit on top of a menu's header and catch the tap meant for its X, while the guide kept saying "Close this menu first". Taps now pass through the goal card, the menu gives up room at its top so the X stays in sight, and close buttons are bigger with a wider tap area. Tapping outside a menu or pressing Escape also closes it.
 
 ## New in v0.8.7.6
 

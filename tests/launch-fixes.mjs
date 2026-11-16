@@ -52,7 +52,7 @@ try {
       coins: window.__ps?.state?.coins,
     }));
     let parsed = false; try { parsed = !!JSON.parse(got.raw); } catch { parsed = false; }
-    ok('version is 0.8.7.6', got.build === '0.8.7.6', got.build);
+    ok('version is 0.8.7.7', got.build === '0.8.7.7', got.build);
     ok('unreadable save is kept in petalspire.v03.bak', got.bak === '{not json', got.bak);
     ok('a fresh garden replaces the bad key only after the backup', parsed && got.coins === 10, { coins: got.coins, head: (got.raw || '').slice(0, 40) });
     ok('unreadable save does not throw', errors.length === 0, errors);

@@ -65,7 +65,7 @@ echo "profile installed"
 
 BUILD_NUM="$(node scripts/asc.mjs next-build)"
 MARKETING_VERSION="0.8.7"
-echo "marketing=$MARKETING_VERSION build=$BUILD_NUM game=0.8.7.6"
+echo "marketing=$MARKETING_VERSION build=$BUILD_NUM game=0.8.7.7"
 
 if [ -d ios/App/App.xcworkspace ]; then
   XCODE=(-workspace ios/App/App.xcworkspace)
