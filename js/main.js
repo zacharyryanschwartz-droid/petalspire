@@ -5337,6 +5337,7 @@ setLoc(curLoc(), true);   // v0.6: resume where the player left off (Home or the
 
 // ---------------- Title & intro ----------------
 if (S.introDone) $('#btn-start').textContent = 'Continue';
+if (isNative()) { const v = $('#title .version'); if (v) v.textContent = `v${BUILD}`; }   // the App Store app is a release, not a prototype
 $('#btn-start').addEventListener('click', () => {
   $('#title').classList.add('out'); setTimeout(() => $('#title').classList.add('hidden'), 650);
   document.body.classList.remove('on-title');   // v0.68: the HUD and tab bar wait behind the title screen
