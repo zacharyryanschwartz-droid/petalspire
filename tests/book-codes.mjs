@@ -70,14 +70,24 @@ await page.evaluate(() => {
 });
 
 async function redeem(typed) {
-  if (!(await page.locator('#redeem-in').isVisible())) {
-    if (await page.locator('#panel:not(.hidden)').count()) await page.click('#panel-close');
-    await page.click('#btn-settings');
+  const panelOpen = await page.evaluate(() => !document.getElementById('panel')?.classList.contains('hidden'));
+  const redeemVisible = await page.locator('#redeem-in').isVisible();
+  if (panelOpen && !redeemVisible) {
+    const close = page.locator('#panel-close');
+    if (await close.count()) await close.click({ force: true });
+    else await page.keyboard.press('Escape');
+    await page.waitForFunction(() => document.getElementById('panel')?.classList.contains('hidden'), { timeout: 5000 });
   }
-  await page.fill('#redeem-in', typed);
+  if (!(await page.locator('#redeem-in').isVisible())) {
+    await page.click('#btn-settings');
+    await page.locator('#redeem-in').waitFor({ state: 'visible' });
+  }
+  await page.locator('#redeem-in').fill(typed);
+  await page.evaluate(() => document.querySelectorAll('.toast').forEach((el) => el.remove()));
   await page.click('[data-act="redeem"]');
-  const text = (await page.locator('.toast').last().innerText()).replace(/\s+/g, ' ');
-  return text;
+  const toast = page.locator('.toast').last();
+  await toast.waitFor({ state: 'visible', timeout: 15000 });
+  return (await toast.innerText()).replace(/\s+/g, ' ');
 }
 
 async function openFinds() {
@@ -133,6 +143,7 @@ async function placeDecor(type, cx, cz, span = 6) {
 const before = await page.evaluate(() => ({ coins: window.__ps.state.coins, wood: window.__ps.state.wood, atm: window.__ps.atmosphereAt('home') }));
 const snowToast = await redeem('snow finch');
 ok('SNOWFINCH names the book and the three keepsakes', /Holly & Wing/.test(snowToast) && /Snowfinch Pair/.test(snowToast) && /Holly Cluster/.test(snowToast) && /Winter Ornament/.test(snowToast) && /just for looks/.test(snowToast), snowToast);
+ok('SNOWFINCH toast does not mention two copies or both locations', !/Home and/i.test(snowToast) && !/the Orchard/i.test(snowToast) && !/×2|two of each/i.test(snowToast), snowToast);
 
 const snowBag = await page.evaluate((ids) => {
   const s = window.__ps.state;
@@ -143,14 +154,14 @@ const snowBag = await page.evaluate((ids) => {
     shop: window.__ps.decoMarketRows('home').join(''),
   };
 }, SNOW);
-ok('SNOWFINCH grants two of each keepsake', SNOW.every((id) => snowBag.inv[id] === 2), snowBag.inv);
+ok('SNOWFINCH grants one of each keepsake', SNOW.every((id) => snowBag.inv[id] === 1), snowBag.inv);
 ok('SNOWFINCH is remembered on the save', snowBag.claimed);
 ok('snow keepsakes add no atmosphere and stay out of the Market', snowBag.atm && !/Snowfinch|Holly Cluster|Winter Ornament/.test(snowBag.shop));
 
 const again = await redeem('SNOWFINCH');
 ok('a second SNOWFINCH says already claimed', /already claimed/i.test(again), again);
 const snowStill = await page.evaluate((ids) => Object.fromEntries(ids.map((id) => [id, window.__ps.state.decorInv[id] || 0])), SNOW);
-ok('a second SNOWFINCH adds nothing', SNOW.every((id) => snowStill[id] === 2), snowStill);
+ok('a second SNOWFINCH adds nothing', SNOW.every((id) => snowStill[id] === 1), snowStill);
 
 await page.click('#tab-bag');
 await page.click('[data-bag="finds"]');
@@ -161,7 +172,7 @@ const bag = await page.evaluate((ids) => {
   });
   return { rows, imgs: document.querySelectorAll('#panel-body img').length };
 }, SNOW);
-ok('Bag Finds lists the snow keepsakes as looks-only', bag.rows.every((r) => r && /Keepsake decoration · just for looks/.test(r.text) && /×2/.test(r.text)), bag.rows?.map((r) => r?.text));
+ok('Bag Finds lists the snow keepsakes as looks-only', bag.rows.every((r) => r && /Keepsake decoration · just for looks/.test(r.text) && !/×2/.test(r.text) && !/one per location/.test(r.text)), bag.rows?.map((r) => r?.text));
 ok('menu icons are drawn markup, not images', bag.rows.every((r) => /<svg/i.test(r.html) && !/<img/i.test(r.html)) && bag.imgs === 0);
 await page.locator('[data-d8-bag="d8_ornament"]').scrollIntoViewIfNeeded();
 await page.screenshot({ path: `${ART}/book-codes-bag.png` });
@@ -188,9 +199,13 @@ const placed = await page.evaluate(async () => {
 ok('Snowfinch Pair can be placed in the garden', placed.hit?.type === 'd8_snowfinch' && !placed.stillPlacing, placed.hit);
 ok('placing a keepsake does not raise atmosphere', placed.atm === before.atm && /Just for looks/.test(placed.pop), { atm: placed.atm, pop: placed.pop });
 const snowInv = await page.evaluate(() => window.__ps.state.decorInv.d8_snowfinch || 0);
-ok('placing a Snowfinch Pair takes one out of the bag', snowInv === 1, snowInv);
+ok('placing a Snowfinch Pair takes it out of the bag', snowInv === 0, snowInv);
 await openFinds();
-ok('a Snowfinch Pair already at Home leaves the Home bag', (await bagRow('d8_snowfinch')) == null);
+ok('a placed Snowfinch Pair leaves the Home bag', (await bagRow('d8_snowfinch')) == null);
+await goLoc('orchard');
+await openFinds();
+ok('a placed Snowfinch Pair also leaves the Orchard bag', (await bagRow('d8_snowfinch')) == null);
+await goLoc('home');
 await page.screenshot({ path: `${ART}/book-codes-garden.png` });
 
 const models = await page.evaluate((ids) => {
@@ -217,6 +232,7 @@ await page.screenshot({ path: `${ART}/book-codes-quilt.png` });
 for (const book of BOOKS) {
   const toast = await redeem(book.typed);
   ok(`${book.code} names the book and the three keepsakes`, new RegExp(esc(book.book)).test(toast) && book.names.every((n) => new RegExp(esc(n)).test(toast)) && /just for looks/.test(toast), toast);
+  ok(`${book.code} toast does not mention two copies or both locations`, !/Home and/i.test(toast) && !/the Orchard/i.test(toast), toast);
   const info = await page.evaluate(({ ids, code, names }) => {
     const s = window.__ps.state;
     return {
@@ -227,13 +243,13 @@ for (const book of BOOKS) {
       names,
     };
   }, book);
-  ok(`${book.code} grants two of each keepsake`, book.ids.every((id) => info.inv[id] === 2), info.inv);
+  ok(`${book.code} grants one of each keepsake`, book.ids.every((id) => info.inv[id] === 1), info.inv);
   ok(`${book.code} is remembered on the save`, info.claimed);
   ok(`${book.code} keepsakes add no atmosphere and stay out of the Market`, info.atm && !book.names.some((n) => info.shop.includes(n)));
   const again = await redeem(book.code);
   ok(`a second ${book.code} says already claimed`, /already claimed/i.test(again), again);
   const still = await page.evaluate((ids) => Object.fromEntries(ids.map((id) => [id, window.__ps.state.decorInv[id] || 0])), book.ids);
-  ok(`a second ${book.code} adds nothing`, book.ids.every((id) => still[id] === 2), still);
+  ok(`a second ${book.code} adds nothing`, book.ids.every((id) => still[id] === 1), still);
 }
 
 await page.click('#tab-bag');
@@ -245,33 +261,26 @@ const newBag = await page.evaluate((ids) => {
   });
   return { rows, imgs: document.querySelectorAll('#panel-body img').length };
 }, NEW_IDS);
-ok('Bag Finds lists the new keepsakes as looks-only', newBag.rows.every((r) => r && /Keepsake decoration · just for looks/.test(r.text) && /×2/.test(r.text)), newBag.rows?.map((r) => r?.id + ':' + r?.text));
+ok('Bag Finds lists the new keepsakes as looks-only', newBag.rows.every((r) => r && /Keepsake decoration · just for looks/.test(r.text) && !/×2/.test(r.text) && !/one per location/.test(r.text)), newBag.rows?.map((r) => r?.id + ':' + r?.text));
 ok('new keepsake menu icons are drawn markup, not images', newBag.rows.every((r) => /<svg/i.test(r.html) && !/<img/i.test(r.html)) && newBag.imgs === 0);
 await page.locator('[data-d8-bag="d8_nightlamp"]').scrollIntoViewIfNeeded();
 await page.screenshot({ path: `${ART}/book-codes-new-sets.png` });
 
 const love = await page.evaluate(() => ({ ok: window.__ps.redeemCode('LOVEBUG'), n: window.__ps.state.decorInv.d8_lovebug || 0 }));
-ok('LOVEBUG still grants its own keepsake', love.ok === true && love.n === 2, love);
+ok('LOVEBUG still grants its own keepsake', love.ok === true && love.n === 1, love);
 
 await goLoc('home');
 await openFinds();
 const loveBag0 = await bagRow('d8_lovebug');
-ok('Love Bug shows as ×2 in the Home bag before placing', !!(loveBag0 && /Love Bug/.test(loveBag0) && /×2/.test(loveBag0)), loveBag0);
+ok('Love Bug shows once in the bag before placing', !!(loveBag0 && /Love Bug/.test(loveBag0) && !/×2/.test(loveBag0)), loveBag0);
 const loveHome = await placeDecor('d8_lovebug', -1.5, 1.2);
-ok('placing a Love Bug takes one out of the bag', loveHome.hit?.type === 'd8_lovebug' && !loveHome.stillPlacing && loveHome.inv === 1, loveHome);
+ok('placing a Love Bug takes it out of the bag', loveHome.hit?.type === 'd8_lovebug' && !loveHome.stillPlacing && loveHome.inv === 0, loveHome);
 await openFinds();
-ok('a Love Bug already at Home leaves the Home bag', (await bagRow('d8_lovebug')) == null);
+ok('a placed Love Bug leaves the Home bag', (await bagRow('d8_lovebug')) == null);
 await goLoc('orchard');
 await openFinds();
-const loveBagOrch = await bagRow('d8_lovebug');
-ok('the leftover Love Bug stays in the Orchard bag', !!(loveBagOrch && /Love Bug/.test(loveBagOrch) && !/×2/.test(loveBagOrch)), loveBagOrch);
-const loveOrch = await placeDecor('d8_lovebug', 300, -2, 10);
-ok('placing the second Love Bug at the Orchard empties the bag', loveOrch.hit?.type === 'd8_lovebug' && !loveOrch.stillPlacing && loveOrch.inv === 0, loveOrch);
-await openFinds();
-ok('Love Bug leaves the Orchard bag once both are placed', (await bagRow('d8_lovebug')) == null);
+ok('a placed Love Bug also leaves the Orchard bag', (await bagRow('d8_lovebug')) == null);
 await goLoc('home');
-await openFinds();
-ok('Love Bug stays out of the Home bag when both are placed', (await bagRow('d8_lovebug')) == null);
 
 const moved = await page.evaluate(() => {
   const d = window.__ps.state.decor.find((x) => x.type === 'd8_lovebug' && x.x < 100);
@@ -281,7 +290,7 @@ const moved = await page.evaluate(() => {
   const x = d.x + 0.9, z = d.z + 0.4;
   const ok = window.__ps.commitMove({ kind: 'decor', id: d.key }, x, z);
   const again = window.__ps.state.decor.find((x) => x.key === d.key);
-  return { ok, inv0, inv: window.__ps.state.decorInv.d8_lovebug || 0, moved: !!(again && (Math.abs(again.x - d.x) > 0.2 || Math.abs(again.z - d.z) > 0.2)), stillPlaced: !!again };
+  return { ok, inv0, inv: window.__ps.state.decorInv.d8_lovebug || 0, stillPlaced: !!again };
 });
 ok('moving a placed Love Bug does not change the bag', moved.ok && moved.inv === moved.inv0 && moved.inv === 0 && moved.stillPlaced, moved);
 
@@ -290,29 +299,37 @@ const demo = await page.evaluate(() => {
   window.__ps.doDemolish('decor', d.key);
   return { inv: window.__ps.state.decorInv.d8_lovebug || 0, placed: window.__ps.state.decor.filter((x) => x.type === 'd8_lovebug').length };
 });
-ok('demolishing a Love Bug returns one to the bag', demo.inv === 1 && demo.placed === 1, demo);
+ok('demolishing a Love Bug returns it to the bag', demo.inv === 1 && demo.placed === 0, demo);
 await goLoc('home');
 await openFinds();
 ok('the returned Love Bug shows again in the Home bag', /Love Bug/.test((await bagRow('d8_lovebug')) || ''));
 await goLoc('orchard');
 await openFinds();
-ok('the Orchard Love Bug stays out of the Orchard bag after the Home one is returned', (await bagRow('d8_lovebug')) == null);
+ok('the returned Love Bug also shows in the Orchard bag', /Love Bug/.test((await bagRow('d8_lovebug')) || ''));
 await goLoc('home');
 
-for (const [id, name, x, z] of [['d8_fairticket', 'Midway Ticket', -0.4, 2.2], ['d8_bust', 'Marble Bust', 1.2, 1.6]]) {
-  const beforeInv = await page.evaluate((id) => window.__ps.state.decorInv[id] || 0, id);
-  await openFinds();
-  ok(`${name} is in the Home bag before placing`, !!(await bagRow(id)));
-  const hit = await placeDecor(id, x, z);
-  const afterInv = await page.evaluate((id) => window.__ps.state.decorInv[id] || 0, id);
-  ok(`placing a ${name} takes one out of the bag`, hit.hit?.type === id && afterInv === beforeInv - 1, { hit: hit.hit, beforeInv, afterInv });
-  await openFinds();
-  ok(`a ${name} already at Home leaves the Home bag`, (await bagRow(id)) == null);
-  await goLoc('orchard');
-  await openFinds();
-  ok(`the leftover ${name} stays in the Orchard bag`, !!(await bagRow(id)));
-  await goLoc('home');
-}
+// Midway Ticket is placed at the Orchard to prove a single copy can stand at either location.
+await goLoc('orchard');
+await openFinds();
+ok('Midway Ticket is in the Orchard bag before placing', !!(await bagRow('d8_fairticket')));
+const ticketHit = await placeDecor('d8_fairticket', 300, -2, 10);
+ok('placing a Midway Ticket at the Orchard takes it out of the bag', ticketHit.hit?.type === 'd8_fairticket' && ticketHit.inv === 0, ticketHit);
+await openFinds();
+ok('a placed Midway Ticket leaves the Orchard bag', (await bagRow('d8_fairticket')) == null);
+await goLoc('home');
+await openFinds();
+ok('a placed Midway Ticket also leaves the Home bag', (await bagRow('d8_fairticket')) == null);
+
+await openFinds();
+ok('Marble Bust is in the Home bag before placing', !!(await bagRow('d8_bust')));
+const bustHit = await placeDecor('d8_bust', 1.2, 1.6);
+ok('placing a Marble Bust takes it out of the bag', bustHit.hit?.type === 'd8_bust' && bustHit.inv === 0, bustHit);
+await openFinds();
+ok('a placed Marble Bust leaves the Home bag', (await bagRow('d8_bust')) == null);
+await goLoc('orchard');
+await openFinds();
+ok('a placed Marble Bust also leaves the Orchard bag', (await bagRow('d8_bust')) == null);
+await goLoc('home');
 
 const jewelsBefore = await page.evaluate(() => window.__ps.state.jewels);
 const bloom = await redeem('early bloom');
@@ -346,10 +363,10 @@ const kept = await page.evaluate((ids) => {
     atm: window.__ps.atmosphereAt('home'),
   };
 }, [...SNOW, ...QUILT, ...NEW_IDS, 'd8_lovebug']);
-const placedBag = new Set(['d8_snowfinch', 'd8_lovebug', 'd8_fairticket', 'd8_bust']);
-ok('keepsakes persist in the save after reload', SNOW.concat(QUILT, NEW_IDS).every((id) => kept.inv[id] === (placedBag.has(id) ? 1 : 2) && kept.saved[id] === kept.inv[id]) && kept.inv.d8_lovebug === 1, kept.inv);
+const outOfBag = new Set(['d8_snowfinch', 'd8_fairticket', 'd8_bust']);
+ok('keepsakes persist in the save after reload', SNOW.concat(QUILT, NEW_IDS, ['d8_lovebug']).every((id) => kept.inv[id] === (outOfBag.has(id) ? 0 : 1) && kept.saved[id] === kept.inv[id]), kept.inv);
 ok('a placed Snowfinch Pair is still in the garden', kept.placed === 1 && kept.placedSaved === 1);
-ok('a returned Love Bug and the Orchard placement persist', kept.inv.d8_lovebug === 1 && kept.saved.d8_lovebug === 1, { inv: kept.inv.d8_lovebug, saved: kept.saved.d8_lovebug });
+ok('the returned Love Bug stays in the bag after reload', kept.inv.d8_lovebug === 1 && kept.saved.d8_lovebug === 1, { inv: kept.inv.d8_lovebug, saved: kept.saved.d8_lovebug });
 ok('redeeming changes neither coins nor wood nor atmosphere', kept.coins === before.coins && kept.wood === before.wood && kept.atm === before.atm, kept);
 ok('all book codes stay claimed', !!(kept.codes?.SNOWFINCH && kept.codes?.QUILTBEE && kept.codes?.LOVEBUG && kept.codes?.EARLYBLOOM && BOOKS.every((b) => kept.codes?.[b.code])), kept.codes);
 ok('the 25 tester jewels persist after reload', kept.jewels === jewelsBefore + 25 && kept.jewelsSaved === jewelsBefore + 25, { jewels: kept.jewels, saved: kept.jewelsSaved, before: jewelsBefore });
@@ -393,14 +410,16 @@ const fixed = await page2.evaluate(() => {
     horse: count('d8_carousel'),
     balloon: count('d8_prizeballoon'),
     bust: count('d8_bust'),
+    exhibit: count('d8_exhibit'),
     arbor: count('d8_arbor'),
   };
 });
-ok('a bugged Love Bug save keeps one bag copy for the free location', fixed.love.inv === 1 && fixed.love.saved === 1 && fixed.love.placed === 1, fixed.love);
-ok('two placed Midway Tickets drop the leftover bag copies', fixed.ticket.inv === 0 && fixed.ticket.saved === 0 && fixed.ticket.placed === 2, fixed.ticket);
-ok('a legit placed-plus-bag Carousel Horse is left alone', fixed.horse.inv === 1 && fixed.horse.saved === 1 && fixed.horse.placed === 1, fixed.horse);
-ok('unplaced Prize Balloons stay in the bag', fixed.balloon.inv === 2 && fixed.balloon.saved === 2 && fixed.balloon.placed === 0, fixed.balloon);
+ok('a placed Love Bug drops leftover bag copies', fixed.love.inv === 0 && fixed.love.saved === 0 && fixed.love.placed === 1, fixed.love);
+ok('two already-placed Midway Tickets drop leftover bag copies', fixed.ticket.inv === 0 && fixed.ticket.saved === 0 && fixed.ticket.placed === 2, fixed.ticket);
+ok('a placed Carousel Horse drops its leftover bag copy', fixed.horse.inv === 0 && fixed.horse.saved === 0 && fixed.horse.placed === 1, fixed.horse);
+ok('unplaced Prize Balloons keep exactly one in the bag', fixed.balloon.inv === 1 && fixed.balloon.saved === 1 && fixed.balloon.placed === 0, fixed.balloon);
 ok('a single unplaced Marble Bust is left alone', fixed.bust.inv === 1 && fixed.bust.saved === 1 && fixed.bust.placed === 0, fixed.bust);
+ok('a redeemed Exhibit Case with no copies gets one in the bag', fixed.exhibit.inv === 1 && fixed.exhibit.saved === 1 && fixed.exhibit.placed === 0, fixed.exhibit);
 ok('a placed Friendship Arbor does not keep a leftover bag copy', fixed.arbor.inv === 0 && fixed.arbor.saved === 0 && fixed.arbor.placed === 1, fixed.arbor);
 ok('the repair load stays free of script errors', errors2.length === 0, errors2);
 await ctx2.close();
