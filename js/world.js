@@ -1517,6 +1517,25 @@ export function createWorld(canvas) {
         [[0, 0.22, 0], [0.07, 0.16, 0.04], [-0.07, 0.16, 0.03], [0.04, 0.1, 0.07], [-0.05, 0.1, 0.06], [0, 0.06, 0.02], [0.08, 0.12, -0.04], [-0.06, 0.13, -0.05]].forEach(([x, y, z]) => g.add(M(new THREE.SphereGeometry(0.055, 8, 6), grape, x, y, z)));
         const leaf = M(leafGeo, mat('#B7D4B5'), -0.1, 0.28, -0.04, 0.6, 0.4, 0.3); leaf.scale.set(1.2, 1, 1.4); g.add(leaf);
         const leaf2 = M(leafGeo, mat('#3D5A40'), 0.1, 0.3, -0.02, -0.5, -0.5, 0.4); leaf2.scale.set(1.1, 1, 1.3); g.add(leaf2); hitH = 0.5; break; }
+      case 'd8_fairticket': { const cream = mat('#FFF9F0'), blush = mat('#F7C5C5'), gold = mat('#F5D07A');
+        g.add(M(new THREE.BoxGeometry(0.42, 0.26, 0.02), cream, 0, 0.28), M(new THREE.BoxGeometry(0.42, 0.07, 0.022), blush, 0, 0.28, 0.002), M(new THREE.CylinderGeometry(0.04, 0.04, 0.025, 12), gold, -0.12, 0.3, 0.014), M(new THREE.CylinderGeometry(0.015, 0.015, 0.16, 6), mat('#8E6040'), 0, 0.08));
+        hitH = 0.45; break; }
+      case 'd8_carousel': { const blush = mat('#F7C5C5', { roughness: 0.5 }), gold = mat('#F5D07A', { metalness: 0.4, roughness: 0.35 });
+        g.add(M(new THREE.CylinderGeometry(0.025, 0.025, 0.7, 8), gold, 0, 0.36), M(new THREE.BoxGeometry(0.28, 0.14, 0.1), blush, 0.02, 0.32, 0), M(new THREE.BoxGeometry(0.1, 0.1, 0.08), blush, 0.16, 0.4, 0));
+        g.add(M(new THREE.BoxGeometry(0.05, 0.16, 0.04), blush, -0.08, 0.2, 0.03), M(new THREE.BoxGeometry(0.05, 0.16, 0.04), blush, 0.1, 0.2, 0.03), M(new THREE.BoxGeometry(0.05, 0.16, 0.04), blush, -0.08, 0.2, -0.03), M(new THREE.BoxGeometry(0.05, 0.16, 0.04), blush, 0.1, 0.2, -0.03), M(new THREE.CylinderGeometry(0.06, 0.06, 0.03, 10), gold, 0, 0.72));
+        hitH = 0.8; break; }
+      case 'd8_prizeballoon': { const blush = mat('#F7C5C5', { roughness: 0.35 });
+        g.add(M(new THREE.SphereGeometry(0.16, 14, 12), blush, 0, 0.48), M(new THREE.ConeGeometry(0.03, 0.05, 8), blush, 0, 0.31), M(new THREE.CylinderGeometry(0.008, 0.008, 0.3, 6), mat('#F5D07A'), 0, 0.16), M(new THREE.TorusGeometry(0.03, 0.008, 6, 10), mat('#B7D4B5'), 0, 0.28));
+        hitH = 0.7; break; }
+      case 'd8_bust': { const marble = mat('#FFF9F0', { roughness: 0.4 });
+        g.add(M(new THREE.CylinderGeometry(0.14, 0.16, 0.1, 12), mat('#3D5A40'), 0, 0.05), M(new THREE.CylinderGeometry(0.1, 0.12, 0.16, 10), marble, 0, 0.18), M(new THREE.SphereGeometry(0.09, 12, 10), marble, 0, 0.34), M(new THREE.BoxGeometry(0.16, 0.06, 0.08), marble, 0, 0.26, 0));
+        hitH = 0.5; break; }
+      case 'd8_exhibit': { const glass = mat('#C8E0E8', { transparent: true, opacity: 0.4, roughness: 0.05 });
+        g.add(M(new THREE.BoxGeometry(0.36, 0.05, 0.28), mat('#8E6040'), 0, 0.025), M(new THREE.BoxGeometry(0.32, 0.32, 0.24), glass, 0, 0.21), M(new THREE.OctahedronGeometry(0.07, 0), mat('#F5D07A', { metalness: 0.4 }), 0, 0.18), M(new THREE.BoxGeometry(0.36, 0.02, 0.28), mat('#FFF9F0'), 0, 0.38));
+        hitH = 0.45; break; }
+      case 'd8_nightlamp': { const moss = mat('#3D5A40'), glass = mat('#C8E0E8', { transparent: true, opacity: 0.45, roughness: 0.1 });
+        g.add(M(new THREE.CylinderGeometry(0.1, 0.12, 0.05, 10), moss, 0, 0.03), M(new THREE.CylinderGeometry(0.1, 0.1, 0.22, 10), glass, 0, 0.16), M(new THREE.CylinderGeometry(0.11, 0.08, 0.06, 8), moss, 0, 0.3), M(new THREE.SphereGeometry(0.05, 8, 6), mat('#F5D07A', { emissive: '#F5D07A', emissiveIntensity: 0.7 }), 0, 0.16), M(new THREE.TorusGeometry(0.04, 0.01, 6, 10), mat('#F5D07A'), 0, 0.36, 0, Math.PI / 2));
+        hitH = 0.5; break; }
     }
     const hit = new THREE.Mesh(new THREE.BoxGeometry(1.0, hitH, 0.9), new THREE.MeshBasicMaterial({ visible: false })); hit.position.y = hitH / 2; g.add(hit);
     return g;
