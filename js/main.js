@@ -2685,7 +2685,7 @@ function findsHTML() {
   const shelfRow = (f) => { const k = kindOfBonus('crate'), has = !!S.shelfOn;
     return `<div class="row shelf-row" data-shelf-row><div class="ico">${findIcon(k)}</div><div class="meta"><b>${f.into.name}</b><small>${has ? `Spare · your Farm Stand already has a Crate Shelf (permanent) · sell it or stock it as an antique` : S.standBuilt ? `In your Bag · install it on your Farm Stand for +${SHELF_BONUS} shelf space (permanent)` : `In your Bag · build the Farm Stand to install it (+${SHELF_BONUS} shelf space)`}</small></div><div class="acts">${has ? '' : `<button class="btn btn-gold sm" data-install-shelf ${S.standBuilt ? '' : 'disabled'}>Install</button>`}<button class="btn sm" data-sell-restored="${k}">Sell ${coin(buyback(RESALE.antique[k]))}</button></div></div>`; };
   const bon = Object.values(FINDS).filter((f) => f.into.bonus && S.bonus[f.into.bonus]).map((f) => f.into.bonus === 'crate' ? shelfRow(f) : `<div class="row"><div class="ico">${findIcon(Object.keys(FINDS).find((k) => FINDS[k] === f))}</div><div class="meta"><b>${f.into.name}</b><small>${f.into.blurb} · <span class="ok-tag">Active</span></small></div><div class="acts"><button class="btn sm" data-sell-restored="${kindOfBonus(f.into.bonus)}">Sell ${coin(buyback(RESALE.antique[kindOfBonus(f.into.bonus)]))}</button></div></div>`).join('');
-  const deco8 = DECO8_IDS.filter((t) => S.decorInv[t] > 0 && !decoPlacedAt(t, curLoc())).map((t) => `<div class="find-row" data-d8-bag="${t}"><div class="ico">${decorIcon(t)}</div><div class="meta"><b>${DECO8[t].name}${S.decorInv[t] > 1 ? ` ×${S.decorInv[t]}` : ''}</b><small>${DECO8[t].cosmetic ? 'Keepsake decoration · just for looks' : `${PLANT_TIERS[DECO8[t].tier].label} decoration · +${DECO8[t].atm} atmosphere where it stands`} · one per location</small></div><div class="acts"><button class="btn btn-gold sm" data-place="${t}">Place</button></div></div>`).join('');
+  const deco8 = DECO8_IDS.filter((t) => S.decorInv[t] > 0 && (isRedeemKeepsake(t) || !decoPlacedAt(t, curLoc()))).map((t) => `<div class="find-row" data-d8-bag="${t}"><div class="ico">${decorIcon(t)}</div><div class="meta"><b>${DECO8[t].name}${S.decorInv[t] > 1 ? ` ×${S.decorInv[t]}` : ''}</b><small>${DECO8[t].cosmetic || isRedeemKeepsake(t) ? 'Keepsake decoration · just for looks' : `${PLANT_TIERS[DECO8[t].tier].label} decoration · +${DECO8[t].atm} atmosphere where it stands · one per location`}</small></div><div class="acts"><button class="btn btn-gold sm" data-place="${t}">Place</button></div></div>`).join('');
   const placed = S.decor.length ? `<p class="muted" style="margin:10px 4px 0">${S.decor.length} decor placed in your garden — tap one to move it back to your bag or sell it. Restored finds can also go on your <b>Farm Stand</b> as antiques (collectors pay more).</p>` : '';
   if (!raw && !restoring && !decor && !bon && !deco8) return head + `<div class="empty">Nothing found yet. About one in five trees, stumps, bushes and rocks hides something — watch for a <b>sparkle</b> when you clear.</div>${placed}`;
   return head + (restoring ? `<div class="sec-title">In the workshop</div><div class="list">${restoring}</div>` : '') +
@@ -5376,7 +5376,7 @@ function redeemCode(raw) {
   S.codes ||= {}; if (S.codes[code]) { toast('You’ve already claimed this code — enjoy!'); return false; }
   S.codes[code] = now();
   const decos = R.decos || (R.deco ? [R.deco] : []);
-  for (const id of decos) if (DECO8[id]) S.decorInv[id] = (S.decorInv[id] || 0) + DECO8_LOCS.length;   // one for Home, one for the Orchard
+  for (const id of decos) if (DECO8[id]) S.decorInv[id] = (S.decorInv[id] || 0) + 1;   // one copy, placeable at any location
   if (R.jewels) S.jewels += R.jewels;
   save(); hud(); const inp = $('#redeem-in'); if (inp) inp.value = ''; toast(R.toast || 'Code redeemed!'); if (panel === 'bag' || panel === 'settings' || panel === 'jewels') renderPanel(); return true;
 }
@@ -5788,14 +5788,17 @@ function statXP() {
   x += X.upg * up + X.pack * (S.packs || 0) + X.clear * (st.cleared || 0) + X.plot * Object.keys(S.lots || {}).filter((l) => l !== 'home' && S.lots[l]).length;
   return x;
 }
-// Garden decorations may stand once at each location. Redeem sets and shop/card decos grant up to that many;
-// a special one-off (the Friendship Arbor) only ever grants one. If an older save left a bag copy after a
-// placement (the bag is shared across Home and the Orchard), trim the extras. Never take a copy the player
-// still has a free location for.
+// Redeem keepsakes are a single copy you can stand at any location. Older saves granted two (one for Home
+// and one for the Orchard): if one already stands, drop leftover bag copies; if none stands, keep exactly one
+// in the bag. A claimed code never ends up with nothing. Shop decorations and the Friendship Arbor keep their
+// own caps (one per location, or one arbor).
+function redeemDecosOf(R) { return R?.decos || (R?.deco ? [R.deco] : []); }
+function isRedeemKeepsake(k) { return Object.values(REDEEM_CODES).some((R) => redeemDecosOf(R).includes(k)); }
+function redeemClaimed(k) { return Object.keys(S.codes || {}).some((code) => redeemDecosOf(REDEEM_CODES[code]).includes(k)); }
 function decoMaxOwned(k) {
   if (!DECO8[k]) return 0;
-  const fromRedeem = Object.values(REDEEM_CODES).some((R) => (R.decos || (R.deco ? [R.deco] : [])).includes(k));
-  return (DECO8[k].special && !fromRedeem) ? 1 : DECO8_LOCS.length;
+  if (isRedeemKeepsake(k)) return 1;
+  return (DECO8[k].special) ? 1 : DECO8_LOCS.length;
 }
 function migDecoBag() {
   if (!S.decorInv || typeof S.decorInv !== 'object') S.decorInv = {};
@@ -5803,8 +5806,16 @@ function migDecoBag() {
   for (const k of DECO8_IDS) {
     const placed = (S.decor || []).filter((d) => d.type === k).length;
     const bag = S.decorInv[k] || 0;
-    const cap = Math.max(0, decoMaxOwned(k) - placed);
-    if (bag > cap) { S.decorInv[k] = cap; if (!cap) delete S.decorInv[k]; fixed += bag - cap; }
+    if (isRedeemKeepsake(k)) {
+      if (placed > 0) {
+        if (bag > 0) { delete S.decorInv[k]; fixed += bag; }
+      } else if (redeemClaimed(k) || bag > 0) {
+        if (bag !== 1) { S.decorInv[k] = 1; fixed += 1; }
+      }
+    } else {
+      const cap = Math.max(0, decoMaxOwned(k) - placed);
+      if (bag > cap) { S.decorInv[k] = cap; if (!cap) delete S.decorInv[k]; fixed += bag - cap; }
+    }
   }
   return fixed;
 }
