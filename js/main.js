@@ -19,7 +19,7 @@ import { createAudio, MUSIC_CREDITS } from './audio.js';
 
 // Save format: v0.3, v0.31 and v0.4 share one localStorage key (schema v: 3). `build` records which prototype build last wrote the save;
 // v0.3 / v0.31 saves (no `build`, no per-plot barrels) are migrated on load (migrate04 below); v0.4 saves load as-is and are re-tagged. Prototype builds stay below 1.0.
-export const BUILD = '0.8.7.6';
+export const BUILD = '0.8.7.7';
 // v0.65: anonymous player tracking (Games Backend on Appwrite; no API key in the game, nothing personal). Skipped for automated runs (navigator.webdriver).
 try { if (!navigator.webdriver) initTracker({ endpoint: 'https://nyc.cloud.appwrite.io/v1', projectId: '6ae0a41a002ce0a48fac', gameId: 'petalspire', platform: isNative() ? 'ios' : 'web', appVersion: BUILD }); } catch (_) {}
 const SAVE_KEY = 'petalspire.v03', V02_KEY = 'petalspire.v02', OLD_KEYS = ['petalspire.v01'], SAVE_BAK = 'petalspire.v03.bak';
@@ -2497,7 +2497,7 @@ function sprigMaybe() {
   sprigEl.addEventListener('click', (e) => { e.stopPropagation(); sprigHide(); }); $('#ui').appendChild(sprigEl); sprigPlace();
 }
 function sprigPlace() {   // v0.8.7: Sprig docks at the screen edge clear of the menu (above it when there is room, else at the top over the panel header)
-  if (!sprigEl) return; const pr = $('#panel')?.getBoundingClientRect(), h = sprigEl.offsetHeight || 80, hudB = ($('#hud')?.getBoundingClientRect().bottom || 60) + 6;
+  if (!sprigEl) return; const pr = $('#panel .panel-card')?.getBoundingClientRect(), h = sprigEl.offsetHeight || 80, hudB = ($('#hud')?.getBoundingClientRect().bottom || 60) + 6;
   const room = pr && pr.height ? pr.top - hudB : innerHeight; sprigEl.style.bottom = 'auto';
   sprigEl.style.top = Math.round(room >= h + 4 ? Math.max(hudB, pr.top - h - 8) : hudB) + 'px'; sprigEl.classList.toggle('sprig-tight', room < h + 4);
 }
@@ -3305,7 +3305,7 @@ function finishMktGuide() {
 function mktGuideFrame() {
   const w = S.marketWelcome;
   if (!w?.guide || w.done || showcaseEl || titleUp() || guideOn() || !S.introDone) {
-    if (!w?.guide || w.done || showcaseEl) { mktPulse?.classList.remove('tut-pulse'); mktPulse = null; mktTutEl?.classList.add('hidden'); }
+    mktPulse?.classList.remove('tut-pulse'); mktPulse = null; mktTutEl?.classList.add('hidden');   // v0.8.7.7: hidden card, no target, no tap guard; it comes back on the next frame it may show
     return;
   }
   while (w.step < MKT_GUIDE.length && MKT_GUIDE[w.step].done()) { w.step++; save(); }
@@ -3322,9 +3322,12 @@ function mktGuideFrame() {
 const mktGuideOn = () => !!(S.marketWelcome?.guide && !S.marketWelcome?.done && !showcaseEl);
 const mktGuard = (e) => {
   if (!mktGuideOn() || guideOn()) return; const t = e.target; if (!(t instanceof Element)) return;
-  if (t.tagName === 'CANVAS' || t.closest('#mkt-tut')) return;
+  // v0.8.7.7: only while the lesson card is on screen with a live target. On the title screen, under another
+  // modal, or before the card is back after a reload, every tap goes through (a half-done lesson used to freeze the game).
+  if (titleUp() || !S.introDone || !mktTutEl || mktTutEl.classList.contains('hidden') || !mktPulse || !mktPulse.isConnected || modalOpen()) return;
+  if (t.tagName === 'CANVAS' || t.closest('#mkt-tut, .sprig-tip')) return;   // v0.8.7.7: Sprig's tip can always be tapped away
   if (mktPulse && (mktPulse === t || mktPulse.contains(t))) return;
-  if (t.closest('#panel-close')) return;
+  if (t.closest('#panel-close') || t.id === 'panel') return;
   if (t.closest('.panel-body') && e.type !== 'click') return;
   e.preventDefault(); e.stopPropagation(); e.stopImmediatePropagation?.();
 };
@@ -5589,6 +5592,32 @@ function plantTagFrame() {
   for (const [id, t] of plantTags) if (!want.has(id)) { t.remove(); plantTags.delete(id); }
 }
 
+// v0.8.7.7: a guide card or Sprig tip never covers a menu's header. The menu gives up room at its top
+// so its close button stays in sight and takes the tap (on small iPhones the card used to sit on the X).
+let panelRoomPx = -1;
+function panelClearance() {
+  const P = $('#panel'), card = P && P.querySelector('.panel-card'); if (!card) return;
+  let room = 0;
+  if (panel && !P.classList.contains('hidden')) {
+    const cr = card.getBoundingClientRect(); let below = 0;
+    for (const g of [tutEl, mktTutEl, sprigEl]) {
+      if (!g || !g.isConnected || g.classList.contains('hidden') || g.classList.contains('tut-low')) continue;
+      const r = g.getBoundingClientRect(); if (!r.height || r.top > innerHeight * 0.5) continue; below = Math.max(below, r.bottom);
+    }
+    if (below) room = Math.max(160, Math.floor(cr.bottom - below - 8));
+  }
+  if (room === panelRoomPx) return; panelRoomPx = room;
+  if (room) P.style.setProperty('--panel-room', room + 'px'); else P.style.removeProperty('--panel-room');
+}
+// Escape (keyboard, or a paired controller's back) closes the top menu, like its X.
+document.addEventListener('keydown', (e) => {
+  if (e.key !== 'Escape' || e.defaultPrevented) return;
+  if ($('.odds-ov') || $('.wheel-ov') || !$('#confirm').classList.contains('hidden')) return;   // those have their own close
+  if (panel) { e.preventDefault(); closePanel(); return; }
+  if (!$('#map').classList.contains('hidden')) { e.preventDefault(); $('#map-close')?.click(); return; }
+  const ts = $('#tile-sheet'); if (ts && !ts.classList.contains('hidden')) { const x = ts.querySelector('.close-btn'); if (x) { e.preventDefault(); x.click(); } }
+}, true);
+
 // ---------------- Loop ----------------
 let lastTick = 0, lastSlow = 0;
 const revealEl = $('#reveal');
@@ -5596,6 +5625,7 @@ function tick() {
   requestAnimationFrame(tick);
   const t = performance.now();
   try { tutFrame(); mktGuideFrame(); plantTagFrame(); } catch (e) { console.error(e); }
+  try { panelClearance(); } catch (e) { console.error(e); }
   W.setPaused(revealEl && !revealEl.classList.contains('hidden') && revealEl.dataset.stage !== 'none');   // v0.63: no 3D redraws under the pack reveal
   if (t - lastTick > 250) { syncBedTargets();
     roadScrapTick(Math.min(1, (t - lastTick) / 1000));
