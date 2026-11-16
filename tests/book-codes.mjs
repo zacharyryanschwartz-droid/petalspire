@@ -1,4 +1,4 @@
-// Book redeem codes: SNOWFINCH and QUILTBEE grant keepsakes once, show in the Bag, and stay in the save.
+// Book redeem codes: SNOWFINCH, QUILTBEE, and the later KDP sets grant keepsakes once, show in the Bag, and stay in the save.
 //   node tests/book-codes.mjs
 
 import { chromium } from 'playwright';
@@ -33,6 +33,16 @@ const NAMES = {
   d8_snowfinch: 'Snowfinch Pair', d8_holly: 'Holly Cluster', d8_ornament: 'Winter Ornament',
   d8_quiltstar: 'Star Quilt', d8_logcabin: 'Log Cabin Quilt', d8_compass: 'Quilt Compass',
 };
+const BOOKS = [
+  { code: 'LAMPLIT', typed: 'lamp lit', book: 'Escape the Lighthouse', ids: ['d8_stormlantern', 'd8_spyglass', 'd8_tidekey'], names: ['Storm Lantern', "Keeper's Spyglass", 'Tide-Worn Key'] },
+  { code: 'COZYCABIN', typed: 'cozy cabin', book: 'Woodsmoke & Wool', ids: ['d8_woolthrow', 'd8_woodstove', 'd8_honeymug'], names: ['Woolen Throw', 'Woodsmoke Stove', 'Honey Mug'] },
+  { code: 'GLASSHOUSE', typed: 'glass house', book: 'Under Glass', ids: ['d8_terrarium', 'd8_potting', 'd8_mister'], names: ['Fern Terrarium', 'Potting Bench', 'Copper Mister'] },
+  { code: 'LEADLIGHT', typed: 'lead light', book: 'Lead & Light', ids: ['d8_rosewindow', 'd8_leadpanel', 'd8_medallion'], names: ['Rose Window', 'Leadlight Panel', 'Honey Medallion'] },
+  { code: 'CLOSEDSTACKS', typed: 'closed stacks', book: 'Closed Stacks', ids: ['d8_tomes', 'd8_brasslamp', 'd8_catalog'], names: ['Stacked Tomes', 'Brass Lamp', 'Card Catalog'] },
+  { code: 'PICTUREPALACE', typed: 'picture palace', book: 'Picture Palace', ids: ['d8_velvetseat', 'd8_marquee', 'd8_filmreel'], names: ['Velvet Seat', 'Marquee Lamp', 'Film Reel'] },
+];
+const NEW_IDS = BOOKS.flatMap((b) => b.ids);
+const esc = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 const browser = await chromium.launch({
   executablePath: process.env.CHROME || '/usr/bin/google-chrome',
   headless: true,
@@ -40,7 +50,7 @@ const browser = await chromium.launch({
 });
 const fails = [];
 const ok = (name, pass, detail) => { console.log(`${pass ? 'PASS' : 'FAIL'}  ${name}${detail != null ? ' — ' + (typeof detail === 'string' ? detail : JSON.stringify(detail)) : ''}`); if (!pass) fails.push(name); };
-fs.mkdirSync('/opt/cursor/artifacts', { recursive: true });
+const ART = (() => { for (const d of ['/opt/cursor/artifacts', '/tmp/petalspire-artifacts']) { try { fs.mkdirSync(d, { recursive: true }); return d; } catch {} } return '.'; })();
 
 const context = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2 });
 const page = await context.newPage();
@@ -101,7 +111,7 @@ const bag = await page.evaluate((ids) => {
 ok('Bag Finds lists the snow keepsakes as looks-only', bag.rows.every((r) => r && /Keepsake decoration · just for looks/.test(r.text) && /×2/.test(r.text)), bag.rows?.map((r) => r?.text));
 ok('menu icons are drawn markup, not images', bag.rows.every((r) => /<svg/i.test(r.html) && !/<img/i.test(r.html)) && bag.imgs === 0);
 await page.locator('[data-d8-bag="d8_ornament"]').scrollIntoViewIfNeeded();
-await page.screenshot({ path: '/opt/cursor/artifacts/book-codes-bag.png' });
+await page.screenshot({ path: `${ART}/book-codes-bag.png` });
 
 await page.click('[data-d8-bag="d8_snowfinch"] [data-place]');
 const placed = await page.evaluate(async () => {
@@ -124,7 +134,7 @@ const placed = await page.evaluate(async () => {
 });
 ok('Snowfinch Pair can be placed in the garden', placed.hit?.type === 'd8_snowfinch' && !placed.stillPlacing, placed.hit);
 ok('placing a keepsake does not raise atmosphere', placed.atm === before.atm && /Just for looks/.test(placed.pop), { atm: placed.atm, pop: placed.pop });
-await page.screenshot({ path: '/opt/cursor/artifacts/book-codes-garden.png' });
+await page.screenshot({ path: `${ART}/book-codes-garden.png` });
 
 const models = await page.evaluate((ids) => {
   const out = {};
@@ -135,7 +145,7 @@ const models = await page.evaluate((ids) => {
     window.__ps.W.removeDecor('probe-' + id);
   }
   return out;
-}, [...SNOW, ...QUILT]);
+}, [...SNOW, ...QUILT, ...NEW_IDS]);
 ok('each keepsake has its own garden model', Object.values(models).every((n) => n >= 3), models);
 
 const quiltToast = await redeem('quiltbee');
@@ -145,7 +155,43 @@ ok('a second QUILTBEE says already claimed', /already claimed/i.test(quiltAgain)
 await page.click('#tab-bag');
 await page.click('[data-bag="finds"]');
 await page.locator('[data-d8-bag="d8_compass"]').scrollIntoViewIfNeeded();
-await page.screenshot({ path: '/opt/cursor/artifacts/book-codes-quilt.png' });
+await page.screenshot({ path: `${ART}/book-codes-quilt.png` });
+
+for (const book of BOOKS) {
+  const toast = await redeem(book.typed);
+  ok(`${book.code} names the book and the three keepsakes`, new RegExp(esc(book.book)).test(toast) && book.names.every((n) => new RegExp(esc(n)).test(toast)) && /just for looks/.test(toast), toast);
+  const info = await page.evaluate(({ ids, code, names }) => {
+    const s = window.__ps.state;
+    return {
+      inv: Object.fromEntries(ids.map((id) => [id, s.decorInv[id] || 0])),
+      claimed: !!s.codes[code],
+      atm: ids.every((id) => window.__ps.DECO8[id].atm === 0 && window.__ps.DECO8[id].cosmetic && window.__ps.DECO8[id].special),
+      shop: window.__ps.decoMarketRows('home').join(''),
+      names,
+    };
+  }, book);
+  ok(`${book.code} grants two of each keepsake`, book.ids.every((id) => info.inv[id] === 2), info.inv);
+  ok(`${book.code} is remembered on the save`, info.claimed);
+  ok(`${book.code} keepsakes add no atmosphere and stay out of the Market`, info.atm && !book.names.some((n) => info.shop.includes(n)));
+  const again = await redeem(book.code);
+  ok(`a second ${book.code} says already claimed`, /already claimed/i.test(again), again);
+  const still = await page.evaluate((ids) => Object.fromEntries(ids.map((id) => [id, window.__ps.state.decorInv[id] || 0])), book.ids);
+  ok(`a second ${book.code} adds nothing`, book.ids.every((id) => still[id] === 2), still);
+}
+
+await page.click('#tab-bag');
+await page.click('[data-bag="finds"]');
+const newBag = await page.evaluate((ids) => {
+  const rows = ids.map((id) => {
+    const row = document.querySelector(`[data-d8-bag="${id}"]`);
+    return row ? { id, text: row.innerText.replace(/\s+/g, ' '), html: row.querySelector('.ico')?.innerHTML || '' } : null;
+  });
+  return { rows, imgs: document.querySelectorAll('#panel-body img').length };
+}, NEW_IDS);
+ok('Bag Finds lists the new keepsakes as looks-only', newBag.rows.every((r) => r && /Keepsake decoration · just for looks/.test(r.text) && /×2/.test(r.text)), newBag.rows?.map((r) => r?.id + ':' + r?.text));
+ok('new keepsake menu icons are drawn markup, not images', newBag.rows.every((r) => /<svg/i.test(r.html) && !/<img/i.test(r.html)) && newBag.imgs === 0);
+await page.locator('[data-d8-bag="d8_filmreel"]').scrollIntoViewIfNeeded();
+await page.screenshot({ path: `${ART}/book-codes-new-sets.png` });
 
 const love = await page.evaluate(() => ({ ok: window.__ps.redeemCode('LOVEBUG'), n: window.__ps.state.decorInv.d8_lovebug || 0 }));
 ok('LOVEBUG still grants its own keepsake', love.ok === true && love.n === 2, love);
@@ -153,7 +199,7 @@ ok('LOVEBUG still grants its own keepsake', love.ok === true && love.n === 2, lo
 const jewelsBefore = await page.evaluate(() => window.__ps.state.jewels);
 const bloom = await redeem('early bloom');
 ok('EARLYBLOOM thanks the tester for 25 jewels', /Thanks for testing Petalspire!/.test(bloom) && /\+25 jewels/.test(bloom), bloom);
-await page.screenshot({ path: '/opt/cursor/artifacts/earlybloom-thanks.png' });
+await page.screenshot({ path: `${ART}/earlybloom-thanks.png` });
 const bloomed = await page.evaluate(() => {
   const raw = JSON.parse(localStorage.getItem('petalspire.v03'));
   return { jewels: window.__ps.state.jewels, hud: document.getElementById('jewel-count')?.textContent, saved: raw.jewels, strip: document.querySelector('#panel .jewel-strip b')?.textContent || '' };
@@ -181,11 +227,11 @@ const kept = await page.evaluate((ids) => {
     jewelsSaved: raw.jewels,
     atm: window.__ps.atmosphereAt('home'),
   };
-}, [...SNOW, ...QUILT, 'd8_lovebug']);
-ok('keepsakes persist in the save after reload', SNOW.concat(QUILT).every((id) => kept.inv[id] === (id === 'd8_snowfinch' ? 1 : 2) && kept.saved[id] === kept.inv[id]) && kept.inv.d8_lovebug === 2, kept.inv);
+}, [...SNOW, ...QUILT, ...NEW_IDS, 'd8_lovebug']);
+ok('keepsakes persist in the save after reload', SNOW.concat(QUILT, NEW_IDS).every((id) => kept.inv[id] === (id === 'd8_snowfinch' ? 1 : 2) && kept.saved[id] === kept.inv[id]) && kept.inv.d8_lovebug === 2, kept.inv);
 ok('a placed Snowfinch Pair is still in the garden', kept.placed === 1 && kept.placedSaved === 1);
 ok('redeeming changes neither coins nor wood nor atmosphere', kept.coins === before.coins && kept.wood === before.wood && kept.atm === before.atm, kept);
-ok('both codes stay claimed', !!(kept.codes?.SNOWFINCH && kept.codes?.QUILTBEE && kept.codes?.LOVEBUG && kept.codes?.EARLYBLOOM));
+ok('all book codes stay claimed', !!(kept.codes?.SNOWFINCH && kept.codes?.QUILTBEE && kept.codes?.LOVEBUG && kept.codes?.EARLYBLOOM && BOOKS.every((b) => kept.codes?.[b.code])), kept.codes);
 ok('the 25 tester jewels persist after reload', kept.jewels === jewelsBefore + 25 && kept.jewelsSaved === jewelsBefore + 25, { jewels: kept.jewels, saved: kept.jewelsSaved, before: jewelsBefore });
 ok('the page stays free of script errors', errors.length === 0, errors);
 
