@@ -40,6 +40,7 @@ const BOOKS = [
   { code: 'LEADLIGHT', typed: 'lead light', book: 'Leadlight', ids: ['d8_rosewindow', 'd8_leadpanel', 'd8_medallion'], names: ['Rose Window', 'Leadlight Panel', 'Honey Medallion'] },
   { code: 'CLOSEDSTACKS', typed: 'closed stacks', book: 'Closed Stacks', ids: ['d8_tomes', 'd8_brasslamp', 'd8_catalog'], names: ['Stacked Tomes', 'Brass Lamp', 'Card Catalog'] },
   { code: 'PICTUREPALACE', typed: 'picture palace', book: 'The Picture Palace', ids: ['d8_velvetseat', 'd8_marquee', 'd8_filmreel'], names: ['Velvet Seat', 'Marquee Lamp', 'Film Reel'] },
+  { code: 'LASTVINTAGE', typed: 'last vintage', book: 'The Last Vintage', ids: ['d8_cellarcask', 'd8_vinbottle', 'd8_grapevine'], names: ['Cellar Cask', 'Vintage Bottle', 'Grapevine Cluster'] },
 ];
 const NEW_IDS = BOOKS.flatMap((b) => b.ids);
 const esc = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -190,7 +191,7 @@ const newBag = await page.evaluate((ids) => {
 }, NEW_IDS);
 ok('Bag Finds lists the new keepsakes as looks-only', newBag.rows.every((r) => r && /Keepsake decoration · just for looks/.test(r.text) && /×2/.test(r.text)), newBag.rows?.map((r) => r?.id + ':' + r?.text));
 ok('new keepsake menu icons are drawn markup, not images', newBag.rows.every((r) => /<svg/i.test(r.html) && !/<img/i.test(r.html)) && newBag.imgs === 0);
-await page.locator('[data-d8-bag="d8_filmreel"]').scrollIntoViewIfNeeded();
+await page.locator('[data-d8-bag="d8_grapevine"]').scrollIntoViewIfNeeded();
 await page.screenshot({ path: `${ART}/book-codes-new-sets.png` });
 
 const love = await page.evaluate(() => ({ ok: window.__ps.redeemCode('LOVEBUG'), n: window.__ps.state.decorInv.d8_lovebug || 0 }));
