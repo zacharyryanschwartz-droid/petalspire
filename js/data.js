@@ -871,7 +871,7 @@ export const BOOSTS = {
 export const OFFER_PACKS = [
   { id: 'starter_pack', productId: 'com.petalspire.starter2', name: 'Starter Pack', blurb: 'A gift bouquet of everything inside: a plant from every tier, the Plow and Sickle, Jewels, coins and Wood', price: '$4.99', usd: 4.99, once: true, starter: true,
     jewels: 20, coins: 1000, wood: 100, tools: ['plow', 'sickle'], plantsPerTier: 1, seedsPerPlant: 3 },
-  { id: 'collector_bundle', productId: 'com.petalspire.collector', name: 'Collector’s Bundle', blurb: 'A grand gift bouquet: everything in the Starter Pack, a glowing Other World plant, more Jewels, coins and Wood, and Double Daily Rewards for good', price: '$19.99', usd: 19.99,
+  { id: 'collector_bundle', productId: 'com.petalspire.collector', name: 'Collector’s Bundle', blurb: 'A grand gift bouquet: everything in the Starter Pack, a glowing Other World plant, more Jewels, coins and Wood, and Double Daily Rewards for good', price: '$19.99', usd: 19.99, once: true,   // a non-consumable App Store product: one purchase per Apple ID
     plantsPerTier: 1, plantTier: 'otherworld', seedsPerPlant: 3, jewels: 120, coins: 6000, wood: 400, tools: ['plow', 'sickle'], dailyX2: true },
 ];
 // A tool the player already owns is swapped for TOOL_SUB_JEWELS Jewels (a fair substitute).
