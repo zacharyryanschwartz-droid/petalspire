@@ -1,0 +1,24 @@
+name: ASC IAP status (read-only)
+on:
+  push:
+    branches: [diag/iap-status]
+permissions:
+  contents: read
+jobs:
+  status:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - name: IAP status
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          ASC_KEY_P8: ${{ secrets.ASC_KEY_P8 }}
+        run: |
+          export ASC_KEY_PATH="$RUNNER_TEMP/k/AuthKey.p8"
+          node scripts/asc.mjs write-key
+          node scripts/asc.mjs iap-status
+          rm -f "$ASC_KEY_PATH"
