@@ -4,6 +4,7 @@ export const BOOKS_PROMO_ENABLED = true;
 
 export const BOOKS = [
   { title: 'Love Bug Critters', url: 'https://a.co/d/040I747u' },
+  // The Last Vintage stays out of the banner until a live Amazon (a.co) link exists.
 ];
 
 export const BOOK_PROMO_LINE = 'Buy any Schwarze Spiele book for bonus Petalspire content';

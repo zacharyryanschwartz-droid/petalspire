@@ -5377,7 +5377,7 @@ function redeemCode(raw) {
   S.codes[code] = now();
   const decos = R.decos || (R.deco ? [R.deco] : []);
   for (const id of decos) if (DECO8[id]) S.decorInv[id] = (S.decorInv[id] || 0) + 1;   // one copy, placeable at any location
-  if (R.jewels) S.jewels += R.jewels;
+  if (R.jewels) { S.jewels += R.jewels; (S.codeJewels ||= {})[code] = now(); }
   save(); hud(); const inp = $('#redeem-in'); if (inp) inp.value = ''; toast(R.toast || 'Code redeemed!'); if (panel === 'bag' || panel === 'settings' || panel === 'jewels') renderPanel(); return true;
 }
 document.addEventListener('keydown', (e) => { if (e.key === 'Enter' && e.target?.id === 'redeem-in') { e.preventDefault(); redeemCode(e.target.value); } });
@@ -5819,13 +5819,28 @@ function migDecoBag() {
   }
   return fixed;
 }
+// Book codes now grant jewels. Older saves that already claimed one get those jewels once
+// on load (S.codeJewels). EARLYBLOOM already paid out on redeem, so we only mark it.
+function migCodeJewels() {
+  if (!(S.jewels >= 0)) S.jewels = 0;
+  S.codeJewels ||= {};
+  let n = 0;
+  for (const [code, R] of Object.entries(REDEEM_CODES)) {
+    if (!S.codes?.[code] || !R.jewels || S.codeJewels[code]) continue;
+    if (R.deco || R.decos) { S.jewels += R.jewels; n += R.jewels; }
+    S.codeJewels[code] = now();
+  }
+  return n;
+}
 function v8Init() {
   const fresh = fromBuild == null && !upgraded;
   if (!S.orders || typeof S.orders !== 'object') S.orders = {};
   for (const L of DECO8_LOCS) if (!S.orders[L] || !Array.isArray(S.orders[L].slots)) S.orders[L] = { slots: [], skipAt: 0, auto: false };
   if (!(S.spins >= 0)) S.spins = 0; if (!(S.spinPity >= 0)) S.spinPity = 0; if (!(S.spinsDone >= 0)) S.spinsDone = 0;
   if (!S.decoCards || typeof S.decoCards !== 'object') S.decoCards = {};
-  if (migDecoBag()) writeSave();
+  const jewelBackfill = migCodeJewels();
+  if (migDecoBag() || jewelBackfill) writeSave();
+  if (jewelBackfill) { hud(); setTimeout(() => toast(`Your book codes now include jewels · <i data-icon="jewel"></i> +${jewelBackfill} jewels`), 1800); }
   if (!S.refClaimed || !Array.isArray(S.refClaimed)) S.refClaimed = [];
   if (!S.refMiles || typeof S.refMiles !== 'object') S.refMiles = {};
   if (!S.refDays || typeof S.refDays !== 'object') S.refDays = {};
