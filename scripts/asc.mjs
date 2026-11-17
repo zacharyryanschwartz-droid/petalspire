@@ -174,8 +174,26 @@ async function cmdAssign() {
   console.log(`Internal group ${group.attributes?.name || 'Internal'} has build ${build}`);
 }
 
+// Read-only: each in-app purchase's App Store state (no key material is printed).
+async function cmdIapStatus() {
+  const list = await api(`/v1/apps/${APP_ID}/inAppPurchasesV2?limit=50&fields[inAppPurchases]=productId,name,state,inAppPurchaseType`);
+  for (const d of list.data || []) {
+    const a = d.attributes || {};
+    let territories = '?';
+    try {
+      const av = await api(`/v2/inAppPurchases/${d.id}/inAppPurchaseAvailability?include=availableTerritories&limit[availableTerritories]=200`);
+      territories = (av.data?.relationships?.availableTerritories?.data || []).map((t) => t.id).join(',') || 'none';
+    } catch (err) { territories = 'error ' + (err.status || ''); }
+    console.log(`${a.productId}\t${a.inAppPurchaseType}\t${a.state}\tterritories=${territories}`);
+  }
+  try {
+    const v = await api(`/v1/apps/${APP_ID}/appStoreVersions?limit=5&fields[appStoreVersions]=versionString,appStoreState,appVersionState`);
+    for (const x of v.data || []) console.log(`version ${x.attributes?.versionString}\t${x.attributes?.appStoreState}\t${x.attributes?.appVersionState || ''}`);
+  } catch (err) { console.log('versions: ' + (err.message || err).slice(0, 200)); }
+}
+
 const cmd = process.argv[2];
-const run = { 'write-key': cmdWriteKey, team: cmdTeam, 'next-build': cmdNextBuild, wait: cmdWait, 'materialize-signing': cmdMaterialize, assign: cmdAssign }[cmd];
+const run = { 'write-key': cmdWriteKey, team: cmdTeam, 'next-build': cmdNextBuild, wait: cmdWait, 'materialize-signing': cmdMaterialize, assign: cmdAssign, 'iap-status': cmdIapStatus }[cmd];
 if (!run) {
   console.error('usage: asc.mjs write-key|team|next-build|wait <build>');
   process.exit(2);

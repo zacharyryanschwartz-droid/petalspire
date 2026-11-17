@@ -11,7 +11,7 @@ import { Payments } from './payments.js';
 import { createAds, gameArt } from './ads.js';
 import { isNative, openExternal, syncNativeChrome } from './native.js';
 import { considerNativeAds } from './admob.js';
-import { PRIVACY_URL, finishProduct, listenForTransactions, loadStore, purchasesVisible, restoreProducts, storePrice } from './store.js';
+import { PRIVACY_URL, finishProduct, listenForTransactions, loadStore, purchasesVisible, restoreProducts, storeLoading, storePrice } from './store.js';
 import { initTracker } from './games-tracker.js';
 import { createReferral, cleanCode } from './referral.js';
 import { shadeAt, speedFor, sunLabel, rebaseStart } from './shade.js';
@@ -188,7 +188,7 @@ let saveTimer = 0;
 let frozen = false;
 const writeSave = () => { if (frozen || preserveCorrupt) return; try { S.savedAt = now(); localStorage.setItem(SAVE_KEY, JSON.stringify(S)); } catch {} };
 function save() { clearTimeout(saveTimer); saveTimer = setTimeout(writeSave, 150); }
-window.addEventListener('visibilitychange', () => { if (document.hidden) writeSave(); });
+window.addEventListener('visibilitychange', () => { if (document.hidden) writeSave(); else if (isNative() && !purchasesVisible()) loadStore(); });
 window.addEventListener('pagehide', writeSave);
 window.addEventListener('petalspire-ads', () => { try { hud(); } catch { /* hud is defined later in this module */ } });
 
@@ -2008,6 +2008,7 @@ function openPanel(name, tab) {
   if (name !== panel) standView = name === 'stand' || name === 'ostand' ? (tab === 'orders' ? 'orders' : 'stand') : standView; panel = name; if (name === 'market' && tab) marketTab = tab; if (name === 'bag' && tab) bagTab = tab; if (name === 'lot' || name === 'orchardtree' || name === 'worker' || name === 'bulk') panelArg = tab;
   $('#tile-sheet').classList.add('hidden'); if (selected != null || focus) { selected = null; focus = null; W.select(null); }
   document.querySelectorAll('#tabbar button').forEach((b) => b.classList.toggle('on', b.dataset.panel === name || (name === 'ostand' && b.dataset.panel === 'stand')));
+  if (name === 'jewels' && isNative() && !purchasesVisible()) loadStore();   // retry the App Store each time the Jewel Shop opens, until it answers
   panelAt = performance.now(); $('#panel').classList.remove('hidden'); $('#panel').dataset.name = name; renderPanel(); $('#panel-body').scrollTop = 0;
   if (name === 'market' && S.marketBuilt) beginMarketWelcome();
 }
@@ -4557,7 +4558,12 @@ function jewelsHTML() {
       <span class="na-art"><svg viewBox="0 0 48 48"><rect x="5" y="11" width="38" height="26" rx="7" fill="#FFF9F0" stroke="#3D5A40" stroke-width="2.6"/><text x="24" y="29" text-anchor="middle" font-family="Nunito" font-weight="900" font-size="12" fill="#3D5A40">AD</text><path d="M8 40L40 8" stroke="#E07F86" stroke-width="4.2" stroke-linecap="round"/></svg></span>
       <span class="na-meta"><b>No More Ads + ${NO_ADS_BUNDLE.n} Jewels</b><small>Removes every ad for good, and adds ${NO_ADS_BUNDLE.n} <i data-icon="jewel"></i></small></span>
       ${priceTag}</button>`;
+  // In the app, never let the paid section silently vanish: if the App Store returned nothing, say so and offer a retry.
+  const down = shopOn || !isNative() ? '' : storeLoading()
+    ? '<div class="store-down" data-store-down><b>Loading the Jewel Shop…</b><small>Checking the App Store</small></div>'
+    : '<div class="store-down" data-store-down><b>Store unavailable</b><small>The App Store didn’t send the Jewel packs. Check your connection and try again.</small><button class="btn btn-gold sm" data-act="store-retry">Try again</button></div>';
   return `<div class="jewel-hero"><i data-icon="jewel"></i><div><b>${S.jewels}</b><small>Jewels</small></div></div>
+    ${down}
     <p class="muted" style="margin:6px 4px 12px">Jewels open Card Packs (${PACK_JEWELS} each), finish a restoration instantly (${RESTORE_HURRY_JEWELS}), grow a planted tree by a stage (${TREE.hurryJewels}) or complete the market rebuild (${BUILDS.market.hurryJewels}).</p>
     ${shop}
     <div class="sec-title">Spend Jewels</div>
@@ -4726,6 +4732,7 @@ $('#panel-body').addEventListener('click', (e) => {
   if (a === 'tut-replay') { tutReplay(); return; }
   if (a === 'tips-again') { S.tips = {}; save(); closePanel(); tip('chop'); return; }
   if (a === 'restore') return restorePurchases();
+  if (a === 'store-retry') { loadStore().then((ok) => { if (!ok) toast('The App Store is still unavailable. Try again in a moment.'); }); renderPanel(); return; }
   if (a === 'privacy') return openExternal(PRIVACY_URL);
   if (a === 'reset') return confirmBox('<h3>Reset your garden?</h3><p class="muted">This erases all progress on this device and starts again in the woods.</p>', 'Reset', () => {
     clearTimeout(saveTimer); localStorage.removeItem(SAVE_KEY); localStorage.removeItem(V02_KEY); S = null; location.reload(); });

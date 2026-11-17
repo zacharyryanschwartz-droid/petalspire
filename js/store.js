@@ -35,19 +35,30 @@ function notify() {
   try { window.dispatchEvent(new Event('petalspire-store')); } catch { /* no window */ }
 }
 
-export async function loadStore() {
-  if (!isNative() || state.ready) return state.ready;
+let loading = null;
+
+/** True while a product request is in flight (the Jewel Shop shows "Loading…" instead of "unavailable"). */
+export function storeLoading() { return !!loading; }
+
+/** Ask the store for products. Safe to call again: a failed or empty load is retried, a loaded store is kept. */
+export function loadStore() {
+  if (!isNative() || state.ready) return Promise.resolve(state.ready);
+  if (loading) return loading;
   const Store = plugin();
-  if (!Store?.loadProducts) return false;
-  try {
-    const res = await Store.loadProducts({ productIds: PRODUCT_IDS });
-    const products = res?.products || [];
-    state.prices = {};
-    for (const p of products) if (p?.productId && p.displayPrice) state.prices[p.productId] = p.displayPrice;
-    state.ready = products.length > 0;
-  } catch { state.ready = false; }
-  notify();
-  return state.ready;
+  if (!Store?.loadProducts) return Promise.resolve(false);
+  loading = (async () => {
+    try {
+      const res = await Store.loadProducts({ productIds: PRODUCT_IDS });
+      const products = res?.products || [];
+      state.prices = {};
+      for (const p of products) if (p?.productId && p.displayPrice) state.prices[p.productId] = p.displayPrice;
+      state.ready = products.length > 0;
+    } catch { state.ready = false; }
+    loading = null;
+    notify();
+    return state.ready;
+  })();
+  return loading;
 }
 
 export async function buyProduct(productId) {
