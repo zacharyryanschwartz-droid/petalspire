@@ -181,9 +181,9 @@ async function cmdIapStatus() {
     const a = d.attributes || {};
     let territories = '?';
     try {
-      const av = await api(`/v2/inAppPurchases/${d.id}/inAppPurchaseAvailability?include=availableTerritories&limit[availableTerritories]=200`);
+      const av = await api(`/v2/inAppPurchases/${d.id}/inAppPurchaseAvailability?include=availableTerritories`);
       territories = (av.data?.relationships?.availableTerritories?.data || []).map((t) => t.id).join(',') || 'none';
-    } catch (err) { territories = 'error ' + (err.status || ''); }
+    } catch (err) { territories = 'error ' + String(err.message || err).replace(/\s+/g, ' ').slice(0, 220); }
     console.log(`${a.productId}\t${a.inAppPurchaseType}\t${a.state}\tterritories=${territories}`);
   }
   try {
