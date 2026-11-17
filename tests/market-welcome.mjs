@@ -138,6 +138,7 @@ ok('market welcome does not throw', native.errors.length === 0 && web.errors.len
 await native.page.evaluate(() => { window.__ps.closePanel(); window.__ps.openPanel('jewels'); });
 await native.page.waitForFunction(() => document.querySelectorAll('#panel-body [data-offer-hero]').length >= 2);
 await native.page.waitForFunction(() => [...document.querySelectorAll('#panel-body [data-offer-hero] img')].every((img) => img.complete && img.naturalWidth > 0));
+await native.page.waitForTimeout(1400);   // let the 1.1s spBloom intro scale finish before measuring
 const shop = await native.page.evaluate(() => [...document.querySelectorAll('#panel-body [data-offer-hero]')].map((hero) => {
   const img = hero.querySelector('img');
   const s = getComputedStyle(img);
