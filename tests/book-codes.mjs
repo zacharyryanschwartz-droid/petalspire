@@ -1,4 +1,4 @@
-// Book redeem codes: SNOWFINCH, QUILTBEE, and the later KDP sets grant keepsakes once, show in the Bag, and stay in the save.
+// Book redeem codes: SNOWFINCH, QUILTBEE, and the later KDP sets grant keepsakes plus 10 jewels once, show in the Bag, and stay in the save.
 //   node tests/book-codes.mjs
 
 import { chromium } from 'playwright';
@@ -143,7 +143,10 @@ async function placeDecor(type, cx, cz, span = 6) {
 const before = await page.evaluate(() => ({ coins: window.__ps.state.coins, wood: window.__ps.state.wood, atm: window.__ps.atmosphereAt('home') }));
 const snowToast = await redeem('snow finch');
 ok('SNOWFINCH names the book and the three keepsakes', /Holly & Wing/.test(snowToast) && /Snowfinch Pair/.test(snowToast) && /Holly Cluster/.test(snowToast) && /Winter Ornament/.test(snowToast) && /just for looks/.test(snowToast), snowToast);
+ok('SNOWFINCH toast mentions +10 jewels', /\+10 jewels/.test(snowToast), snowToast);
 ok('SNOWFINCH toast does not mention two copies or both locations', !/Home and/i.test(snowToast) && !/the Orchard/i.test(snowToast) && !/×2|two of each/i.test(snowToast), snowToast);
+const snowJewels = await page.evaluate(() => window.__ps.state.jewels);
+ok('SNOWFINCH grants 10 jewels', snowJewels === 12, snowJewels);
 
 const snowBag = await page.evaluate((ids) => {
   const s = window.__ps.state;
@@ -162,6 +165,7 @@ const again = await redeem('SNOWFINCH');
 ok('a second SNOWFINCH says already claimed', /already claimed/i.test(again), again);
 const snowStill = await page.evaluate((ids) => Object.fromEntries(ids.map((id) => [id, window.__ps.state.decorInv[id] || 0])), SNOW);
 ok('a second SNOWFINCH adds nothing', SNOW.every((id) => snowStill[id] === 1), snowStill);
+ok('a second SNOWFINCH adds no jewels', (await page.evaluate(() => window.__ps.state.jewels)) === 12);
 
 await page.click('#tab-bag');
 await page.click('[data-bag="finds"]');
@@ -221,18 +225,25 @@ const models = await page.evaluate((ids) => {
 ok('each keepsake has its own garden model', Object.values(models).every((n) => n >= 3), models);
 
 const quiltToast = await redeem('quiltbee');
-ok('QUILTBEE names Pieced & Puzzled and the quilt blocks', /Pieced & Puzzled/.test(quiltToast) && /Star Quilt/.test(quiltToast) && /Log Cabin Quilt/.test(quiltToast) && /Quilt Compass/.test(quiltToast), quiltToast);
+ok('QUILTBEE names Pieced & Puzzled and the quilt blocks', /Pieced & Puzzled/.test(quiltToast) && /Star Quilt/.test(quiltToast) && /Log Cabin Quilt/.test(quiltToast) && /Quilt Compass/.test(quiltToast) && /\+10 jewels/.test(quiltToast), quiltToast);
+const quiltJewels = await page.evaluate(() => window.__ps.state.jewels);
+ok('QUILTBEE grants 10 jewels', quiltJewels === 22, quiltJewels);
 const quiltAgain = await redeem('QUILT BEE');
 ok('a second QUILTBEE says already claimed', /already claimed/i.test(quiltAgain), quiltAgain);
+ok('a second QUILTBEE adds no jewels', (await page.evaluate(() => window.__ps.state.jewels)) === 22);
 await page.click('#tab-bag');
 await page.click('[data-bag="finds"]');
 await page.locator('[data-d8-bag="d8_compass"]').scrollIntoViewIfNeeded();
 await page.screenshot({ path: `${ART}/book-codes-quilt.png` });
 
+let jewelsPrev = await page.evaluate(() => window.__ps.state.jewels);
 for (const book of BOOKS) {
   const toast = await redeem(book.typed);
   ok(`${book.code} names the book and the three keepsakes`, new RegExp(esc(book.book)).test(toast) && book.names.every((n) => new RegExp(esc(n)).test(toast)) && /just for looks/.test(toast), toast);
+  ok(`${book.code} toast mentions +10 jewels`, /\+10 jewels/.test(toast), toast);
   ok(`${book.code} toast does not mention two copies or both locations`, !/Home and/i.test(toast) && !/the Orchard/i.test(toast), toast);
+  const jewels0 = await page.evaluate(() => window.__ps.state.jewels);
+  ok(`${book.code} grants 10 jewels`, jewels0 === jewelsPrev + 10, { jewels0, jewelsPrev });
   const info = await page.evaluate(({ ids, code, names }) => {
     const s = window.__ps.state;
     return {
@@ -250,6 +261,8 @@ for (const book of BOOKS) {
   ok(`a second ${book.code} says already claimed`, /already claimed/i.test(again), again);
   const still = await page.evaluate((ids) => Object.fromEntries(ids.map((id) => [id, window.__ps.state.decorInv[id] || 0])), book.ids);
   ok(`a second ${book.code} adds nothing`, book.ids.every((id) => still[id] === 1), still);
+  ok(`a second ${book.code} adds no jewels`, (await page.evaluate(() => window.__ps.state.jewels)) === jewels0);
+  jewelsPrev = jewels0;
 }
 
 await page.click('#tab-bag');
@@ -266,8 +279,10 @@ ok('new keepsake menu icons are drawn markup, not images', newBag.rows.every((r)
 await page.locator('[data-d8-bag="d8_nightlamp"]').scrollIntoViewIfNeeded();
 await page.screenshot({ path: `${ART}/book-codes-new-sets.png` });
 
-const love = await page.evaluate(() => ({ ok: window.__ps.redeemCode('LOVEBUG'), n: window.__ps.state.decorInv.d8_lovebug || 0 }));
+const loveJewels0 = await page.evaluate(() => window.__ps.state.jewels);
+const love = await page.evaluate(() => ({ ok: window.__ps.redeemCode('LOVEBUG'), n: window.__ps.state.decorInv.d8_lovebug || 0, jewels: window.__ps.state.jewels }));
 ok('LOVEBUG still grants its own keepsake', love.ok === true && love.n === 1, love);
+ok('LOVEBUG grants 10 jewels', love.jewels === loveJewels0 + 10, love);
 
 await goLoc('home');
 await openFinds();
@@ -370,6 +385,7 @@ ok('the returned Love Bug stays in the bag after reload', kept.inv.d8_lovebug ==
 ok('redeeming changes neither coins nor wood nor atmosphere', kept.coins === before.coins && kept.wood === before.wood && kept.atm === before.atm, kept);
 ok('all book codes stay claimed', !!(kept.codes?.SNOWFINCH && kept.codes?.QUILTBEE && kept.codes?.LOVEBUG && kept.codes?.EARLYBLOOM && BOOKS.every((b) => kept.codes?.[b.code])), kept.codes);
 ok('the 25 tester jewels persist after reload', kept.jewels === jewelsBefore + 25 && kept.jewelsSaved === jewelsBefore + 25, { jewels: kept.jewels, saved: kept.jewelsSaved, before: jewelsBefore });
+ok('book-code jewels also persist after reload', kept.jewels === 2 + 10 * 12 + 25, kept.jewels);
 ok('the page stays free of script errors', errors.length === 0, errors);
 
 const broken = {
@@ -412,6 +428,9 @@ const fixed = await page2.evaluate(() => {
     bust: count('d8_bust'),
     exhibit: count('d8_exhibit'),
     arbor: count('d8_arbor'),
+    jewels: s.jewels,
+    jewelsSaved: raw.jewels,
+    codeJewels: raw.codeJewels,
   };
 });
 ok('a placed Love Bug drops leftover bag copies', fixed.love.inv === 0 && fixed.love.saved === 0 && fixed.love.placed === 1, fixed.love);
@@ -421,8 +440,30 @@ ok('unplaced Prize Balloons keep exactly one in the bag', fixed.balloon.inv === 
 ok('a single unplaced Marble Bust is left alone', fixed.bust.inv === 1 && fixed.bust.saved === 1 && fixed.bust.placed === 0, fixed.bust);
 ok('a redeemed Exhibit Case with no copies gets one in the bag', fixed.exhibit.inv === 1 && fixed.exhibit.saved === 1 && fixed.exhibit.placed === 0, fixed.exhibit);
 ok('a placed Friendship Arbor does not keep a leftover bag copy', fixed.arbor.inv === 0 && fixed.arbor.saved === 0 && fixed.arbor.placed === 1, fixed.arbor);
+ok('already-claimed book codes grant 10 jewels each once on load', fixed.jewels === 32 && fixed.jewelsSaved === 32, fixed);
+ok('the jewel backfill is marked on the save', !!(fixed.codeJewels?.LOVEBUG && fixed.codeJewels?.MIDWAY && fixed.codeJewels?.AFTERDARK) && !fixed.codeJewels?.EARLYBLOOM, fixed.codeJewels);
+await page2.waitForFunction(() => [...document.querySelectorAll('.toast')].some((el) => /\+30 jewels/.test(el.innerText) && /book codes now include jewels/i.test(el.innerText)), { timeout: 5000 });
+ok('the backfill toast mentions the jewels', true);
 ok('the repair load stays free of script errors', errors2.length === 0, errors2);
+
+await page2.reload({ waitUntil: 'domcontentloaded' });
+await page2.waitForFunction(() => window.__ps && window.__ps.state, { timeout: 20000 });
+const fixedAgain = await page2.evaluate(() => ({ jewels: window.__ps.state.jewels, saved: JSON.parse(localStorage.getItem('petalspire.v03')).jewels }));
+ok('a second load does not grant the book-code jewels again', fixedAgain.jewels === 32 && fixedAgain.saved === 32, fixedAgain);
 await ctx2.close();
+
+const alreadyBloomed = { ...broken, jewels: 27, codes: { ...broken.codes, EARLYBLOOM: 1 } };
+const ctx3 = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2 });
+const page3 = await ctx3.newPage();
+await page3.addInitScript((raw) => { localStorage.setItem('petalspire.v03', raw); }, JSON.stringify(alreadyBloomed));
+await page3.goto(base, { waitUntil: 'domcontentloaded' });
+await page3.waitForFunction(() => window.__ps && window.__ps.state, { timeout: 20000 });
+const bloomedFix = await page3.evaluate(() => {
+  const raw = JSON.parse(localStorage.getItem('petalspire.v03'));
+  return { jewels: window.__ps.state.jewels, saved: raw.jewels, marked: !!raw.codeJewels?.EARLYBLOOM };
+});
+ok('an already-claimed tester code is not paid a second time on load', bloomedFix.jewels === 57 && bloomedFix.saved === 57 && bloomedFix.marked, bloomedFix);
+await ctx3.close();
 
 await browser.close();
 server.close();

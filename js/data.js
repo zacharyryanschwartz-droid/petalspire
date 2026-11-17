@@ -985,22 +985,24 @@ export const DECO8_SHOP = DECO8_IDS.filter((k) => !DECO8[k].special);   // the 1
 export const DECO8_LOCS = ['home', 'orchard'];
 // v0.8.5 redeem codes (Settings › Help › Redeem code). Typed case-insensitively; each one can be claimed once per save
 // (S.codes). { deco: id } or { decos: [ids] } gives one of each decoration, which can be placed at any location.
-// { jewels: n } adds jewels. Nothing else.
+// Book codes also grant BOOK_CODE_JEWELS jewels (below the tester thank-you). { jewels: n } adds jewels. Nothing else.
+export const BOOK_CODE_JEWELS = 10;
+const BOOK_JEWEL_TOAST = ` <i data-icon="jewel"></i> +${BOOK_CODE_JEWELS} jewels`;
 export const REDEEM_CODES = {
-  LOVEBUG: { deco: 'd8_lovebug', toast: '🐞 A Love Bug crawled into your Bag! Place it — just for looks.' },
-  // KDP book bonuses, about a dollar of keepsakes. One claim per save. No coins, growth, or atmosphere.
-  SNOWFINCH: { book: 'Holly & Wing', decos: ['d8_snowfinch', 'd8_holly', 'd8_ornament'], toast: 'Snowfinch set from <b>Holly &amp; Wing</b> is in your Bag: Snowfinch Pair, Holly Cluster, and Winter Ornament. Place them — just for looks.' },
-  QUILTBEE: { book: 'Pieced & Puzzled', decos: ['d8_quiltstar', 'd8_logcabin', 'd8_compass'], toast: 'Quilt Bee set from <b>Pieced &amp; Puzzled</b> is in your Bag: Star Quilt, Log Cabin Quilt, and Quilt Compass. Place them — just for looks.' },
-  LAMPLIT: { book: 'Escape the Lighthouse', decos: ['d8_stormlantern', 'd8_spyglass', 'd8_tidekey'], toast: 'Lamplit set from <b>Escape the Lighthouse</b> is in your Bag: Storm Lantern, Keeper\'s Spyglass, and Tide-Worn Key. Place them — just for looks.' },
-  COZYCABIN: { book: 'Woodsmoke & Wool', decos: ['d8_woolthrow', 'd8_woodstove', 'd8_honeymug'], toast: 'Cozy Cabin set from <b>Woodsmoke &amp; Wool</b> is in your Bag: Woolen Throw, Woodsmoke Stove, and Honey Mug. Place them — just for looks.' },
-  GLASSHOUSE: { book: 'The Locked Glasshouse', decos: ['d8_terrarium', 'd8_potting', 'd8_mister'], toast: 'Glasshouse set from <b>The Locked Glasshouse</b> is in your Bag: Fern Terrarium, Potting Bench, and Copper Mister. Place them — just for looks.' },
-  LEADLIGHT: { book: 'Leadlight', decos: ['d8_rosewindow', 'd8_leadpanel', 'd8_medallion'], toast: 'Leadlight set from <b>Leadlight</b> is in your Bag: Rose Window, Leadlight Panel, and Honey Medallion. Place them — just for looks.' },
-  CLOSEDSTACKS: { book: 'Closed Stacks', decos: ['d8_tomes', 'd8_brasslamp', 'd8_catalog'], toast: 'Library set from <b>Closed Stacks</b> is in your Bag: Stacked Tomes, Brass Lamp, and Card Catalog. Place them — just for looks.' },
-  PICTUREPALACE: { book: 'The Picture Palace', decos: ['d8_velvetseat', 'd8_marquee', 'd8_filmreel'], toast: 'Cinema set from <b>The Picture Palace</b> is in your Bag: Velvet Seat, Marquee Lamp, and Film Reel. Place them — just for looks.' },
-  LASTVINTAGE: { book: 'The Last Vintage', decos: ['d8_cellarcask', 'd8_vinbottle', 'd8_grapevine'], toast: 'Vintage set from <b>The Last Vintage</b> is in your Bag: Cellar Cask, Vintage Bottle, and Grapevine Cluster. Place them — just for looks.' },
-  MIDWAY: { book: 'The Locked Midway', decos: ['d8_fairticket', 'd8_carousel', 'd8_prizeballoon'], toast: 'Midway set from <b>The Locked Midway</b> is in your Bag: Midway Ticket, Carousel Horse, and Prize Balloon. Place them — just for looks.' },
-  AFTERDARK: { book: 'The Museum After Dark', decos: ['d8_bust', 'd8_exhibit', 'd8_nightlamp'], toast: 'Museum set from <b>The Museum After Dark</b> is in your Bag: Marble Bust, Exhibit Case, and Night Lantern. Place them — just for looks.' },
-  // Tester thank-you, announced with the TestFlight build. Once per save.
+  LOVEBUG: { deco: 'd8_lovebug', jewels: BOOK_CODE_JEWELS, toast: '🐞 A Love Bug crawled into your Bag! Place it — just for looks.' + BOOK_JEWEL_TOAST },
+  // KDP book bonuses: one keepsake set plus jewels. One claim per save. No coins, growth, or atmosphere.
+  SNOWFINCH: { book: 'Holly & Wing', decos: ['d8_snowfinch', 'd8_holly', 'd8_ornament'], jewels: BOOK_CODE_JEWELS, toast: 'Snowfinch set from <b>Holly &amp; Wing</b> is in your Bag: Snowfinch Pair, Holly Cluster, and Winter Ornament. Place them — just for looks.' + BOOK_JEWEL_TOAST },
+  QUILTBEE: { book: 'Pieced & Puzzled', decos: ['d8_quiltstar', 'd8_logcabin', 'd8_compass'], jewels: BOOK_CODE_JEWELS, toast: 'Quilt Bee set from <b>Pieced &amp; Puzzled</b> is in your Bag: Star Quilt, Log Cabin Quilt, and Quilt Compass. Place them — just for looks.' + BOOK_JEWEL_TOAST },
+  LAMPLIT: { book: 'Escape the Lighthouse', decos: ['d8_stormlantern', 'd8_spyglass', 'd8_tidekey'], jewels: BOOK_CODE_JEWELS, toast: 'Lamplit set from <b>Escape the Lighthouse</b> is in your Bag: Storm Lantern, Keeper\'s Spyglass, and Tide-Worn Key. Place them — just for looks.' + BOOK_JEWEL_TOAST },
+  COZYCABIN: { book: 'Woodsmoke & Wool', decos: ['d8_woolthrow', 'd8_woodstove', 'd8_honeymug'], jewels: BOOK_CODE_JEWELS, toast: 'Cozy Cabin set from <b>Woodsmoke &amp; Wool</b> is in your Bag: Woolen Throw, Woodsmoke Stove, and Honey Mug. Place them — just for looks.' + BOOK_JEWEL_TOAST },
+  GLASSHOUSE: { book: 'The Locked Glasshouse', decos: ['d8_terrarium', 'd8_potting', 'd8_mister'], jewels: BOOK_CODE_JEWELS, toast: 'Glasshouse set from <b>The Locked Glasshouse</b> is in your Bag: Fern Terrarium, Potting Bench, and Copper Mister. Place them — just for looks.' + BOOK_JEWEL_TOAST },
+  LEADLIGHT: { book: 'Leadlight', decos: ['d8_rosewindow', 'd8_leadpanel', 'd8_medallion'], jewels: BOOK_CODE_JEWELS, toast: 'Leadlight set from <b>Leadlight</b> is in your Bag: Rose Window, Leadlight Panel, and Honey Medallion. Place them — just for looks.' + BOOK_JEWEL_TOAST },
+  CLOSEDSTACKS: { book: 'Closed Stacks', decos: ['d8_tomes', 'd8_brasslamp', 'd8_catalog'], jewels: BOOK_CODE_JEWELS, toast: 'Library set from <b>Closed Stacks</b> is in your Bag: Stacked Tomes, Brass Lamp, and Card Catalog. Place them — just for looks.' + BOOK_JEWEL_TOAST },
+  PICTUREPALACE: { book: 'The Picture Palace', decos: ['d8_velvetseat', 'd8_marquee', 'd8_filmreel'], jewels: BOOK_CODE_JEWELS, toast: 'Cinema set from <b>The Picture Palace</b> is in your Bag: Velvet Seat, Marquee Lamp, and Film Reel. Place them — just for looks.' + BOOK_JEWEL_TOAST },
+  LASTVINTAGE: { book: 'The Last Vintage', decos: ['d8_cellarcask', 'd8_vinbottle', 'd8_grapevine'], jewels: BOOK_CODE_JEWELS, toast: 'Vintage set from <b>The Last Vintage</b> is in your Bag: Cellar Cask, Vintage Bottle, and Grapevine Cluster. Place them — just for looks.' + BOOK_JEWEL_TOAST },
+  MIDWAY: { book: 'The Locked Midway', decos: ['d8_fairticket', 'd8_carousel', 'd8_prizeballoon'], jewels: BOOK_CODE_JEWELS, toast: 'Midway set from <b>The Locked Midway</b> is in your Bag: Midway Ticket, Carousel Horse, and Prize Balloon. Place them — just for looks.' + BOOK_JEWEL_TOAST },
+  AFTERDARK: { book: 'The Museum After Dark', decos: ['d8_bust', 'd8_exhibit', 'd8_nightlamp'], jewels: BOOK_CODE_JEWELS, toast: 'Museum set from <b>The Museum After Dark</b> is in your Bag: Marble Bust, Exhibit Case, and Night Lantern. Place them — just for looks.' + BOOK_JEWEL_TOAST },
+  // Tester thank-you, announced with the TestFlight build. Once per save. Do not backfill on load — jewels already paid out on redeem.
   EARLYBLOOM: { jewels: 25, toast: 'Thanks for testing Petalspire! <i data-icon="jewel"></i> +25 jewels' },
 };
 // chance that a Card Pack ALSO holds a decoration card (a bonus 4th card — the 3 normal cards and their odds are unchanged)
