@@ -93,6 +93,19 @@ xcodebuild "${XCODE[@]}" \
   OTHER_CODE_SIGN_FLAGS="--keychain $KEYCHAIN" \
   archive
 
+# Fail the build if the StoreKit bridge is not wired into the archived app (Jewel Shop would show "Store unavailable").
+APP_DIR="$(find "$ARCHIVE/Products/Applications" -maxdepth 1 -name '*.app' -print -quit)"
+APP_BIN="$APP_DIR/$(/usr/libexec/PlistBuddy -c 'Print CFBundleExecutable' "$APP_DIR/Info.plist")"
+check() { if "$@"; then :; else echo "StoreKit wiring check failed: $*" >&2; exit 1; fi; }
+check grep -aq 'PetalspireStore' "$APP_BIN"
+check grep -aq 'PetalspireBridgeViewController' "$APP_BIN"
+check grep -aqr 'PetalspireBridgeViewController' "$APP_DIR/Base.lproj/Main.storyboardc"
+check test -s "$APP_DIR/public/vendor/capacitor-core.js"
+check grep -q 'cap.registerPlugin = registerPlugin' "$APP_DIR/public/vendor/capacitor-core.js"
+check grep -q "vendor/capacitor-core.js" "$APP_DIR/public/js/native-boot.js"
+if grep -q 'jewel-grid' "$APP_DIR/public/index.html"; then echo "StoreKit wiring check failed: index.html hides the Jewel Shop" >&2; exit 1; fi
+echo "StoreKit wiring check passed (plugin class, storyboard controller, @capacitor/core in the app)"
+
 PLIST="$EXPORT/ExportOptions.plist"
 cat > "$PLIST" <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
