@@ -7,9 +7,14 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
     func scene(_ scene: UIScene, willConnectTo session: UISceneSession, options connectionOptions: UIScene.ConnectionOptions) {
         guard let windowScene = scene as? UIWindowScene else { return }
 
-        window = UIWindow(windowScene: windowScene)
-        window?.rootViewController = PetalspireBridgeViewController()
-        window?.makeKeyAndVisible()
+        // Main.storyboard already builds the window with PetalspireBridgeViewController (it registers the
+        // PetalspireStore StoreKit plugin). Replacing that window left the plain storyboard bridge on screen,
+        // so JS never saw PetalspireStore and the Jewel Shop got zero products. Only build a window if UIKit did not.
+        if window == nil {
+            window = UIWindow(windowScene: windowScene)
+            window?.rootViewController = PetalspireBridgeViewController()
+            window?.makeKeyAndVisible()
+        }
 
         SceneDelegateProxy.shared.scene(scene, willConnectTo: session, options: connectionOptions)
     }
