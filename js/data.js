@@ -983,8 +983,9 @@ export const DECO8 = {
 export const DECO8_IDS = Object.keys(DECO8);
 export const DECO8_SHOP = DECO8_IDS.filter((k) => !DECO8[k].special);   // the 14 (the Friendship Arbor only comes from referrals)
 export const DECO8_LOCS = ['home', 'orchard'];
-// v0.8.5 redeem codes (Settings › Help › Redeem code). Typed case-insensitively; each one can be claimed once per save
-// (S.codes). { deco: id } or { decos: [ids] } gives one of each decoration, which can be placed at any location.
+// v0.8.5 redeem codes (Settings › Help › Redeem code). Typed case-insensitively (spaces and hyphens ignored); each reward
+// can be claimed once per save (S.codes). An { alias: 'CANONICAL' } entry shares that claim and reward. { deco: id } or
+// { decos: [ids] } gives one of each decoration, which can be placed at any location.
 // Codes are cosmetic only (App Store guideline 3.1.1: no currency outside In-App Purchase). { jewels: n } entries are
 // kept but switched off: book codes grant BOOK_CODE_JEWELS (0), and jewel-only codes (EARLYBLOOM) don't redeem in the app
 // while CODE_JEWELS_ON is false. To re-enable later: set CODE_JEWELS_ON = true and BOOK_CODE_JEWELS = 10.
@@ -1004,7 +1005,9 @@ export const REDEEM_CODES = {
   PICTUREPALACE: { book: 'The Picture Palace', decos: ['d8_velvetseat', 'd8_marquee', 'd8_filmreel'], jewels: BOOK_CODE_JEWELS, toast: 'Cinema set from <b>The Picture Palace</b> is in your Bag: Velvet Seat, Marquee Lamp, and Film Reel. Place them — just for looks.' + BOOK_JEWEL_TOAST },
   LASTVINTAGE: { book: 'The Last Vintage', decos: ['d8_cellarcask', 'd8_vinbottle', 'd8_grapevine'], jewels: BOOK_CODE_JEWELS, toast: 'Vintage set from <b>The Last Vintage</b> is in your Bag: Cellar Cask, Vintage Bottle, and Grapevine Cluster. Place them — just for looks.' + BOOK_JEWEL_TOAST },
   MIDWAY: { book: 'The Locked Midway', decos: ['d8_fairticket', 'd8_carousel', 'd8_prizeballoon'], jewels: BOOK_CODE_JEWELS, toast: 'Midway set from <b>The Locked Midway</b> is in your Bag: Midway Ticket, Carousel Horse, and Prize Balloon. Place them — just for looks.' + BOOK_JEWEL_TOAST },
+  'SS-YKGT-N9BX': { alias: 'MIDWAY' },   // same Midway keepsakes; one claim per save with MIDWAY
   AFTERDARK: { book: 'The Museum After Dark', decos: ['d8_bust', 'd8_exhibit', 'd8_nightlamp'], jewels: BOOK_CODE_JEWELS, toast: 'Museum set from <b>The Museum After Dark</b> is in your Bag: Marble Bust, Exhibit Case, and Night Lantern. Place them — just for looks.' + BOOK_JEWEL_TOAST },
+  'SS-9SXS-47ME': { alias: 'AFTERDARK' },   // same Museum keepsakes; one claim per save with AFTERDARK
   // Tester thank-you (jewels). Inactive in the iOS app while CODE_JEWELS_ON is false. Once per save.
   EARLYBLOOM: { jewels: 25, toast: 'Thanks for testing Petalspire! <i data-icon="jewel"></i> +25 jewels' },
 };
