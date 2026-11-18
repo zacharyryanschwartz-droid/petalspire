@@ -2,7 +2,7 @@
 import * as THREE from 'three';
 import { createWorld } from './world.js';
 import { buildPlant } from './plants.js';
-import { CHARMS, CHARM_IDS, STAND_BUY, BULK, BLOOM, bloomJewels, RUSH, STAND_UNLOCK, WORKER, itemLoc, sellsAt, ORCH_STAND, parkLv, hydroId, HYDROSOL, NON_CARDS, ROAD_SCRAP, TINC_DUP_COINS, SPECIES, FANTASY_SPECIES, PLANT_TIERS, cardTier, FEATURE_TIER_FROM_OLD, TIER_ORDER, PACK_W, DRYING, rollSeeds, FEATURES, CARDS, RARITY, ITEMS, SELL_ORDER, TIPS, RESALE, PACKS, PACK_JEWELS, JEWEL_EXCHANGE, JEWEL_DROP, PARKING, ENDLESS_LV, DECO8, DECO8_IDS, DECO8_SHOP, REDEEM_CODES, DECO8_LOCS, DECO8_PACK, DECO8_DUP, BILLBOARD, WINDMILL, DUP_COINS, SUPPLY_CARDS, SUPPLY_DUP, WATER_TRUCK, CARD_LEVELS, RACK_SLOTS, BUILDING_LV, CONS, consJewels,  DAILY, PACK_LOOT, rollLoot, PACK_MIX, OWNED_K, WATER, BARREL_LV, DRY_S, BARREL, BASES, TINCTURE, STILL, oilId, tinctureId, TINCTURE_NAMES,
+import { CHARMS, CHARM_IDS, STAND_BUY, BULK, BLOOM, bloomJewels, RUSH, STAND_UNLOCK, WORKER, itemLoc, sellsAt, ORCH_STAND, parkLv, hydroId, HYDROSOL, NON_CARDS, ROAD_SCRAP, TINC_DUP_COINS, SPECIES, FANTASY_SPECIES, PLANT_TIERS, cardTier, FEATURE_TIER_FROM_OLD, TIER_ORDER, PACK_W, DRYING, rollSeeds, FEATURES, CARDS, RARITY, ITEMS, SELL_ORDER, TIPS, RESALE, PACKS, PACK_JEWELS, JEWEL_EXCHANGE, JEWEL_DROP, PARKING, ENDLESS_LV, DECO8, DECO8_IDS, DECO8_SHOP, REDEEM_CODES, CODE_JEWELS_ON, DECO8_LOCS, DECO8_PACK, DECO8_DUP, BILLBOARD, WINDMILL, DUP_COINS, SUPPLY_CARDS, SUPPLY_DUP, WATER_TRUCK, CARD_LEVELS, RACK_SLOTS, BUILDING_LV, CONS, consJewels,  DAILY, PACK_LOOT, rollLoot, PACK_MIX, OWNED_K, WATER, BARREL_LV, DRY_S, BARREL, BASES, TINCTURE, STILL, oilId, tinctureId, TINCTURE_NAMES,
   WOOD, BED_COSTS, STAND_CAP, MARKET_GOAL, WATER_REGEN_S, WATER_REGEN_MAX, STARTER, STARTER_FILL, STARTER_JEWELS,
   BUILDS, FINDS, FIND_IDS, FIND_CHANCE, SAPLING_CHANCE, RESTORE_HURRY_JEWELS, ATMOS_STEP, ATMOS_MAX, TREE, SHOP, JEWEL_BUNDLES, NO_ADS_BUNDLE, ADS, ADS_MODE, OTHER_GAMES, BOOSTS, STARTER_PACK, OFFER_PACKS, OFFER_VALUE, TOOL_SUB_JEWELS, TREE_IRRIG, STUDIO, CROSS_PROMO, SOCIALS, FOLLOW_REWARD, SHADE, TEA, teaInfo, teaId, teaSps, registerTea, DRY_TIER_S, PACK_W_ORCH, TREES, TREE_IDS, PRESS, FRUITSTAND, SEED_BAGS, bagId } from './data.js';
 import { ROAD, LOTS, SIGNS, LOT_FOR_SALE, LOT_PRICES, SITES, OBSTACLES, SPOTS, PARK_X, BEHIND, FRONT, BED_N, TILE, SITE_HALF, siteById, obstacleById, inSite, lotCenter, lotAt, ORCHARD_TREE_SPOTS, ORCH_GRID_OLD_TO_NEW, ORCH_ROW_OLD_TO_NEW, ORCH_NORTH_OLD, OWNABLE_LOTS, LOCATIONS, ORCHARD_PRICE, ORCH_X, ORCH_FOR_SALE, ORCH_PLOT_PRICES, ORCH_LOTS, lotLoc } from './layout.js';
@@ -5377,14 +5377,18 @@ function playIntro() {
 $('#story').addEventListener('click', () => { if (W.ctl.glide) { W.ctl.glide.dur = Math.min(W.ctl.glide.dur, performance.now() - W.ctl.glide.t0 + 400); } });
 
 // v0.8.5: redeem codes (table in data.js). Case-insensitive; each code once per save, remembered in S.codes.
+// Codes give cosmetics only in the iOS app; jewels from codes need CODE_JEWELS_ON (the web prototype keeps them).
+const jewelCodesOn = () => CODE_JEWELS_ON || !isNative();
 function redeemCode(raw) {
   const code = String(raw || '').trim().toUpperCase().replace(/\s+/g, ''); if (!code) { toast('Type a code first'); return false; }
-  const R = REDEEM_CODES[code]; if (!R) { toast('That code doesn’t match anything — check the spelling and try again'); return false; }
+  const R0 = REDEEM_CODES[code];
+  const R = R0 && R0.jewels && !R0.deco && !R0.decos && !jewelCodesOn() ? null : R0;   // jewel-only codes are off in the app (data.js CODE_JEWELS_ON)
+  if (!R) { toast('That code doesn’t match anything — check the spelling and try again'); return false; }
   S.codes ||= {}; if (S.codes[code]) { toast('You’ve already claimed this code — enjoy!'); return false; }
   S.codes[code] = now();
   const decos = R.decos || (R.deco ? [R.deco] : []);
   for (const id of decos) if (DECO8[id]) S.decorInv[id] = (S.decorInv[id] || 0) + 1;   // one copy, placeable at any location
-  if (R.jewels) { S.jewels += R.jewels; (S.codeJewels ||= {})[code] = now(); }
+  if (R.jewels && jewelCodesOn()) { S.jewels += R.jewels; (S.codeJewels ||= {})[code] = now(); }
   save(); hud(); const inp = $('#redeem-in'); if (inp) inp.value = ''; toast(R.toast || 'Code redeemed!'); if (panel === 'bag' || panel === 'settings' || panel === 'jewels') renderPanel(); return true;
 }
 document.addEventListener('keydown', (e) => { if (e.key === 'Enter' && e.target?.id === 'redeem-in') { e.preventDefault(); redeemCode(e.target.value); } });
@@ -5826,28 +5830,14 @@ function migDecoBag() {
   }
   return fixed;
 }
-// Book codes now grant jewels. Older saves that already claimed one get those jewels once
-// on load (S.codeJewels). EARLYBLOOM already paid out on redeem, so we only mark it.
-function migCodeJewels() {
-  if (!(S.jewels >= 0)) S.jewels = 0;
-  S.codeJewels ||= {};
-  let n = 0;
-  for (const [code, R] of Object.entries(REDEEM_CODES)) {
-    if (!S.codes?.[code] || !R.jewels || S.codeJewels[code]) continue;
-    if (R.deco || R.decos) { S.jewels += R.jewels; n += R.jewels; }
-    S.codeJewels[code] = now();
-  }
-  return n;
-}
+// (v0.8.7.x: the one-time book-code jewel backfill was removed; codes are cosmetic only. Jewels already granted stay.)
 function v8Init() {
   const fresh = fromBuild == null && !upgraded;
   if (!S.orders || typeof S.orders !== 'object') S.orders = {};
   for (const L of DECO8_LOCS) if (!S.orders[L] || !Array.isArray(S.orders[L].slots)) S.orders[L] = { slots: [], skipAt: 0, auto: false };
   if (!(S.spins >= 0)) S.spins = 0; if (!(S.spinPity >= 0)) S.spinPity = 0; if (!(S.spinsDone >= 0)) S.spinsDone = 0;
   if (!S.decoCards || typeof S.decoCards !== 'object') S.decoCards = {};
-  const jewelBackfill = migCodeJewels();
-  if (migDecoBag() || jewelBackfill) writeSave();
-  if (jewelBackfill) { hud(); setTimeout(() => toast(`Your book codes now include jewels · <i data-icon="jewel"></i> +${jewelBackfill} jewels`), 1800); }
+  if (migDecoBag()) writeSave();
   if (!S.refClaimed || !Array.isArray(S.refClaimed)) S.refClaimed = [];
   if (!S.refMiles || typeof S.refMiles !== 'object') S.refMiles = {};
   if (!S.refDays || typeof S.refDays !== 'object') S.refDays = {};
