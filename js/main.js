@@ -5376,19 +5376,34 @@ function playIntro() {
 }
 $('#story').addEventListener('click', () => { if (W.ctl.glide) { W.ctl.glide.dur = Math.min(W.ctl.glide.dur, performance.now() - W.ctl.glide.t0 + 400); } });
 
-// v0.8.5: redeem codes (table in data.js). Case-insensitive; each code once per save, remembered in S.codes.
+// v0.8.5: redeem codes (table in data.js). Case, spaces and hyphens are ignored; aliases share one claim per save in S.codes.
 // Codes give cosmetics only in the iOS app; jewels from codes need CODE_JEWELS_ON (the web prototype keeps them).
 const jewelCodesOn = () => CODE_JEWELS_ON || !isNative();
+function lookupRedeemCode(raw) {
+  const typed = String(raw || '').trim().toUpperCase().replace(/[\s-]+/g, '');
+  if (!typed) return '';
+  return Object.keys(REDEEM_CODES).find((k) => k.replace(/-/g, '') === typed) || '';
+}
+function redeemCanonical(code) {
+  const e = REDEEM_CODES[code];
+  return (e && e.alias && REDEEM_CODES[e.alias]) ? e.alias : code;
+}
+function redeemReward(code) { return REDEEM_CODES[redeemCanonical(code)]; }
+function isCodeClaimed(claim) {
+  return Object.keys(S.codes || {}).some((k) => k === claim || redeemCanonical(k) === claim);
+}
 function redeemCode(raw) {
-  const code = String(raw || '').trim().toUpperCase().replace(/\s+/g, ''); if (!code) { toast('Type a code first'); return false; }
-  const R0 = REDEEM_CODES[code];
+  const typed = String(raw || '').trim().toUpperCase().replace(/\s+/g, ''); if (!typed) { toast('Type a code first'); return false; }
+  const code = lookupRedeemCode(typed);
+  const R0 = redeemReward(code);
   const R = R0 && R0.jewels && !R0.deco && !R0.decos && !jewelCodesOn() ? null : R0;   // jewel-only codes are off in the app (data.js CODE_JEWELS_ON)
   if (!R) { toast('That code doesn’t match anything — check the spelling and try again'); return false; }
-  S.codes ||= {}; if (S.codes[code]) { toast('You’ve already claimed this code — enjoy!'); return false; }
-  S.codes[code] = now();
+  const claim = redeemCanonical(code);
+  S.codes ||= {}; if (isCodeClaimed(claim)) { toast('You’ve already claimed this code — enjoy!'); return false; }
+  S.codes[claim] = now();
   const decos = R.decos || (R.deco ? [R.deco] : []);
   for (const id of decos) if (DECO8[id]) S.decorInv[id] = (S.decorInv[id] || 0) + 1;   // one copy, placeable at any location
-  if (R.jewels && jewelCodesOn()) { S.jewels += R.jewels; (S.codeJewels ||= {})[code] = now(); }
+  if (R.jewels && jewelCodesOn()) { S.jewels += R.jewels; (S.codeJewels ||= {})[claim] = now(); }
   save(); hud(); const inp = $('#redeem-in'); if (inp) inp.value = ''; toast(R.toast || 'Code redeemed!'); if (panel === 'bag' || panel === 'settings' || panel === 'jewels') renderPanel(); return true;
 }
 document.addEventListener('keydown', (e) => { if (e.key === 'Enter' && e.target?.id === 'redeem-in') { e.preventDefault(); redeemCode(e.target.value); } });
@@ -5805,7 +5820,7 @@ function statXP() {
 // own caps (one per location, or one arbor).
 function redeemDecosOf(R) { return R?.decos || (R?.deco ? [R.deco] : []); }
 function isRedeemKeepsake(k) { return Object.values(REDEEM_CODES).some((R) => redeemDecosOf(R).includes(k)); }
-function redeemClaimed(k) { return Object.keys(S.codes || {}).some((code) => redeemDecosOf(REDEEM_CODES[code]).includes(k)); }
+function redeemClaimed(k) { return Object.keys(S.codes || {}).some((code) => redeemDecosOf(redeemReward(code)).includes(k)); }
 function decoMaxOwned(k) {
   if (!DECO8[k]) return 0;
   if (isRedeemKeepsake(k)) return 1;

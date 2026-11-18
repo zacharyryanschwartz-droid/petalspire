@@ -1,4 +1,5 @@
 // Book redeem codes: SNOWFINCH, QUILTBEE, and the later KDP sets grant keepsakes only (no jewels, App Store 3.1.1) once, show in the Bag, and stay in the save.
+// Midway / Museum aliases (SS-YKGT-N9BX, SS-9SXS-47ME) share that claim: typed lower-case or without hyphens still works, and redeeming the alias after the printed code (or the other way around) is already claimed.
 //   node tests/book-codes.mjs
 
 import { chromium } from 'playwright';
@@ -265,6 +266,17 @@ for (const book of BOOKS) {
   jewelsPrev = jewels0;
 }
 
+for (const a of [
+  { alias: 'SS-YKGT-N9BX', canon: 'MIDWAY', ids: ['d8_fairticket', 'd8_carousel', 'd8_prizeballoon'] },
+  { alias: 'SS-9SXS-47ME', canon: 'AFTERDARK', ids: ['d8_bust', 'd8_exhibit', 'd8_nightlamp'] },
+]) {
+  const toast = await redeem(a.alias);
+  ok(`${a.alias} after ${a.canon} says already claimed`, /already claimed/i.test(toast), toast);
+  const still = await page.evaluate((ids) => Object.fromEntries(ids.map((id) => [id, window.__ps.state.decorInv[id] || 0])), a.ids);
+  ok(`${a.alias} after ${a.canon} adds no keepsakes`, a.ids.every((id) => still[id] === 1), still);
+  ok(`${a.alias} after ${a.canon} adds no jewels`, (await page.evaluate(() => window.__ps.state.jewels)) === jewelsPrev);
+}
+
 await page.click('#tab-bag');
 await page.click('[data-bag="finds"]');
 const newBag = await page.evaluate((ids) => {
@@ -485,7 +497,85 @@ ok('iOS: LASTVINTAGE gives its keepsakes and no jewels', ios.book === true && io
 ok('iOS code checks stay free of script errors', errors4.length === 0, errors4);
 await ctx4.close();
 
+
+// Alias codes for The Locked Midway and The Museum After Dark share one claim with the printed names.
+const ALIASES = [
+  { canon: 'MIDWAY', alias: 'SS-YKGT-N9BX', lower: 'ss-ykgt-n9bx', compact: 'ssykgtn9bx', ids: ['d8_fairticket', 'd8_carousel', 'd8_prizeballoon'], book: 'The Locked Midway', names: ['Midway Ticket', 'Carousel Horse', 'Prize Balloon'] },
+  { canon: 'AFTERDARK', alias: 'SS-9SXS-47ME', lower: 'ss-9sxs-47me', compact: 'ss9sxs47me', ids: ['d8_bust', 'd8_exhibit', 'd8_nightlamp'], book: 'The Museum After Dark', names: ['Marble Bust', 'Exhibit Case', 'Night Lantern'] },
+];
+
+async function freshRedeemPage() {
+  const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2 });
+  const p = await ctx.newPage();
+  const errs = [];
+  p.on('pageerror', (e) => errs.push(String(e)));
+  await p.addInitScript((raw) => { localStorage.setItem('petalspire.v03', raw); }, save);
+  await p.goto(base, { waitUntil: 'domcontentloaded' });
+  await p.waitForFunction(() => window.__ps && window.__ps.state, { timeout: 20000 });
+  return { ctx, p, errs };
+}
+
+async function redeemOn(p, code) {
+  return p.evaluate((code) => {
+    document.querySelectorAll('.toast').forEach((el) => el.remove());
+    const j0 = window.__ps.state.jewels;
+    const ok = window.__ps.redeemCode(code);
+    const toast = document.querySelector('.toast')?.innerText.replace(/\s+/g, ' ') || '';
+    const s = window.__ps.state;
+    return {
+      ok,
+      toast,
+      jewels: s.jewels,
+      j0,
+      inv: { ...s.decorInv },
+      codes: { ...(s.codes || {}) },
+    };
+  }, code);
+}
+
+for (const a of ALIASES) {
+  {
+    const { ctx, p, errs } = await freshRedeemPage();
+    const first = await redeemOn(p, a.alias);
+    ok(`${a.alias} grants the ${a.canon} set`, first.ok === true && a.ids.every((id) => first.inv[id] === 1) && a.names.every((n) => new RegExp(esc(n)).test(first.toast)) && new RegExp(esc(a.book)).test(first.toast), first);
+    ok(`${a.alias} grants no jewels`, first.jewels === first.j0, first);
+    ok(`${a.alias} is remembered as ${a.canon}`, !!first.codes[a.canon] && !first.codes[a.alias], first.codes);
+    const again = await redeemOn(p, a.canon);
+    ok(`${a.canon} after ${a.alias} is already claimed`, again.ok === false && /already claimed/i.test(again.toast), again);
+    ok(`${a.canon} after ${a.alias} adds no keepsakes`, a.ids.every((id) => again.inv[id] === 1), again.inv);
+    ok(`${a.canon} after ${a.alias} adds no jewels`, again.jewels === first.jewels, again);
+    ok(`${a.alias} then ${a.canon} stay free of script errors`, errs.length === 0, errs);
+    await ctx.close();
+  }
+  {
+    const { ctx, p, errs } = await freshRedeemPage();
+    const lower = await redeemOn(p, a.lower);
+    ok(`${a.lower} (lowercase, hyphens) grants the ${a.canon} set`, lower.ok === true && a.ids.every((id) => lower.inv[id] === 1), lower);
+    const compact = await redeemOn(p, a.compact);
+    ok(`${a.compact} after lowercase hyphenated is already claimed`, compact.ok === false && /already claimed/i.test(compact.toast) && a.ids.every((id) => compact.inv[id] === 1), compact);
+    ok(`${a.lower} grants no jewels`, lower.jewels === lower.j0 && compact.jewels === lower.jewels, { lower, compact });
+    ok(`lowercase ${a.canon} alias checks stay free of script errors`, errs.length === 0, errs);
+    await ctx.close();
+  }
+  {
+    const { ctx, p, errs } = await freshRedeemPage();
+    const compact = await redeemOn(p, a.compact);
+    ok(`${a.compact} (lowercase, no hyphens) grants the ${a.canon} set`, compact.ok === true && a.ids.every((id) => compact.inv[id] === 1) && !!compact.codes[a.canon], compact);
+    const canon = await redeemOn(p, a.canon.toLowerCase());
+    ok(`${a.canon} after ${a.compact} is already claimed`, canon.ok === false && /already claimed/i.test(canon.toast) && a.ids.every((id) => canon.inv[id] === 1), canon);
+    const { ctx: ctxB, p: pB, errs: errsB } = await freshRedeemPage();
+    const first = await redeemOn(pB, a.canon);
+    const aliasAfter = await redeemOn(pB, a.alias);
+    ok(`${a.canon} first grants the set once`, first.ok === true && a.ids.every((id) => first.inv[id] === 1), first);
+    ok(`${a.alias} after ${a.canon} is already claimed`, aliasAfter.ok === false && /already claimed/i.test(aliasAfter.toast) && a.ids.every((id) => aliasAfter.inv[id] === 1) && aliasAfter.jewels === first.jewels, aliasAfter);
+    ok(`compact / canonical-first ${a.canon} checks stay free of script errors`, errs.length === 0 && errsB.length === 0, [...errs, ...errsB]);
+    await ctx.close();
+    await ctxB.close();
+  }
+}
+
 await browser.close();
 server.close();
+
 if (fails.length) { console.error('FAILED', fails); process.exit(1); }
 console.log('book codes ok');
