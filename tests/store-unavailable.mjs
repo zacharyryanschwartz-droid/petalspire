@@ -34,7 +34,7 @@ async function boot(mode) {
         async loadProducts({ productIds }) {
           window.__loads++;
           if (mode === 'throw') throw new Error('StoreKit down');
-          if (mode === 'empty' || (mode === 'later' && window.__loads < 2)) return { products: [] };
+          if (mode === 'empty' || (mode === 'later' && window.__loads < 2)) return { products: [], requested: productIds.length, storefront: 'USA', canPay: true };
           return { products: productIds.map((p) => ({ productId: p, displayPrice: '$1.23' })) };
         },
         async purchase() { return { status: 'cancelled' }; },
@@ -66,6 +66,7 @@ for (const mode of ['empty', 'throw']) {
   await page.waitForTimeout(300);
   const s = await shopState(page);
   ok(`${mode}: shop says Store unavailable with a Try again button`, s.cards === 0 && /Store unavailable/.test(s.down) && s.retry, s);
+  ok(`${mode}: the card names why it is empty`, mode === 'empty' ? /0 of 6 products · storefront USA/.test(s.down) : /bridge: StoreKit down/.test(s.down), s.down);
   ok(`${mode}: opening the shop retried the store`, s.loads >= 2, s.loads);
   await page.waitForTimeout(1500);
   const idle = await page.evaluate(() => window.__loads);

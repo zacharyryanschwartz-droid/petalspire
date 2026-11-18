@@ -11,7 +11,7 @@ import { Payments } from './payments.js';
 import { createAds, gameArt } from './ads.js';
 import { isNative, openExternal, syncNativeChrome } from './native.js';
 import { considerNativeAds } from './admob.js';
-import { PRIVACY_URL, finishProduct, listenForTransactions, loadStore, purchasesVisible, restoreProducts, storeLoading, storePrice } from './store.js';
+import { PRIVACY_URL, finishProduct, listenForTransactions, loadStore, purchasesVisible, restoreProducts, storeLoading, storePrice, storeWhy } from './store.js';
 import { initTracker } from './games-tracker.js';
 import { createReferral, cleanCode } from './referral.js';
 import { shadeAt, speedFor, sunLabel, rebaseStart } from './shade.js';
@@ -4561,7 +4561,7 @@ function jewelsHTML() {
   // In the app, never let the paid section silently vanish: if the App Store returned nothing, say so and offer a retry.
   const down = shopOn || !isNative() ? '' : storeLoading()
     ? '<div class="store-down" data-store-down><b>Loading the Jewel Shop…</b><small>Checking the App Store</small></div>'
-    : '<div class="store-down" data-store-down><b>Store unavailable</b><small>The App Store didn’t send the Jewel packs. Check your connection and try again.</small><button class="btn btn-gold sm" data-act="store-retry">Try again</button></div>';
+    : `<div class="store-down" data-store-down><b>Store unavailable</b><small>The App Store didn’t send the Jewel packs. Check your connection and try again.</small>${storeWhy() ? `<small class="store-why" data-store-why>${storeWhy().replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c])}</small>` : ''}<button class="btn btn-gold sm" data-act="store-retry">Try again</button></div>`;
   return `<div class="jewel-hero"><i data-icon="jewel"></i><div><b>${S.jewels}</b><small>Jewels</small></div></div>
     ${down}
     <p class="muted" style="margin:6px 4px 12px">Jewels open Card Packs (${PACK_JEWELS} each), finish a restoration instantly (${RESTORE_HURRY_JEWELS}), grow a planted tree by a stage (${TREE.hurryJewels}) or complete the market rebuild (${BUILDS.market.hurryJewels}).</p>

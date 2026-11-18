@@ -65,18 +65,28 @@ public class PetalspireStore: CAPPlugin, CAPBridgedPlugin {
     @objc func loadProducts(_ call: CAPPluginCall) {
         let requested = call.getArray("productIds", String.self) ?? productIds
         Task { @MainActor in
+            // Diagnostics for an empty shop: which storefront the device is in and whether payments are allowed.
+            let storefront = await Storefront.current
+            var info: [String: Any] = [
+                "requested": requested.count,
+                "storefront": storefront?.countryCode ?? "none",
+                "canPay": AppStore.canMakePayments,
+            ]
             do {
                 let products = try await Product.products(for: requested)
-                let rows: [[String: Any]] = products.map { product in
+                info["products"] = products.map { product in
                     [
                         "productId": product.id,
                         "displayPrice": product.displayPrice,
                         "displayName": product.displayName,
-                    ]
+                    ] as [String: Any]
                 }
-                call.resolve(["products": rows])
+                info["missing"] = requested.filter { id in !products.contains { $0.id == id } }
+                call.resolve(info)
             } catch {
-                call.resolve(["products": []])
+                info["products"] = [] as [[String: Any]]
+                info["error"] = String(describing: error)
+                call.resolve(info)
             }
         }
     }

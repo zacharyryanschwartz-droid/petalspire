@@ -10,7 +10,7 @@ export const PRODUCT_IDS = [
   ...OFFER_PACKS.map((o) => o.productId),
 ];
 
-const state = { ready: false, prices: {} };
+const state = { ready: false, prices: {}, why: '' };
 
 function plugin() {
   if (!isNative()) return null;
@@ -20,6 +20,9 @@ function plugin() {
 }
 
 export function storeReady() { return state.ready; }
+
+/** Short reason the last load came back empty (shown small in the Jewel Shop so a tester can report it). */
+export function storeWhy() { return state.why; }
 
 /** Localized App Store price, or the fallback string from data.js. */
 export function storePrice(productId, fallback) {
@@ -45,7 +48,7 @@ export function loadStore() {
   if (!isNative() || state.ready) return Promise.resolve(state.ready);
   if (loading) return loading;
   const Store = plugin();
-  if (!Store?.loadProducts) return Promise.resolve(false);
+  if (!Store?.loadProducts) { state.why = 'no store plugin'; return Promise.resolve(false); }
   loading = (async () => {
     try {
       const res = await Store.loadProducts({ productIds: PRODUCT_IDS });
@@ -53,7 +56,8 @@ export function loadStore() {
       state.prices = {};
       for (const p of products) if (p?.productId && p.displayPrice) state.prices[p.productId] = p.displayPrice;
       state.ready = products.length > 0;
-    } catch { state.ready = false; }
+      state.why = state.ready ? '' : [`0 of ${res?.requested ?? PRODUCT_IDS.length} products`, res?.storefront && `storefront ${res.storefront}`, res?.canPay === false && 'payments off', res?.error && String(res.error).slice(0, 120)].filter(Boolean).join(' · ');
+    } catch (err) { state.ready = false; state.why = 'bridge: ' + String(err?.code || err?.message || err).slice(0, 80); }
     loading = null;
     notify();
     return state.ready;
