@@ -195,18 +195,57 @@ await page.evaluate(() => {
 });
 await page.waitForTimeout(250);
 const plantUi = await page.evaluate(() => {
-  const chip = document.querySelector('[data-plant="lavender"]');
-  const bedBtn = document.querySelector('[data-plantbed="lavender"]');
+  const sheet = document.getElementById('tile-sheet');
+  const bedBtn = sheet?.querySelector('[data-act="plant-bed-pick"]');
+  const chips = [...(sheet?.querySelectorAll('[data-plant], .seed-chip, .seed-bank-row') || [])];
+  const plantBedBtns = [...(sheet?.querySelectorAll('[data-plantbed]') || [])];
+  const hud = document.getElementById('hud')?.getBoundingClientRect();
+  const box = sheet?.getBoundingClientRect();
   return {
-    chip: chip?.innerText.replace(/\s+/g, ' ').trim() || null,
-    chipBanked: chip?.classList.contains('banked'),
-    hasBadge: !!chip?.querySelector('.bank-badge'),
     bedBtn: bedBtn?.innerText.replace(/\s+/g, ' ').trim() || null,
-    sheetHidden: document.getElementById('tile-sheet')?.classList.contains('hidden'),
+    bedBtnCount: sheet ? sheet.querySelectorAll('[data-act="plant-bed-pick"]').length : 0,
+    chips: chips.length,
+    plantBedBtns: plantBedBtns.length,
+    sheetHidden: sheet?.classList.contains('hidden'),
+    underHud: !!(hud && box && box.top < hud.bottom - 1),
+    sheetTop: box && Math.round(box.top),
+    hudBottom: hud && Math.round(hud.bottom),
   };
 });
-ok('empty soil sheet shows the banked seed and a Plant this bed button', /banked/i.test(plantUi.chip || '') && plantUi.chipBanked && plantUi.hasBadge && /Plant this bed/.test(plantUi.bedBtn || '') && plantUi.sheetHidden === false, plantUi);
+ok('empty soil sheet has one Plant this bed button and no seed-bank cards', plantUi.bedBtnCount === 1 && /Plant this bed/.test(plantUi.bedBtn || '') && plantUi.chips === 0 && plantUi.plantBedBtns === 0 && plantUi.sheetHidden === false, plantUi);
+ok('the bed panel sits below the HUD', plantUi.underHud === false && plantUi.sheetTop >= plantUi.hudBottom, plantUi);
 await snap(page, 'seedbank-plant.png');
+
+await page.click('#tile-sheet [data-act="plant-bed-pick"]');
+await page.waitForTimeout(200);
+const pickerUi = await page.evaluate(() => {
+  const picker = document.getElementById('seed-picker');
+  const tile = picker?.querySelector('[data-plantbed="lavender"]');
+  const tiles = [...(picker?.querySelectorAll('.seed-pick') || [])];
+  const hud = document.getElementById('hud')?.getBoundingClientRect();
+  const box = picker?.getBoundingClientRect();
+  const widths = tiles.map((t) => Math.round(t.getBoundingClientRect().width));
+  const wraps = tiles.map((t) => {
+    const b = t.querySelector('b');
+    if (!b) return false;
+    const cs = getComputedStyle(b);
+    return cs.overflowWrap === 'anywhere' || cs.wordBreak === 'break-all';
+  });
+  return {
+    hidden: picker?.classList.contains('hidden'),
+    text: tile?.innerText.replace(/\s+/g, ' ').trim() || null,
+    banked: !!tile?.classList.contains('banked'),
+    n: tiles.length,
+    widths,
+    uniform: widths.length > 1 ? Math.max(...widths) - Math.min(...widths) <= 2 : true,
+    midWordCss: wraps.some(Boolean),
+    underHud: !!(hud && box && !picker?.classList.contains('hidden') && box.top < hud.bottom - 1),
+    pickerTop: box && Math.round(box.top),
+    hudBottom: hud && Math.round(hud.bottom),
+  };
+});
+ok('Plant this bed opens a seed picker with loose and banked counts', !pickerUi.hidden && /Lavender/i.test(pickerUi.text || '') && /banked/i.test(pickerUi.text || '') && pickerUi.n >= 1, pickerUi);
+ok('the seed picker sits below the HUD with even tiles and no mid-word wrap CSS', pickerUi.underHud === false && pickerUi.uniform && !pickerUi.midWordCss, pickerUi);
 
 const fullBed = await page.evaluate(() => {
   const ps = window.__ps;
@@ -278,6 +317,71 @@ ok('old-save page had no errors', old.errors.length === 0, old.errors);
 await old.context.close();
 
 ok('first page had no errors', errors.length === 0, errors);
+
+// Phone-size shots of the short bed panel and the open picker (about 471×1024).
+const phone = await browser.newContext({ viewport: { width: 471, height: 1024 }, deviceScaleFactor: 2 });
+const phonePage = await phone.newPage();
+phonePage.on('pageerror', (e) => errors.push('phone:' + String(e)));
+const phoneSave = JSON.stringify({
+  v: 3, coins: 200, wood: 40, jewels: 2, introDone: true, tut: { done: true }, guideDone: true,
+  lots: { home: true }, loc: 'home', standBuilt: true, marketBuilt: true, marketAvail: true,
+  beds: ['home-0'], tiles: Array(9).fill(null),
+  barrels: { home: { x: -1.15, z: 4.25, w: 9, at: Date.now(), lv: 1 } },
+  bags: { home: {
+    seed_lavender: 3, seed_calendula: 4, seed_chamomile: 4, seed_peppermint: 4,
+    seed_rosemary: 4, seed_yarrow: 4, seed_sunflower: 12, seed_damaskrose: 8,
+    seed_tulsi: 8, seed_elderflower: 8, seed_saffron: 8, seed_bluelotus: 8,
+  }, orchard: {} },
+  seedBank: { home: {
+    lavender: 9, sunflower: 8, damaskrose: 8, tulsi: 8, elderflower: 8, saffron: 8, bluelotus: 8,
+  }, orchard: {} },
+  unlocked: { lavender: true, calendula: true, chamomile: true, peppermint: true, rosemary: true, yarrow: true, sunflower: true, damaskrose: true, tulsi: true, elderflower: true, saffron: true, bluelotus: true, moonflower: true },
+});
+await phonePage.addInitScript((raw) => { localStorage.setItem('petalspire.v03', raw); }, phoneSave);
+await phonePage.goto(base, { waitUntil: 'domcontentloaded' });
+await phonePage.waitForFunction(() => window.__ps && window.__ps.state && window.__ps.bankSeeds, { timeout: 20000 });
+await phonePage.evaluate(() => {
+  document.body.classList.remove('on-title');
+  document.getElementById('title')?.classList.add('hidden');
+  document.getElementById('studio-splash')?.remove();
+  document.getElementById('tip')?.classList.add('hidden');
+  document.querySelectorAll('.toast,.sprig-tip,.pop').forEach((e) => e.remove());
+  window.__ps.state.unlocked.moonflower = true;
+  window.__ps.selectTile(0);
+  window.__ps.layoutSheet();
+});
+await phonePage.waitForTimeout(300);
+const phonePanel = await phonePage.evaluate(() => {
+  const sheet = document.getElementById('tile-sheet').getBoundingClientRect();
+  const hud = document.getElementById('hud').getBoundingClientRect();
+  const btnN = document.querySelectorAll('#tile-sheet [data-act="plant-bed-pick"]').length;
+  const wall = document.querySelectorAll('#tile-sheet [data-plantbed], #tile-sheet .seed-chip, #tile-sheet .seed-bank-row').length;
+  return { btnN, wall, underHud: sheet.top < hud.bottom - 1, top: Math.round(sheet.top), hudBottom: Math.round(hud.bottom) };
+});
+ok('phone bed panel is a single Plant this bed button, clear of the HUD', phonePanel.btnN === 1 && phonePanel.wall === 0 && !phonePanel.underHud, phonePanel);
+await phonePage.screenshot({ path: path.join(SHOTS, 'bedpanel-empty.png') });
+console.log('SHOT', path.join(SHOTS, 'bedpanel-empty.png'));
+await phonePage.click('#tile-sheet [data-act="plant-bed-pick"]');
+await phonePage.waitForTimeout(250);
+const phonePick = await phonePage.evaluate(() => {
+  const picker = document.getElementById('seed-picker');
+  const box = picker.getBoundingClientRect();
+  const hud = document.getElementById('hud').getBoundingClientRect();
+  const tiles = [...picker.querySelectorAll('.seed-pick')];
+  const widths = tiles.map((t) => Math.round(t.getBoundingClientRect().width));
+  const moon = picker.querySelector('[data-plantbed="moonflower"]');
+  return {
+    hidden: picker.classList.contains('hidden'),
+    n: tiles.length,
+    underHud: box.top < hud.bottom - 1,
+    uniform: widths.length ? Math.max(...widths) - Math.min(...widths) <= 2 : false,
+    moonOff: !!(moon && moon.disabled),
+  };
+});
+ok('phone seed picker is a uniform grid below the HUD, with ineligible seeds disabled', !phonePick.hidden && phonePick.n >= 12 && !phonePick.underHud && phonePick.uniform && phonePick.moonOff, phonePick);
+await phonePage.screenshot({ path: path.join(SHOTS, 'bedpanel-picker.png') });
+console.log('SHOT', path.join(SHOTS, 'bedpanel-picker.png'));
+await phone.close();
 
 await browser.close();
 server.close();

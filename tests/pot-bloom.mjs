@@ -61,6 +61,8 @@ const catalog = await page.evaluate(() => ({
   potWood: window.__ps.POT.wood,
   isMoon: window.__ps.isOtherworldPlant('moonflower'),
   isLav: window.__ps.isOtherworldPlant('lavender'),
+  isMoonpeach: window.__ps.isOtherworldPlant('moonpeach'),
+  isCrystalApple: window.__ps.isOtherworldPlant('crystalapple'),
 }));
 ok('Other World plants are Moonflower, Crystal Rose and Spiral Sunpetal',
   catalog.plants.slice().sort().join(',') === 'crystalrose,moonflower,sunpetal', catalog.plants);
@@ -68,6 +70,7 @@ ok('Other World trees are listed separately (Moonpeach, Crystal Apple)',
   catalog.trees.slice().sort().join(',') === 'crystalapple,moonpeach', catalog.trees);
 ok('Garden Pot costs 8 Wood (less than the first raised bed)', catalog.potWood === 8, catalog);
 ok('isOtherworldPlant is true for Moonflower and false for Lavender', catalog.isMoon && !catalog.isLav, catalog);
+ok('Other World trees do not get the bloom cinematic', !catalog.isMoonpeach && !catalog.isCrystalApple, catalog);
 
 const cleared = await page.evaluate(() => {
   const S = window.__ps.state, W = window.__ps.W;
@@ -247,6 +250,68 @@ const persisted = await page.evaluate((id) => {
 ok('the save stores the pot, its plant, and the bloomed flag', persisted.pot?.sp === 'moonflower' && persisted.pot.bloomed === true, persisted.pot);
 const saved = await page.evaluate(() => localStorage.getItem('petalspire.v03'));
 
+// Harvest bloom: plays once per harvest, before the reward pops, and never moves the camera.
+await aimPot();
+await page.setViewportSize({ width: 471, height: 1024 });
+await page.waitForTimeout(200);
+await aimPot();
+const camHarvestBefore = await page.evaluate(() => {
+  const c = window.__ps.W.ctl;
+  return { x: c.target.x, y: c.target.y, z: c.target.z, az: c.az, pol: c.pol, zoom: c.zoom };
+});
+const harvesting = await page.evaluate((id) => {
+  const ps = window.__ps;
+  document.getElementById('tip')?.classList.add('hidden');
+  document.querySelectorAll('.toast,.sprig-tip,.pop,.item-fly').forEach((e) => e.remove());
+  ps.skipBloom();
+  const flowers0 = ps.state.inv.flower_moonflower || 0;
+  const stillThere = !!ps.potById(id)?.plant;
+  ps.harvestPot(id);
+  const pops = [...document.querySelectorAll('.pop')].map((e) => e.textContent);
+  const skip = document.getElementById('bloom-skip');
+  return {
+    stillThere,
+    playing: !!ps.bloomPlaying,
+    skipHint: !!(skip && !skip.classList.contains('hidden')),
+    pops,
+    flowersNow: (ps.state.inv.flower_moonflower || 0) - flowers0,
+    empty: !ps.potById(id)?.plant,
+  };
+}, planted.id);
+ok('harvesting a Moonflower plays the bloom moment before the reward pops', harvesting.stillThere && harvesting.playing && harvesting.skipHint && harvesting.pops.length === 0 && harvesting.flowersNow === 0 && !harvesting.empty, harvesting);
+const hb1 = path.join(SHOTS, 'harvest-bloom-1.png');
+const hb2 = path.join(SHOTS, 'harvest-bloom-2.png');
+await page.screenshot({ path: hb1, scale: 'css' });
+console.log('SHOT', hb1);
+const stillBlooming = await page.evaluate((id) => {
+  const ps = window.__ps;
+  return !!(ps.bloomPlaying && ps.potById(id)?.plant);
+}, planted.id);
+if (stillBlooming) await page.screenshot({ path: hb2, scale: 'css' });
+else fs.copyFileSync(hb1, hb2);
+console.log('SHOT', hb2, stillBlooming ? 'live' : 'copied mid-bloom frame');
+const camHarvestDuring = await page.evaluate(() => {
+  const c = window.__ps.W.ctl;
+  return { x: c.target.x, y: c.target.y, z: c.target.z, az: c.az, pol: c.pol, zoom: c.zoom };
+});
+ok('the harvest bloom never moves or re-centers the camera',
+  Math.abs(camHarvestDuring.x - camHarvestBefore.x) < 0.001 && Math.abs(camHarvestDuring.z - camHarvestBefore.z) < 0.001
+  && Math.abs(camHarvestDuring.az - camHarvestBefore.az) < 0.001 && Math.abs(camHarvestDuring.zoom - camHarvestBefore.zoom) < 0.001,
+  { camHarvestBefore, camHarvestDuring });
+const afterHarvest = await page.evaluate((id) => {
+  const ps = window.__ps, flowers0 = ps.state.inv.flower_moonflower || 0, seeds0 = ps.state.inv.seed_moonflower || 0;
+  const did = ps.skipBloom();
+  const pops = [...document.querySelectorAll('.pop')].map((e) => e.textContent.replace(/\s+/g, ' ').trim());
+  return {
+    did, playing: !!ps.bloomPlaying, empty: !ps.potById(id)?.plant,
+    flowers: (ps.state.inv.flower_moonflower || 0) - flowers0,
+    seeds: (ps.state.inv.seed_moonflower || 0) - seeds0,
+    pops,
+  };
+}, planted.id);
+ok('after the harvest bloom, the reward pops and the pot is cleared', !afterHarvest.playing && afterHarvest.empty && afterHarvest.pops.length > 0, afterHarvest);
+await page.setViewportSize({ width: 390, height: 844 });
+
 // Film a second pot's Sunpetal bloom for mid-bloom frames + bloom.mp4 (skip already tested on the Moonflower).
 const frameDir = path.join(SHOTS, 'bloom-frames');
 fs.mkdirSync(frameDir, { recursive: true });
@@ -312,7 +377,13 @@ const reduced = await page.evaluate(() => {
 ok('reduced-motion still plays a short in-place bloom (no crash)', reduced.placed && reduced.fired && reduced.playingWas && reduced.reduced, reduced);
 
 const demo = await page.evaluate(() => {
-  const ps = window.__ps, pot = ps.state.pots[0], wood0 = ps.state.wood, seeds0 = ps.state.inv.seed_moonflower || 0;
+  const ps = window.__ps, pot = ps.state.pots[0], S = ps.state;
+  if (!pot.plant) {
+    S.inv.seed_moonflower = (S.inv.seed_moonflower || 0) + 1;
+    S.bags.home.seed_moonflower = (S.bags.home.seed_moonflower || 0) + 1;
+    ps.plantPot(pot.id, 'moonflower');
+  }
+  const wood0 = ps.state.wood, seeds0 = ps.state.inv.seed_moonflower || 0;
   const can = ps.canDemolish('pot', pot.id);
   ps.doDemolish('pot', pot.id);
   return { can, n: (ps.state.pots || []).length, woodBack: ps.state.wood - wood0, seeds: (ps.state.inv.seed_moonflower || 0) - seeds0 };
@@ -341,6 +412,24 @@ try {
   restored = { error: String(e), errors: errors.filter((x) => String(x).startsWith('reload')) };
 }
 ok('reloading the save restores the pot and its Moonflower without replaying the bloom', restored.n >= 1 && restored.sp === 'moonflower' && restored.bloomed && !restored.playing, restored);
+
+// If the plant finished while the player was away, bloomed was never set — coming back should play the cinematic.
+const away = await page2.evaluate(() => {
+  const ps = window.__ps;
+  ps.skipBloom();
+  const pot = (ps.state.pots || []).find((p) => p.plant?.sp === 'moonflower') || ps.state.pots[0];
+  if (pot?.plant) delete pot.plant.bloomed;
+  const before = { sp: pot?.plant?.sp, bloomed: !!pot?.plant?.bloomed, playing: !!ps.bloomPlaying };
+  // A later sync (or returning to the garden) should start the missed moment.
+  if (pot) ps.syncPot(pot.id, false);
+  const afterSync = { playing: !!ps.bloomPlaying, bloomed: !!pot?.plant?.bloomed };
+  if (!afterSync.playing) ps.flushPendingBlooms();
+  const after = { playing: !!ps.bloomPlaying, bloomed: !!ps.potById(pot.id)?.plant?.bloomed };
+  ps.skipBloom();
+  return { before, afterSync, after };
+});
+ok('a ripe Moonflower that finished while away is not silently marked bloomed', away.before.sp === 'moonflower' && away.before.bloomed === false && !away.before.playing, away.before);
+ok('coming back and opening the garden plays the missed Other World bloom', (away.afterSync.playing || away.after.playing) && (away.afterSync.bloomed || away.after.bloomed), away);
 
 const ff = spawnSync('ffmpeg', [
   '-y', '-framerate', '8', '-i', path.join(frameDir, 'f%02d.png'),
