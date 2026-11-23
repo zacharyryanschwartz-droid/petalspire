@@ -635,6 +635,14 @@ export function registerTea(id) {
 
 export const WOOD = { tree: 3, stump: 1, bush: 0, rock: 0 };
 export const BED_COSTS = [12, 20, 28, 36, 44, 52];   // wood per raised bed, escalating
+// A Garden Pot is a one-slot planter you can place on any of your land (not a raised-bed patch).
+// 8 Wood: cheaper than the first 12-Wood raised bed, dearer per plant because it sits anywhere.
+export const POT = { name: 'Garden Pot', wood: 8 };
+// Other World flower plants (Moonflower, Crystal Rose, Spiral Sunpetal). Other World fruit trees
+// (Moonpeach, Crystal Apple) fruit rather than bloom and are listed separately.
+export const OTHERWORLD_PLANTS = Object.keys(SPECIES).filter((k) => SPECIES[k].tier === 'otherworld');
+export const OTHERWORLD_TREES = Object.keys(TREES).filter((k) => TREES[k].tier === 'otherworld');
+export const isOtherworldPlant = (sp) => SPECIES[sp]?.tier === 'otherworld';
 export const STAND_CAP = 18;   // v0.65: was 12
 // v0.65: customers may buy several kinds of item per visit; index = Farm Stand level − 1 (the Orchard Stand uses Lv1).
 // kinds = [min, max] different items, upTo = most units of each. (Before v0.65: 1 kind, 40% → 2; up to 3 of each.)
