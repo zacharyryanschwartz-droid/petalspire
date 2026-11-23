@@ -75,6 +75,7 @@ function freshState() {
     hives: {}, hiveInv: 0,   // v0.4: placeable Honeybee Skeps, one per plot ({ lot: { x, z } }); the boost only reaches beds on that plot
     discovered: {},
     lots: { home: true }, loc: 'home', lotsBought: 0, obs: {}, beds: [], tiles: [],
+    seedBank: { home: {}, orchard: {} },   // reserved seeds per location; never sold, used to plant a full 3×3 bed
     rack: Array(RACK_SLOTS).fill(null), standLv: 1, rackLv: 1,   // v0.63: coin upgrades (Lv1–4)
     stand: {}, ostand: {}, starterOpened: false, waterAt: 0,
     // v0.3: things are built, not unlocked
@@ -164,6 +165,72 @@ function installBags() {
   Object.defineProperty(S, 'inv', { get: () => S.bags[bagCtx || viewLoc()], set: () => {}, enumerable: false, configurable: true });
 }
 installBags();
+// Seed Bank: once you have a full bed's worth (PER_BED = 9 on a 3×3 raised bed) of a flower, you can bank that type.
+// Banked seeds live in S.seedBank[loc][sp] (not in the Bag), so they cannot be sold, stocked, bagged, or sent.
+// Planting uses loose bag seeds first, then the bank. Harvests and other gains refill a banked type back up to 9.
+const BANK_N = PER_BED;
+const bankLoc = (loc) => (loc === 'orchard' ? 'orchard' : 'home');
+function installSeedBank() {
+  const raw = S.seedBank, out = { home: {}, orchard: {} };
+  if (raw && typeof raw === 'object' && !Array.isArray(raw)) {
+    const flat = !raw.home && !raw.orchard && Object.keys(raw).some((k) => SPECIES[k]);
+    if (flat) {
+      for (const [sp, n] of Object.entries(raw)) if (SPECIES[sp]) out.home[sp] = Math.max(0, Math.floor(+n || 0));
+    } else {
+      for (const loc of BAG_LOCS) {
+        const src = raw[loc];
+        if (src && typeof src === 'object' && !Array.isArray(src)) {
+          for (const [sp, n] of Object.entries(src)) if (SPECIES[sp]) out[loc][sp] = Math.max(0, Math.floor(+n || 0));
+        }
+      }
+    }
+  }
+  S.seedBank = out;
+  for (const loc of BAG_LOCS) {
+    const bank = out[loc], bag = bagOf(loc);
+    for (const sp of Object.keys(bank)) {
+      if (!SPECIES[sp]) { delete bank[sp]; continue; }
+      let n = bank[sp];
+      if (n > BANK_N) { bag['seed_' + sp] = (bag['seed_' + sp] || 0) + (n - BANK_N); n = BANK_N; }
+      bank[sp] = n;
+    }
+  }
+  refillSeedBank();
+}
+function bankOf(loc = viewLoc()) { return S.seedBank[bankLoc(loc)]; }
+const isBanked = (sp, loc = viewLoc()) => Object.prototype.hasOwnProperty.call(bankOf(loc), sp);
+const bankCount = (sp, loc = viewLoc()) => bankOf(loc)[sp] || 0;
+const looseSeeds = (sp) => S.inv['seed_' + sp] || 0;
+const seedHave = (sp, loc) => (loc ? (bagOf(loc)['seed_' + sp] || 0) + bankCount(sp, loc) : looseSeeds(sp) + bankCount(sp));
+function refillSeedBank(loc) {
+  let n = 0;
+  for (const L of (loc ? [bankLoc(loc)] : BAG_LOCS)) {
+    const bank = bankOf(L), bag = bagOf(L);
+    for (const sp of Object.keys(bank)) {
+      const need = BANK_N - (bank[sp] || 0); if (need <= 0) continue;
+      const take = Math.min(need, bag['seed_' + sp] || 0); if (!take) continue;
+      bag['seed_' + sp] -= take; bank[sp] = (bank[sp] || 0) + take; n += take;
+    }
+  }
+  return n;
+}
+function takePlantSeed(sp, loc) {
+  const bag = loc ? bagOf(loc) : S.inv, bank = bankOf(loc || viewLoc()), id = 'seed_' + sp;
+  if ((bag[id] || 0) > 0) { bag[id]--; return 'loose'; }
+  if ((bank[sp] || 0) > 0) { bank[sp]--; return 'bank'; }
+  return null;
+}
+function canBank(sp, loc = viewLoc()) { return !!(SPECIES[sp] && !isBanked(sp, loc) && (bagOf(loc)['seed_' + sp] || 0) >= BANK_N); }
+function bankSeeds(sp, loc = viewLoc()) {
+  return inBag(loc, () => {
+    if (!canBank(sp, loc)) { if (!SPECIES[sp]) return false; toast(isBanked(sp, loc) ? `${SPECIES[sp].name} is already in the Seed Bank` : `You need ${BANK_N} ${SPECIES[sp].name} seeds to bank a full bed`); return false; }
+    S.inv['seed_' + sp] -= BANK_N; bankOf(loc)[sp] = BANK_N;
+    save(); hud(); if (panel) renderPanel();
+    toast(`Banked ${BANK_N} ${SPECIES[sp].name} seeds · they can’t be sold, and they’re always here for a full bed`);
+    return true;
+  });
+}
+installSeedBank();
 // v0.7: Glycerin and Vinegar are Home-only supplies — any left in the Orchard Bag move to the Home Bag (nothing lost)
 function migBasesHome() { const o = S.bags?.orchard, h = S.bags?.home; let n = 0; if (!o || !h) return 0; for (const b of ['glycerin', 'vinegar']) if (o[b] > 0) { h[b] = (h[b] || 0) + o[b]; n += o[b]; o[b] = 0; } return n; }
 migBasesHome();
@@ -186,8 +253,8 @@ function migrateOrchGrid() {
 migrateOrchGrid();
 let saveTimer = 0;
 let frozen = false;
-const writeSave = () => { if (frozen || preserveCorrupt) return; try { S.savedAt = now(); localStorage.setItem(SAVE_KEY, JSON.stringify(S)); } catch {} };
-function save() { clearTimeout(saveTimer); saveTimer = setTimeout(writeSave, 150); }
+const writeSave = () => { if (frozen || preserveCorrupt) return; try { refillSeedBank(); S.savedAt = now(); localStorage.setItem(SAVE_KEY, JSON.stringify(S)); } catch {} };
+function save() { refillSeedBank(); clearTimeout(saveTimer); saveTimer = setTimeout(writeSave, 150); }
 window.addEventListener('visibilitychange', () => { if (document.hidden) writeSave(); else if (isNative() && !purchasesVisible()) loadStore(); });
 window.addEventListener('pagehide', writeSave);
 window.addEventListener('petalspire-ads', () => { try { hud(); } catch { /* hud is defined later in this module */ } });
@@ -1730,9 +1797,14 @@ function renderSheet() {
   let head, body = '';
   if (!p) {
     head = `<h3>Empty soil <small>${tileName(i)} · pick a seed to plant</small></h3>`; body = sunHTML(tileSun[i] ?? 1) + irrigLine(i) + workerLine(i) + (beeBonus(i) ? `<p class="bee-line">🐝 Bees: +${HIVE_BONUS} flower per harvest here</p>` : '');
-    const owned = Object.keys(SPECIES).filter((sp) => S.inv['seed_' + sp] > 0);
+    const owned = Object.keys(SPECIES).filter((sp) => seedHave(sp) > 0);
     if (!owned.length) body += S.marketBuilt ? `<p class="muted no-seeds-line">You’re out of seeds. Buy more at the Supply Market, or harvest a bloom — every harvest gives seeds.</p><div class="ts-actions"><button class="btn btn-primary" data-act="open-market">Visit Supply Market</button></div>` : `<p class="muted no-seeds-line">You’re out of seeds. Harvest a bloom — every harvest gives seeds back.</p>`;
-    else body += `<p class="plant-cue"><i data-icon="sprout"></i> Tap a seed to plant it here</p><div class="ts-row">${owned.map((sp) => `<button class="seed-chip" data-plant="${sp}"><span class="chip-ico">${itemSvg('seed_' + sp)}</span>${SPECIES[sp].name}<small>×${S.inv['seed_' + sp]} seeds</small></button>`).join('')}</div>`;
+    else {
+      const emptyN = bedTiles(bedOfTile(i)).filter((t) => !S.tiles[t]).length;
+      body += `<p class="plant-cue"><i data-icon="sprout"></i> Tap a seed to plant it here</p><div class="ts-row">${owned.map((sp) => `<button class="seed-chip${isBanked(sp) ? ' banked' : ''}" data-plant="${sp}"><span class="chip-ico">${itemSvg('seed_' + sp)}</span>${isBanked(sp) ? '<span class="bank-badge" title="Banked"><i data-icon="vault"></i></span>' : ''}${SPECIES[sp].name}<small>×${seedHave(sp)} seeds${isBanked(sp) ? ` · ${bankCount(sp)} banked` : ''}</small></button>`).join('')}</div>`;
+      const bankPlant = owned.filter((sp) => isBanked(sp) && emptyN > 1);
+      if (bankPlant.length) body += `<div class="ts-actions bank-bed-acts">${bankPlant.map((sp) => `<button class="btn btn-gold sm" data-plantbed="${sp}"><i data-icon="vault"></i> Plant this bed · ${SPECIES[sp].name}</button>`).join('')}</div>`;
+    }
     body += moveDemoHTML('bed', bedOfTile(i), true);
   } else {
     const sp = SPECIES[p.sp], st = stageOf(p), k = progress(p);
@@ -1753,6 +1825,7 @@ function renderSheet() {
 }
 $('#tile-sheet').addEventListener('click', (e) => {
   const b = e.target.closest('button'); if (!b) return;
+  if (b.dataset.plantbed) return plantBed(bedOfTile(selected), b.dataset.plantbed);
   if (b.dataset.plant) return plant(selected, b.dataset.plant);
   if (b.dataset.unhook) return unhookIrrigation(b.dataset.unhook);
   const a = b.dataset.act;
@@ -1768,8 +1841,8 @@ $('#tile-sheet').addEventListener('click', (e) => {
 });
 function plant(i, sp) { return inBag(tileLoc(i), () => plant_(i, sp)); }
 function plant_(i, sp) {
-  if (S.tiles[i] || !(S.inv['seed_' + sp] > 0)) return;
-  S.inv['seed_' + sp]--; S.tiles[i] = { sp, plantedAt: now(), wateredAt: null, growMs: SPECIES[sp].growS * 1000 * growK(sp) }; if (sp === 'bluelotus') S.tiles[i].fill = 0;
+  if (S.tiles[i] || !takePlantSeed(sp)) return;
+  S.tiles[i] = { sp, plantedAt: now(), wateredAt: null, growMs: SPECIES[sp].growS * 1000 * growK(sp) }; if (sp === 'bluelotus') S.tiles[i].fill = 0;
   syncTile(i); save(); hud(); if (selected === i) deselect(); sfx('plant');   // v0.8.7.2: planting just plants — no water panel or tip; the droplet on the plant is the cue
 }
 // v0.63: Fill bed — keep pouring until this bed's thirsty plants have their water (or the barrels run dry)
@@ -1881,6 +1954,19 @@ function sickleBed(b) {
   toast(`Sickle: harvested ${ripe.length} ripe plant${ripe.length > 1 ? 's' : ''} in ${bedLabel(b)}`);
   checkGoals(); return { n: ripe.length, got, seeds };
 }
+// Plant every empty tile in a bed from loose seeds, then the Seed Bank (no plow required).
+function plantBed(b, sp) { return inBag(lotLoc(lotOfSite(b)), () => plantBed_(b, sp)); }
+function plantBed_(b, sp) {
+  if (!sp || !SPECIES[sp]) return { n: 0 };
+  if (b == null || b < 0 || !S.beds[b]) { toast('Tap one of your raised beds'); return { n: 0 }; }
+  const empty = bedTiles(b).filter((k) => !S.tiles[k]);
+  if (!empty.length) { toast('Every tile in this bed is already planted'); return { n: 0 }; }
+  const have = seedHave(sp); if (!have) { toast(`No ${SPECIES[sp].name} seeds — buy some at the Market`); return { n: 0 }; }
+  const go = empty.slice(0, have); let n = 0;
+  for (const k of go) { if (!takePlantSeed(sp)) break; S.tiles[k] = { sp, plantedAt: now(), wateredAt: null, growMs: SPECIES[sp].growS * 1000 * growK(sp) }; if (sp === 'bluelotus') S.tiles[k].fill = 0; syncTile(k); n++; }
+  if (n) { sfx('plant'); save(); hud(); if (selected != null) deselect(); toast(`Planted ${n} / ${empty.length}${n < empty.length ? ' (out of seeds)' : ''} · ${SPECIES[sp].name}`); }
+  return { n, of: empty.length };
+}
 // v0.41: the Plow plants ONE raised bed (every empty tile in it, as far as the seeds go)
 function plowBed(b, sp) { return inBag(lotLoc(lotOfSite(b)), () => plowBed_(b, sp)); }
 function plowBed_(b, sp) {
@@ -1889,12 +1975,12 @@ function plowBed_(b, sp) {
   if (b == null || b < 0 || !S.beds[b]) { toast('Tap one of your raised beds — the plow only plants beds'); return { n: 0 }; }
   const empty = bedTiles(b).filter((i) => !S.tiles[i]);
   if (!empty.length) { toast('Every tile in this bed is already planted'); return { n: 0 }; }
-  const have = S.inv['seed_' + sp] || 0; if (!have) { toast(`No ${SPECIES[sp].name} seeds — buy some at the Market`); return { n: 0 }; }
+  const have = seedHave(sp); if (!have) { toast(`No ${SPECIES[sp].name} seeds — buy some at the Market`); return { n: 0 }; }
   exitPlace(); S.toolAt.plow = now();
   const go = empty.slice(0, have), n = go.length;
   const rows = []; for (let r = 0; r < BED_N; r++) rows.push([W.tileWorld(b * PER_BED + r * BED_N), W.tileWorld(b * PER_BED + r * BED_N + BED_N - 1)]);
   W.plowFurrows(rows);
-  for (const i of go) { S.inv['seed_' + sp]--; S.tiles[i] = { sp, plantedAt: now(), wateredAt: null, growMs: SPECIES[sp].growS * 1000 * growK(sp), hold: true }; }
+  for (const i of go) { takePlantSeed(sp); S.tiles[i] = { sp, plantedAt: now(), wateredAt: null, growMs: SPECIES[sp].growS * 1000 * growK(sp), hold: true }; }
   S.stats.plowed = (S.stats.plowed || 0) + n; save(); hud();
   go.forEach((i) => { const r = Math.floor((i % PER_BED) / BED_N); setTimeout(() => { if (S.tiles[i]) { delete S.tiles[i].hold; syncTile(i); } }, r * 140 + 700); });
   setTimeout(() => save(), BED_N * 140 + 900);
@@ -1916,16 +2002,16 @@ function syncBedTargets() {
   const key = t + ':' + list.map((l) => +l.ok).join(''); if (key === bedTargetKey) return; bedTargetKey = key; W.setBedTargets(list);
 }
 function toolBar() {
-  const plowSeeds = Object.keys(SPECIES).filter((k) => S.inv['seed_' + k] > 0);
+  const plowSeeds = Object.keys(SPECIES).filter((k) => seedHave(k) > 0);
   if (placing?.what === 'sickle') $('#buildbar-text').innerHTML = `<b>Harvest Sickle</b> · tap a glowing raised bed to harvest every ripe plant in it`;
-  if (placing?.what === 'plow') $('#buildbar-text').innerHTML = `<b>Hand Plow</b> · ${placing.sp ? `tap a glowing raised bed to plant its empty tiles` : 'pick a seed:'}<span class="seed-chips">${plowSeeds.map((k) => `<button class="chip ${placing.sp === k ? 'on' : ''}" data-plowseed="${k}"><span class="chip-ico sm">${itemSvg('seed_' + k)}</span>${SPECIES[k].name} ×${S.inv['seed_' + k]}</button>`).join('')}</span>`;
+  if (placing?.what === 'plow') $('#buildbar-text').innerHTML = `<b>Hand Plow</b> · ${placing.sp ? `tap a glowing raised bed to plant its empty tiles` : 'pick a seed:'}<span class="seed-chips">${plowSeeds.map((k) => `<button class="chip ${placing.sp === k ? 'on' : ''}${isBanked(k) ? ' banked' : ''}" data-plowseed="${k}"><span class="chip-ico sm">${itemSvg('seed_' + k)}</span>${SPECIES[k].name} ×${seedHave(k)}${isBanked(k) ? ' <i data-icon="vault"></i>' : ''}</button>`).join('')}</span>`;
 }
 function useTool(t) {
   if (!S.owned[t]) return;
-  if (t === 'plow' && !Object.keys(SPECIES).some((k) => S.inv['seed_' + k] > 0)) { toast('No seeds for the plow — buy some at the Market'); return; }
+  if (t === 'plow' && !Object.keys(SPECIES).some((k) => seedHave(k) > 0)) { toast('No seeds for the plow — buy some at the Market'); return; }
   closePanel(); deselect(); if (buildMode) exitBuild(); if (placing) exitPlace();
   placing = { what: t, sp: null };
-  if (t === 'plow') { const have = Object.keys(SPECIES).filter((k) => S.inv['seed_' + k] > 0); if (have.length === 1) placing.sp = have[0]; }
+  if (t === 'plow') { const have = Object.keys(SPECIES).filter((k) => seedHave(k) > 0); if (have.length === 1) placing.sp = have[0]; }
   toolBar(); $('#buildbar').classList.remove('hidden'); syncBedTargets();
 }
 $('#buildbar').addEventListener('click', (e) => { const b = e.target.closest('[data-plowseed]'); if (!b || placing?.what !== 'plow') return; placing.sp = b.dataset.plowseed; toolBar(); });
@@ -2645,11 +2731,31 @@ const TIER_RANK = (id) => { const sp = spOfItem(id) || (id.startsWith('seed_') ?
 const itemVal = (id) => (ITEMS[id] ? sellOf(id) : BASES[id] ? BASES[id].price : id === 'sapling' ? SHOP.sapling.price : 0);
 const itemNm = (id) => ITEMS[id]?.name || BASES[id]?.name || id;
 const byValue = (ids, val = itemVal) => [...ids].sort((a, b) => val(b) - val(a) || TIER_RANK(b) - TIER_RANK(a) || itemNm(a).localeCompare(itemNm(b)));
+function seedBankHTML() {
+  const loc = viewLoc();
+  const banked = Object.keys(SPECIES).filter((sp) => isBanked(sp, loc));
+  const ready = Object.keys(SPECIES).filter((sp) => canBank(sp, loc));
+  if (!banked.length && !ready.length) return '';
+  const rows = [
+    ...banked.map((sp) => {
+      const n = bankCount(sp, loc), loose = S.inv['seed_' + sp] || 0;
+      return `<div class="row seed-bank-row" data-seed-bank="${sp}"><div class="ico">${itemSvg('seed_' + sp)}<span class="bank-badge" title="Banked"><i data-icon="vault"></i></span></div>
+        <div class="meta"><b>${SPECIES[sp].name} · banked</b><small>${n} of ${BANK_N} reserved for a full bed · can’t be sold${loose ? ` · ${loose} extra in your bag` : n < BANK_N ? ' · refill from harvests' : ''}</small></div></div>`;
+    }),
+    ...ready.map((sp) => `<div class="row seed-bank-row ready" data-seed-bank-ready="${sp}"><div class="ico">${itemSvg('seed_' + sp)}</div>
+      <div class="meta"><b>${SPECIES[sp].name}</b><small>You have ${S.inv['seed_' + sp]} seeds · bank ${BANK_N} so they can never be sold</small></div>
+      <div class="acts"><button class="btn btn-gold sm" data-bank="${sp}"><i data-icon="vault"></i> Bank ${BANK_N}</button></div></div>`),
+  ].join('');
+  return `<div class="sec-title" data-seed-bank-title><i data-icon="vault"></i> Seed Bank</div>
+    <p class="muted seed-bank-blurb">Bank ${BANK_N} seeds of a flower to keep a full bed’s worth that can never be sold. Planting uses your loose seeds first, then the bank. Harvests refill it.</p>
+    <div class="list seed-bank-list">${rows}</div>`;
+}
 function satchelHTML() {
   const ids = ['seed_', 'flower_', 'dried_'].flatMap((p) => Object.keys(SPECIES).map((sp) => p + sp)).filter((id) => ITEMS[id]);   // v0.5: every plant
   const res = (icon, name, n) => `<div class="inv"><i data-icon="${icon}" style="width:38px;height:38px"></i><b>${name}</b><small>×${n}</small></div>`;
   const cells = res('wood', 'Wood', S.wood) + res('scrap', 'Scrap Metal', S.scrap || 0) + (S.inv.sapling ? res('sapling', 'Tree sapling', S.inv.sapling) : '') +
-    byValue(ids.filter((id) => S.inv[id] > 0)).map((id) => `<div class="inv" data-bag-item="${id}">${itemSvg(id)}<b>${ITEMS[id].name}</b><small>×${S.inv[id]}</small>${locTagCell(id)}</div>`).join('') +
+    byValue(ids.filter((id) => S.inv[id] > 0)).map((id) => { const sp = id.startsWith('seed_') ? id.slice(5) : null, banked = !!(sp && isBanked(sp));
+      return `<div class="inv${banked ? ' banked' : ''}" data-bag-item="${id}">${itemSvg(id)}${banked ? '<span class="bank-badge" title="Banked"><i data-icon="vault"></i></span>' : ''}<b>${ITEMS[id].name}</b><small>×${S.inv[id]}</small>${locTagCell(id)}</div>`; }).join('') +
     // v0.65: rain barrels are installed fixtures — never in the Bag (tap one in the garden to see its water and upgrade it with coins)
     byValue(['glycerin', 'vinegar'].filter((id) => S.inv[id] > 0 || (S.tinctureBuilt && S.inv === bagOf('home')))).map((id) => `<div class="inv">${itemSvg(id)}<b>${BASES[id].name}</b><small>×${S.inv[id]}</small></div>`).join('') +
     byValue(SELL_ORDER.filter((id) => ['tinc_', 'oil_', 'hydro_', 'tea_', 'press_', 'jar_', 'fruit_', 'bag'].some((p) => id.startsWith(p)) && S.inv[id] > 0)).map((id) => `<div class="inv">${itemSvg(id)}<b>${ITEMS[id].name}</b><small>×${S.inv[id]}</small>${locTagCell(id)}</div>`).join('');
@@ -2660,7 +2766,7 @@ function satchelHTML() {
   const here = curLoc(), sendable = S.lots.orchard ? [...ids, ...(here === 'home' ? ['sapling'] : []),   /* v0.65: saplings never go Home */ ...(here === 'home' ? [] : ['glycerin', 'vinegar']) /* v0.7: Tincture bases are Home-only (never sent to the Orchard) */, ...SELL_ORDER.filter((id) => !ids.includes(id))].filter((id, k, a) => a.indexOf(id) === k && S.inv[id] > 0) : [];
   const sendRows = byValue(sendable).map((id) => `<div class="row send-row" data-send-row="${id}"><div class="ico">${id === 'sapling' ? '<i data-icon="sapling" style="width:34px;height:34px"></i>' : itemSvg(id)}</div><div class="meta"><b>${id === 'sapling' ? 'Tree sapling' : ITEMS[id]?.name || BASES[id]?.name} ×${S.inv[id]}</b>${ITEMS[id] && !sellsAt(id, here) ? `<small><span class="loc-tag sm">${sellTag(id)}</span></small>` : ''}</div><div class="acts">${sendBtns(id)}</div></div>`).join('');
   return `<div class="bag-loc" data-bag-loc="${here}"><i data-icon="${here === 'orchard' ? 'sapling' : 'stand'}"></i><span><b>${here === 'orchard' ? 'Orchard Bag' : 'Home Bag'}</b><small>Goods here stay ${here === 'orchard' ? 'at the Orchard' : 'at Home'} · Coins, Wood, Scrap, Jewels and cards are shared</small></span></div>
-    <div class="inv-grid">${cells || ''}</div>${bagStrip()}
+    ${seedBankHTML()}<div class="inv-grid">${cells || ''}</div>${bagStrip()}
     ${sendRows ? `<details class="send-box" data-send-box${sendOpen ? ' open' : ''}><summary>${vanOn() ? '🚚' : '📦'} Send to ${here === 'orchard' ? 'Home' : 'the Orchard'} · ${vanOn() ? 'by delivery van, ' : 'arrives at once, '}free</summary><div class="list send-list">${sendRows}</div></details>` : ''}
     ${S.hiveInv > 0 ? `<div class="ts-actions" style="margin-top:10px"><button class="btn btn-primary" data-act="place-hive">🐝 Place your Honeybee Skep (${S.hiveInv})</button></div>` : ''}
     ${unbuiltHTML()}
@@ -4049,7 +4155,7 @@ const workerKeep = (loc) => locBeds(loc).length * BED_N * BED_N;   // seeds of e
 // v0.7.2 pacing: time budget for this pass = real time since the last pass (≥ one live step, ≤ one catch-up step), minus overrun
 function wkBudget(w) { const dt = Math.min(WORKER.catchStepS * 1000, Math.max(WORKER.stepS * 1000, now() - (w.last || w.hired || now()))); return dt - (w.debt || 0); }
 // v0.7.2: the seed a Gardener plants into an empty plot: any seed in this location's Bag, picked at random (no favouring price)
-const workerSeed = () => rndOf(Object.keys(SPECIES).filter((sp) => S.inv['seed_' + sp] > 0 && ITEMS['flower_' + sp])) || null;
+const workerSeed = () => rndOf(Object.keys(SPECIES).filter((sp) => seedHave(sp) > 0 && ITEMS['flower_' + sp])) || null;
 function workerPass(k) { workerBusy++; try { return inBag(workerLoc(k), () => (wkRoleOf(k) === 'm' ? managerPass_(k) : workerPass_(k))); } finally { workerBusy--; } }
 // Gardener: plants, harvests, waters and picks on every plot of its location (beds and fruit trees), in random order, as far
 // as its time budget goes. It makes nothing and stocks nothing.
@@ -4063,7 +4169,7 @@ function workerPass_(lot) {
       if (u.b != null) { const tiles = bedTiles(u.b), at = bedCenter(u.b), xz = [at.x, at.z]; let h = 0, pl = 0, wa = 0, col;
         // harvest ripe plants, replant the same species from Bag seeds
         for (const i of tiles) { const p = S.tiles[i]; if (!p || stageOf(p) < 3) continue; const r = harvestCore(i); if (!r) continue; h++; col = SPECIES[r.sp]?.color;
-          if (S.inv['seed_' + r.sp] > 0) { plant(i, r.sp); pl++; } else syncTile(i); }
+          if (seedHave(r.sp) > 0) { plant(i, r.sp); pl++; } else syncTile(i); }
         // fill the bed's empty spots with random seeds from this location's Bag
         for (const i of tiles) { if (S.tiles[i]) continue; const sp = workerSeed(); if (!sp) break; plant(i, sp); if (S.tiles[i]?.sp === sp) pl++; else break; }
         // water thirsty plants from the barrel (a Blue Lotus barrel needs two passes: half, then full)
@@ -4666,6 +4772,7 @@ $('#panel-body').addEventListener('click', (e) => {
   if (b.dataset.makecollect) { const [c, k] = b.dataset.makecollect.split(':'); return craftCollect(c, +k); }
   if (b.dataset.pick != null) return pickTree(+b.dataset.pick);
   if (b.dataset.wtree != null) { const ok = waterTree(+b.dataset.wtree); if (ok) { save(); hud(); renderPanel(); } return ok; }
+  if (b.dataset.bank) return bankSeeds(b.dataset.bank);
   if (b.dataset.bagseeds) { const [sp, n] = b.dataset.bagseeds.split(':'); return bagSeeds(sp, +n); }
   if (b.dataset.teaadd != null) { teaAdd(b.dataset.teaadd); return renderPanel(); }
   if (b.dataset.tearm != null) { teaRemove(+b.dataset.tearm); return renderPanel(); }
@@ -5434,8 +5541,8 @@ function tutTree() {   // the tree or stump to clear next: inside the patch clos
 }
 const STARTER_SEEDS = Object.entries(STARTER).filter(([k]) => k.startsWith('seed_')).reduce((a, [, n]) => a + n, 0);   // the starter pack's seeds (Lavender + Calendula)
 const tutPlanted = () => tutTiles().filter((i) => S.tiles[i]).length;
-const tutSeedsLeft = () => inBag('home', () => Object.keys(SPECIES).some((sp) => S.inv['seed_' + sp] > 0));
-const tutSeedGoal = () => Math.max(!tutPlanted() ? STARTER_SEEDS : 1, Math.min(STARTER_SEEDS, tutPlanted() + inBag('home', () => Object.keys(SPECIES).reduce((a, sp) => a + (S.inv['seed_' + sp] || 0), 0))));
+const tutSeedsLeft = () => inBag('home', () => Object.keys(SPECIES).some((sp) => seedHave(sp) > 0));
+const tutSeedGoal = () => Math.max(!tutPlanted() ? STARTER_SEEDS : 1, Math.min(STARTER_SEEDS, tutPlanted() + inBag('home', () => Object.keys(SPECIES).reduce((a, sp) => a + seedHave(sp), 0))));
 function tutBedAt(first, tag) {   // Build › Raised Bed › tap a glowing patch (also used when the first bed is full)
   const pre = tag ? tag + ' — ' : '';
   if (S.wood < bedCost()) return { text: `${pre}chop a few more trees — a raised bed needs ${bedCost()} Wood.`, world: tutTree()?.v };
@@ -5616,7 +5723,7 @@ function plantTagFrame() {
   const want = new Set();
   if (!hide) for (const id of tutHomeBeds()) {
     const tiles = siteTiles(id), empty = tiles.filter((i) => !S.tiles[i]).length; if (!empty) continue;
-    const seeds = inBag(tileLoc(tiles[0]), () => Object.keys(SPECIES).some((sp) => S.inv['seed_' + sp] > 0));
+    const seeds = inBag(tileLoc(tiles[0]), () => Object.keys(SPECIES).some((sp) => seedHave(sp) > 0));
     if (!seeds && empty < tiles.length) continue;   // something grows here already: its harvest brings seeds
     const s = siteById(id), p = W.project(V3(s.x, 0.15, s.z - TILE * BED_N / 2)); if (p.behind || p.x < 0 || p.x > innerWidth || p.y < 50 || p.y > innerHeight - 70) continue;
     want.add(id); let t = plantTags.get(id); if (!t) { t = el('div', 'plant-tag', ''); t.dataset.bed = id; plantTagBox.appendChild(t); plantTags.set(id, t); }
@@ -5759,7 +5866,7 @@ window.__ps = {
   carScreen() { const c = custs[0]?.car; return c ? W.project(c.group.position.clone().setY(0.7)) : null; },
   nextCustomerIn(ms) { nextCust = now() + ms; }, spawnCustomer, spawnArrival, spawnOArrival, get oVisitors() { return ocusts.map((c) => ({ slot: c.slot, x: c.car?.stopX, done: c.done })); }, get opark() { return { built: !!S.oparkingBuilt, spots: oparkCap(), cars: oparkCars(), bays: oBayXs(), vis: W.oparking.visible, bayVis: W.oparking.children.filter((g) => g.isGroup && g.visible).length, bbVis: W.obillboard.visible, bbHome: bbActiveAt('home'), bbOrch: bbActiveAt('orchard') }; }, nextOCustIn(ms) { nextOCust = now() + ms; }, buildTraffic, get park() { return { lv: cardLv('parking'), spots: parkCap(), cars: parkCars(), bays: bayXs(), gapMult: S.parkingBuilt ? PARKING.gapMult[parkI()] : 1 }; }, parkLevelText,
   grant(o) { for (const [k, v] of Object.entries(o)) { if (['coins', 'wood', 'jewels', 'scrap'].includes(k)) S[k] += v; else if (FINDS[k]) S.finds[k] = (S.finds[k] || 0) + v; else S.inv[k] += v; } save(); hud(); if (panel) renderPanel(); },
-  tapObstacle, buildBed, siteTiles, irrigBlock, enterBuild, exitBuild, selectTile, plant, water, waterBed, writeSave, syncBarrels, harvest, openPanel, closePanel, buyPack, buy, stock, buyLot,
+  tapObstacle, buildBed, siteTiles, irrigBlock, enterBuild, exitBuild, selectTile, plant, plantBed, plowBed, water, waterBed, writeSave, syncBarrels, harvest, openPanel, closePanel, buyPack, buy, stock, buyLot, BANK_N, bankSeeds, canBank, isBanked, bankCount, seedHave, looseSeeds, refillSeedBank, takePlantSeed, seedBankHTML, installSeedBank, get seedBank() { return S.seedBank; },
   buildStand, buildRack, startMarket, finishMarket, restore, recycle, collectLoot, enterPlace, placeAt, dropFor,
   camera(az, pol, zoom, tx, tz) { if (az != null) W.ctl.az = az; if (pol != null) W.ctl.pol = pol; if (zoom != null) W.ctl.zoom = zoom; if (tx != null) { W.ctl.target.set(tx, 0.3, tz); W.ctl.moved = true; } W.ctl.glide = null; W.updateCamera(); },
   Ads, get adsOn() { return Ads.enabled; },

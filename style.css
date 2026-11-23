@@ -123,6 +123,20 @@ i[data-icon] svg{width:100%;height:100%}
 .inv svg{width:38px;height:38px}
 .inv b{display:block;font-size:13px;font-weight:800;line-height:1.15}
 .inv small{font-weight:800;color:var(--ink-soft)}
+.inv{position:relative}
+.inv.banked,.seed-chip.banked{border-color:#F5D07A;background:#FFFBF3}
+.bank-badge{position:absolute;top:3px;right:3px;width:18px;height:18px;border-radius:50%;background:#FFF9F0;box-shadow:0 0 0 1.5px #F5D07A;display:grid;place-items:center}
+.seed-chip{position:relative}
+.seed-chip .bank-badge{top:4px;right:4px}
+.row .ico{position:relative}
+.row .ico .bank-badge{top:-3px;right:-3px}
+.bank-badge i{width:11px;height:11px}
+.seed-bank-blurb{margin:0 4px 8px;line-height:1.35}
+.seed-bank-list{margin-bottom:8px}
+.sec-title[data-seed-bank-title]{display:flex;align-items:center;gap:6px}
+.sec-title[data-seed-bank-title] i{width:18px;height:18px}
+.bank-bed-acts{flex-wrap:wrap}
+.seed-chips .chip.banked{border-color:#F5D07A;background:#FFFBF3}
 
 /* rack */
 .slots{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:4px 2px 12px}
