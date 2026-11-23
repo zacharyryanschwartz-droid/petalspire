@@ -65,7 +65,12 @@ i[data-icon] svg{width:100%;height:100%}
     radial-gradient(100% 70% at 100% 100%,rgba(183,212,181,.22),transparent 60%);
   border:2px solid var(--sage);box-shadow:0 10px 30px rgba(70,50,20,.22), inset 0 0 0 5px var(--cream), inset 0 0 0 6px rgba(247,197,197,.7)}
 .tile-sheet{position:absolute;left:calc(var(--sal) + 10px);right:calc(var(--sar) + 10px);
-  bottom:calc(var(--sab) + var(--tabh) + 18px);border-radius:22px;padding:14px 16px 14px;animation:rise .25s ease}
+  --sheet-bottom:calc(var(--sab) + var(--tabh) + 18px);
+  bottom:var(--sheet-bottom);top:auto;
+  max-height:calc(100% - var(--hud-bottom, 64px) - 8px - var(--sheet-bottom));
+  border-radius:22px;padding:14px 16px 14px;animation:rise .25s ease;
+  display:flex;flex-direction:column;overflow:hidden;min-height:0}
+.tile-sheet .ts-body{overflow-y:auto;-webkit-overflow-scrolling:touch;touch-action:pan-y;overscroll-behavior:contain;min-height:0;flex:1 1 auto}
 @keyframes rise{from{transform:translateY(16px);opacity:0}}
 .ts-head{display:flex;align-items:center;gap:10px;margin-bottom:10px}
 .ts-head h3{margin:0;font-family:'Fraunces',serif;font-weight:600;font-size:19px;color:var(--moss);flex:1;line-height:1.1}
@@ -496,6 +501,9 @@ body.ads-on .jeweldock,
 body.ads-on .tooldock{
   bottom:calc(var(--sab) + var(--tabh) + 16px + var(--ad-h) + 8px)
 }
+body.ads-on .tile-sheet, body.ads-on .seed-picker{
+  --sheet-bottom:calc(var(--sab) + var(--tabh) + 16px + var(--ad-h) + 8px)
+}
 body.ads-on .panel{padding-bottom:calc(var(--sab) + var(--tabh) + 16px + var(--ad-h) + 8px)}
 body.ads-on .jeweldock, body.ads-on .tooldock{z-index:14}
 /* iPhone app: real safe-area insets (WKWebView often reports env() as 0). The tab bar stays
@@ -525,6 +533,9 @@ html.native-app body.ads-on .tut-fin,
 html.native-app body.ads-on .jeweldock,
 html.native-app body.ads-on .tooldock{
   bottom:calc(var(--sab) + var(--tabh) + 16px + var(--ad-h) + 8px);
+}
+html.native-app body.ads-on .tile-sheet, html.native-app body.ads-on .seed-picker{
+  --sheet-bottom:calc(var(--sab) + var(--tabh) + 16px + var(--ad-h) + 8px);
 }
 /* The banner sits above the tab bar, so a menu has to clear both or its last row slides under them. */
 html.native-app body.ads-on .panel{padding-bottom:calc(var(--sab) + var(--tabh) + 16px + var(--ad-h) + 8px)}
@@ -1558,6 +1569,30 @@ body.guide-on #jd-bloom, body.guide-on #jd-rush{display:none!important}
 .panel-head h2{min-width:0}
 
 /* Garden Pot + Other World bloom moment */
+
+/* Seed picker: one clean grid, never under the HUD */
+.seed-picker{position:absolute;left:calc(var(--sal) + 10px);right:calc(var(--sar) + 10px);
+  top:calc(var(--hud-bottom, 64px) + 8px);bottom:var(--sheet-bottom, calc(var(--sab) + var(--tabh) + 18px));
+  z-index:32;display:flex;flex-direction:column;min-height:0;pointer-events:auto}
+.seed-picker.hidden{display:none!important}
+.seed-picker-card{flex:1 1 auto;min-height:0;display:flex;flex-direction:column;overflow:hidden;border-radius:22px;padding:14px 16px}
+.seed-picker-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;overflow-y:auto;
+  -webkit-overflow-scrolling:touch;touch-action:pan-y;overscroll-behavior:contain;min-height:0;flex:1 1 auto;padding:2px 1px 8px}
+@media (min-width:420px){.seed-picker-grid{grid-template-columns:repeat(3,minmax(0,1fr))}}
+.seed-pick{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;
+  min-height:108px;padding:10px 8px 8px;border-radius:16px;border:1.5px solid var(--sage);background:#fff;
+  font-family:'Nunito',system-ui,sans-serif;font-weight:800;font-size:14px;color:var(--moss);
+  box-shadow:0 2px 0 rgba(61,90,64,.12);text-align:center;overflow:hidden}
+.seed-pick b{font-family:'Fraunces',serif;font-weight:600;font-size:15px;line-height:1.15;color:var(--moss);
+  overflow-wrap:normal;word-break:normal;hyphens:none;text-wrap:pretty}
+.seed-pick small{font-family:'Nunito',system-ui,sans-serif;font-weight:700;font-size:11px;color:var(--ink-soft);
+  overflow-wrap:normal;word-break:normal;hyphens:none;line-height:1.25}
+.seed-pick .chip-ico{display:grid;place-items:center}
+.seed-pick .chip-ico svg,.seed-pick .chip-ico img{width:36px;height:36px}
+.seed-pick.banked{border-color:#F5D07A;background:#FFFBF3}
+.seed-pick .bank-badge{position:absolute;top:6px;right:6px}
+.seed-pick.is-off,.seed-pick[disabled]{opacity:.42;filter:grayscale(.35)}
+.ts-actions .btn{overflow-wrap:normal;word-break:normal;hyphens:none;white-space:normal}
 #bloom-skip{position:fixed;left:50%;top:38%;transform:translateX(-50%);z-index:80;pointer-events:none;padding:8px 16px;border-radius:999px;border:1.5px solid #F5D07A;background:rgba(255,249,240,.96);color:#3D5A40;font-family:'Nunito',sans-serif;font-weight:700;font-size:14px;letter-spacing:.02em;box-shadow:0 4px 16px rgba(61,90,64,.22);white-space:nowrap}
 #bloom-skip.hidden{display:none}
 #bloom-skip b{font-family:'Fraunces',serif;font-weight:600;color:#3D5A40}

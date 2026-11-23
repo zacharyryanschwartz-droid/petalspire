@@ -977,7 +977,7 @@ collectGroundSaplings();   // v0.8.7.8: saplings already on the ground go straig
 for (const g of S.ground) W.addLoot(g.key, g.kind, g.x, g.z, false);
 for (const d of S.decor) W.addDecor(d.key, d.type, d.x, d.z, d.r || 0, false);
 if (!Array.isArray(S.pots)) S.pots = [];
-for (const d of S.pots) { if (d.plant && (d.plant.wateredAt ? progress(d.plant) : 0) >= 1) d.plant.bloomed = true; W.addPot(d.id, d.x, d.z, d.r || 0, false); }
+for (const d of S.pots) { W.addPot(d.id, d.x, d.z, d.r || 0, false); }
 for (const d of S.gf) W.addFeat(d.key, d.id, d.x, d.z, d.r || 0, false);   // v0.65
 queueMicrotask(() => { migGF065(); migTrees065(); deliverOverdue(); });
 for (const t of S.trees) W.addGrown(t.id, t.x, t.z, treeStage(t), t.st === 'stump' ? 'stump' : 'full');
@@ -1015,6 +1015,7 @@ function syncTile(i, pop = true) {
   if (W.setPlant(i, p.sp, st, !!p.wateredAt, fill)) W.attachPlant(i, buildPlant(p.sp, st, { fill }), pop);
   W.setIcon(i, thirsty(p) ? 'water' : st === 3 ? 'ready' : null);
   if (lastStage[i] != null && lastStage[i] !== st && st === 3) onBloom(i);
+  else if (st === 3 && isOtherworldPlant(p.sp) && !p.bloomed) maybeBloomFx(p, W.tileWorld(i), tileLoc(i));
   lastStage[i] = st;
 }
 function syncStill() { W.setStill(S.stills.map((t) => t && { done: now() - t.start >= t.ms })); }
@@ -1037,7 +1038,7 @@ function syncStand() {
 bgCasters = W.bgTrees.map((b, n) => ({ id: 'bg' + n, x: b.x, z: b.z, w: SHADE.bgTree.w * b.s, reach: SHADE.bgTree.reach * b.s }));
 catchUpIrrigation(); catchUpShade(); worldReady = true; applyShade(); shadeSig = shadeSignature();
 for (const id of [...S.irrigBeds]) { if (!S.barrels[feedLot(id)]) { S.irrigBeds.splice(S.irrigBeds.indexOf(id), 1); if (S.irrigFrom) delete S.irrigFrom[id]; continue; } W.setIrrigation(id, true, barrelXZ(feedLot(id))); }
-for (let i = 0; i < S.tiles.length; i++) { if (S.tiles[i] && stageOf(S.tiles[i]) >= 3) S.tiles[i].bloomed = true; syncTile(i, false); }
+for (let i = 0; i < S.tiles.length; i++) syncTile(i, false);
 syncPots(false);
 syncRack(); syncStand(); syncTinc(); syncStill(); syncBarrels(); setTimeout(syncBees, 0);   // after the module has defined the bee helpers
 document.fonts?.ready.then(() => W.relabel());
@@ -1065,7 +1066,7 @@ function hud() {
   const nf = Object.values(S.finds).reduce((a, v) => a + v, 0) + (S.inv.sapling || 0) + Object.values(S.decorInv).reduce((a, v) => a + v, 0);
   const fb = $('#bag-badge'); fb.classList.toggle('hidden', !nf); fb.textContent = nf;
   $('#tab-build').classList.toggle('glow', buildReady());
-  renderGoal(); syncTools();
+  renderGoal(); syncTools(); layoutSheet();
 }
 function buildReady() {
   if (!S.beds.length) return S.wood >= bedCost() && SITES.some((s) => S.lots[s.lot] && !S.beds.includes(s.id) && siteClear(s.id));
@@ -1901,7 +1902,60 @@ function hurryMarket() { if (!S.marketProj || !spendJewels(BUILDS.market.hurryJe
 let selected = null, focus = null;
 function selectTile(i) { focus = null; selected = i; W.select(i); closePanel(); renderSheet(); }
 function focusThing(f) { selected = null; W.select(null); closePanel(); focus = f; renderFocus(); }
-function deselect() { selected = null; focus = null; W.select(null); $('#tile-sheet').classList.add('hidden'); syncBedTargets(); }   // v0.68: barrel reach frames clear at once
+function deselect() { selected = null; focus = null; W.select(null); $('#tile-sheet').classList.add('hidden'); closeSeedPicker(); syncBedTargets(); }   // v0.68: barrel reach frames clear at once
+function layoutSheet() {
+  const hud = $('#hud');
+  const bottom = hud ? Math.ceil(hud.getBoundingClientRect().bottom) : 0;
+  document.documentElement.style.setProperty('--hud-bottom', Math.max(0, bottom) + 'px');
+}
+function seedPickerEl() {
+  let e = document.getElementById('seed-picker');
+  if (!e) {
+    e = document.createElement('div');
+    e.id = 'seed-picker';
+    e.className = 'seed-picker hidden';
+    e.setAttribute('role', 'dialog');
+    e.setAttribute('aria-label', 'Pick a seed');
+    e.innerHTML = `<div class="seed-picker-card sheet"><div class="ts-head"><h3>Plant this bed <small>Pick a seed</small></h3><button class="close-btn" data-act="close-picker" aria-label="Close">×</button></div><div class="seed-picker-grid" id="seed-picker-grid"></div></div>`;
+    ($('#ui') || document.body).appendChild(e);
+    e.addEventListener('click', (ev) => {
+      if (ev.target.closest('[data-act="close-picker"]') || ev.target === e) { ev.preventDefault(); closeSeedPicker(); return; }
+      const b = ev.target.closest('[data-plantbed]'); if (!b || b.disabled) return;
+      const bed = +e.dataset.bed, sp = b.dataset.plantbed;
+      closeSeedPicker();
+      plantBed(bed, sp);
+    });
+  }
+  return e;
+}
+function seedPickerList() {
+  return Object.keys(SPECIES).filter((sp) => (S.unlocked && S.unlocked[sp]) || seedHave(sp) > 0);
+}
+function openSeedPicker(bed) {
+  if (bed == null || bed < 0 || !S.beds[bed]) return false;
+  layoutSheet();
+  const e = seedPickerEl(), grid = e.querySelector('#seed-picker-grid');
+  e.dataset.bed = String(bed);
+  const list = seedPickerList();
+  if (!list.length) { toast('You’re out of seeds — buy some at the Market, or harvest a bloom'); return false; }
+  grid.innerHTML = list.map((sp) => {
+    const have = seedHave(sp), ok = have > 0, loose = looseSeeds(sp), bank = bankCount(sp);
+    const count = isBanked(sp) ? `${loose} loose · ${bank} banked` : `${have} seed${have === 1 ? '' : 's'}`;
+    return `<button type="button" class="seed-pick${isBanked(sp) ? ' banked' : ''}${ok ? '' : ' is-off'}" data-plantbed="${sp}" ${ok ? '' : 'disabled'}>
+      <span class="chip-ico">${itemSvg('seed_' + sp)}</span>
+      ${isBanked(sp) ? '<span class="bank-badge" title="Banked"><i data-icon="vault"></i></span>' : ''}
+      <b>${SPECIES[sp].name}</b>
+      <small>${count}</small>
+    </button>`;
+  }).join('');
+  fillIcons(e);
+  e.classList.remove('hidden');
+  return true;
+}
+function closeSeedPicker() {
+  const e = document.getElementById('seed-picker');
+  if (e) e.classList.add('hidden');
+}
 function renderFocus() {
   const sh = $('#tile-sheet'); if (!focus) return;
   let head = '', body = '';
@@ -1968,9 +2022,9 @@ function renderFocus() {
     head = `<h3>${BUILD_NAMES[focus.id] || focus.id}</h3>`;
     body = `<p class="muted">Slide it to a clear spot, or take it down.</p>` + moveDemoHTML(focus.id, '', true);
   }
-  sh.innerHTML = `<div class="ts-head"><div class="ts-ico">${focus.kind === 'tree' ? ICONS.sapling : focus.kind === 'pot' ? potSvg() : focus.kind === 'barrel' ? FEATURE_ART.rainbarrel : focus.kind === 'hive' ? '<span style="font-size:30px;line-height:1">🐝</span>' : focus.kind === 'gfeat' ? FEATURE_ART[S.gf.find((x) => x.key === focus.key)?.id] || '' : decorIcon(S.decor.find((x) => x.key === focus.key)?.type)}</div>${head}<button class="close-btn" data-act="close">×</button></div>${body}`;
+  sh.innerHTML = `<div class="ts-head"><div class="ts-ico">${focus.kind === 'tree' ? ICONS.sapling : focus.kind === 'pot' ? potSvg() : focus.kind === 'barrel' ? FEATURE_ART.rainbarrel : focus.kind === 'hive' ? '<span style="font-size:30px;line-height:1">🐝</span>' : focus.kind === 'gfeat' ? FEATURE_ART[S.gf.find((x) => x.key === focus.key)?.id] || '' : decorIcon(S.decor.find((x) => x.key === focus.key)?.type)}</div>${head}<button class="close-btn" data-act="close">×</button></div><div class="ts-body">${body}</div>`;
   sh.dataset.st = focus.kind === 'tree' ? treeStage(treeById(focus.id)) : -1;
-  upgToBottom(sh); fillIcons(sh); sh.classList.remove('hidden');
+  upgToBottom(sh); fillIcons(sh); sh.classList.remove('hidden'); layoutSheet();
 }
 function renderSheet() {
   if (focus) return renderFocus();
@@ -1983,10 +2037,7 @@ function renderSheet() {
     const owned = Object.keys(SPECIES).filter((sp) => seedHave(sp) > 0);
     if (!owned.length) body += S.marketBuilt ? `<p class="muted no-seeds-line">You’re out of seeds. Buy more at the Supply Market, or harvest a bloom — every harvest gives seeds.</p><div class="ts-actions"><button class="btn btn-primary" data-act="open-market">Visit Supply Market</button></div>` : `<p class="muted no-seeds-line">You’re out of seeds. Harvest a bloom — every harvest gives seeds back.</p>`;
     else {
-      const emptyN = bedTiles(bedOfTile(i)).filter((t) => !S.tiles[t]).length;
-      body += `<p class="plant-cue"><i data-icon="sprout"></i> Tap a seed to plant it here</p><div class="ts-row">${owned.map((sp) => `<button class="seed-chip${isBanked(sp) ? ' banked' : ''}" data-plant="${sp}"><span class="chip-ico">${itemSvg('seed_' + sp)}</span>${isBanked(sp) ? '<span class="bank-badge" title="Banked"><i data-icon="vault"></i></span>' : ''}${SPECIES[sp].name}<small>×${seedHave(sp)} seeds${isBanked(sp) ? ` · ${bankCount(sp)} banked` : ''}</small></button>`).join('')}</div>`;
-      const bankPlant = owned.filter((sp) => isBanked(sp) && emptyN > 1);
-      if (bankPlant.length) body += `<div class="ts-actions bank-bed-acts">${bankPlant.map((sp) => `<button class="btn btn-gold sm" data-plantbed="${sp}"><i data-icon="vault"></i> Plant this bed · ${SPECIES[sp].name}</button>`).join('')}</div>`;
+      body += `<p class="plant-cue"><i data-icon="sprout"></i> Pick a seed to plant this bed</p><div class="ts-actions"><button class="btn btn-gold" data-act="plant-bed-pick"><i data-icon="sprout"></i> Plant this bed</button></div>`;
     }
     body += moveDemoHTML('bed', bedOfTile(i), true);
   } else {
@@ -2002,13 +2053,13 @@ function renderSheet() {
     else body += `${dots}<div class="ts-actions"><button class="btn btn-gold" data-act="harvest"><i data-icon="sparkle"></i> Harvest</button></div>`;
     body += moveDemoHTML('bed', bedOfTile(i), true);
   }
-  sh.innerHTML = `<div class="ts-head">${head}<button class="close-btn" data-act="close">×</button></div>${body}`;
+  sh.innerHTML = `<div class="ts-head">${head}<button class="close-btn" data-act="close">×</button></div><div class="ts-body">${body}</div>`;
   sh.dataset.st = p ? stageOf(p) : -1; sh.dataset.bw = p && budWait(p) ? '1' : '0'; sh.dataset.water = totalWater();
-  upgToBottom(sh); fillIcons(sh); sh.classList.remove('hidden');
+  upgToBottom(sh); fillIcons(sh); sh.classList.remove('hidden'); layoutSheet();
 }
 $('#tile-sheet').addEventListener('click', (e) => {
   const b = e.target.closest('button'); if (!b) return;
-  if (b.dataset.plantbed) return plantBed(bedOfTile(selected), b.dataset.plantbed);
+  if (b.dataset.plantbed) return plantBed(Math.floor(selected / PER_BED), b.dataset.plantbed);
   if (b.dataset.plant) return focus?.kind === 'pot' ? plantPot(focus.id, b.dataset.plant) : plant(selected, b.dataset.plant);
   if (b.dataset.unhook) return unhookIrrigation(b.dataset.unhook);
   const a = b.dataset.act;
@@ -2019,6 +2070,7 @@ $('#tile-sheet').addEventListener('click', (e) => {
   if (a === 'open-worker') return openPanel('worker', b.dataset.lot);
   if (a === 'move-thing') return startMove(b.dataset.move, b.dataset.id || '');
   if (a === 'demo-thing') return askDemolish(b.dataset.move, b.dataset.id || '');
+  if (a === 'plant-bed-pick') return openSeedPicker(Math.floor(selected / PER_BED));
   if (a === 'close') deselect(); else if (a === 'water') focus?.kind === 'pot' ? waterPot(focus.id) : water(selected); else if (a === 'water-bed') waterBed(selected); else if (a === 'harvest') focus?.kind === 'pot' ? harvestPot(focus.id) : harvest(selected); else if (a === 'open-market') openPanel('market', 'buy');
   else if (a === 'hurry-tree') hurryTree(focus.id); else if (a === 'chop-tree') tapGrown(focus.id); else if (a === 'store-decor') storeDecor(focus.key); else if (a === 'store-gf') storeGF(focus.key); else if (a === 'upg-gf') { const d = S.gf.find((x) => x.key === focus.key); if (d) { upgradeCard(d.id); renderFocus(); } } else if (a === 'sell-placed') sellPlaced(focus);
 });
@@ -2098,6 +2150,15 @@ function harvestCore_(i) {   // normal yields/seeds rules, shared by the hand ha
 }
 function harvest(i) {
   const p = S.tiles[i]; if (!p || stageOf(p) < 3) return;
+  if (isOtherworldPlant(p.sp)) {
+    const pos = W.tileWorld(i), color = SPECIES[p.sp].color;
+    playBloomCinematic(pos, color, () => finishHarvest(i));
+    return;
+  }
+  finishHarvest(i);
+}
+function finishHarvest(i) {
+  const p = S.tiles[i]; if (!p || stageOf(p) < 3) return;
   const sp = SPECIES[p.sp], loc = tileLoc(i); const { f, s } = harvestCore(i); sfx('harvest');
   syncTile(i); save(); hud();
   setTimeout(() => maybeBoost('harvest', { loc, sp: p.sp, f, s }), 900);   // v0.66: now and then, offer a Double Harvest
@@ -2126,6 +2187,16 @@ function sickleBed(b) {
   if (b == null || b < 0 || !S.beds[b]) { toast('Tap one of your raised beds'); return { n: 0 }; }
   const ripe = bedTiles(b).filter((i) => S.tiles[i] && stageOf(S.tiles[i]) >= 3);
   if (!ripe.length) { toast('Nothing is ripe in this bed yet — the sickle skips growing plants'); return { n: 0 }; }
+  const ow = ripe.find((i) => isOtherworldPlant(S.tiles[i].sp));
+  if (ow != null) {
+    playBloomCinematic(W.tileWorld(ow), SPECIES[S.tiles[ow].sp].color, () => sickleBedFinish(b));
+    return { n: ripe.length, blooming: true };
+  }
+  return sickleBedFinish(b);
+}
+function sickleBedFinish(b) {
+  const ripe = bedTiles(b).filter((i) => S.tiles[i] && stageOf(S.tiles[i]) >= 3);
+  if (!ripe.length) return { n: 0 };
   exitPlace(); S.toolAt.sickle = now();
   W.sickleSweep([bedCenter(b)]);
   const got = {}, spOf = {}; let seeds = 0;
@@ -2297,6 +2368,15 @@ function harvestPotCore(id) {
 }
 function harvestPot(id) {
   const pot = potById(id); if (!pot?.plant || stageOf(pot.plant) < 3) return;
+  if (isOtherworldPlant(pot.plant.sp)) {
+    const pos = W.potWorld(id), color = SPECIES[pot.plant.sp].color;
+    playBloomCinematic(pos, color, () => finishHarvestPot(id));
+    return;
+  }
+  finishHarvestPot(id);
+}
+function finishHarvestPot(id) {
+  const pot = potById(id); if (!pot?.plant || stageOf(pot.plant) < 3) return;
   const sp = SPECIES[pot.plant.sp], loc = potLoc(pot), out = harvestPotCore(id); if (!out) return;
   sfx('harvest'); syncPot(id); save(); hud();
   setTimeout(() => maybeBoost('harvest', { loc, sp: out.sp, f: out.f, s: out.s }), 900);
@@ -2315,41 +2395,68 @@ function syncPot(id, pop = true) {
   if (W.setPotPlant(id, p.sp, st, !!p.wateredAt, fill)) W.attachPotPlant(id, buildPlant(p.sp, st, { fill }), pop);
   W.setPotIcon(id, thirsty(p) ? 'water' : st === 3 ? 'ready' : null);
   if (lastPotStage[id] != null && lastPotStage[id] !== st && st === 3) onPotBloom(id);
+  else if (st === 3 && isOtherworldPlant(p.sp) && !p.bloomed) maybeBloomFx(p, W.potWorld(id), lotLoc(lotAt((potById(id) || pot).x, (potById(id) || pot).z) || 'home'));
   lastPotStage[id] = st;
 }
 function syncPots(pop = false) { for (const pot of S.pots || []) syncPot(pot.id, pop); }
 function reducedMotion() { return !!(window.matchMedia?.('(prefers-reduced-motion: reduce)').matches || S.audio?.reduceMotion); }
-let bloomPlaying = false, bloomTimer = 0;
+let bloomPlaying = false, bloomTimer = 0, bloomOnDone = null;
 function bloomSkipEl() {
   let e = document.getElementById('bloom-skip');
   if (!e) { e = document.createElement('div'); e.id = 'bloom-skip'; e.className = 'hidden'; e.innerHTML = '<b>Bloom</b> · tap to skip'; document.body.appendChild(e); }
   return e;
 }
-function skipBloom() {
-  if (!bloomPlaying) return false;
-  bloomPlaying = false; clearTimeout(bloomTimer); bloomSkipEl().classList.add('hidden'); W.skipBloomFx(); syncPots(false); for (let i = 0; i < (S.tiles || []).length; i++) if (S.tiles[i]) syncTile(i, false); return true;
+function bloomSceneReady() {
+  return !!(S.introDone && document.body && !document.body.classList.contains('on-title'));
 }
-function playBloomCinematic(worldPos, color) {
+function bloomLocOk(loc) { return !loc || loc === viewLoc(); }
+function endBloom() {
+  const cb = bloomOnDone; bloomOnDone = null;
+  bloomPlaying = false; clearTimeout(bloomTimer); bloomSkipEl().classList.add('hidden');
+  try { syncPots(false); for (let i = 0; i < (S.tiles || []).length; i++) if (S.tiles[i]) syncTile(i, false); } catch (_) {}
+  if (cb) { try { cb(); } catch (_) {} }
+  if (!bloomPlaying) queueMicrotask(() => { try { flushPendingBlooms(); } catch (_) {} });
+}
+function skipBloom() {
+  if (!bloomPlaying && !W.bloomFxActive()) return false;
+  bloomPlaying = false; clearTimeout(bloomTimer); bloomSkipEl().classList.add('hidden');
+  if (!W.skipBloomFx()) endBloom();
+  return true;
+}
+function playBloomCinematic(worldPos, color, done) {
   skipBloom();
   bloomPlaying = true;
+  bloomOnDone = typeof done === 'function' ? done : null;
   const reduced = reducedMotion();
   bloomSkipEl().classList.remove('hidden');
-  if (!reduced) sfx('bloom');
+  try { if (!reduced) sfx('bloom'); } catch (_) {}
   const cam = W.ctl.target.clone(), az = W.ctl.az, pol = W.ctl.pol, zoom = W.ctl.zoom;
-  W.playBloomFx(worldPos, color || '#C8E0E8', { reduced, duration: reduced ? 900 : 2500, onDone: () => { bloomPlaying = false; bloomSkipEl().classList.add('hidden'); syncPots(false); for (let i = 0; i < (S.tiles || []).length; i++) if (S.tiles[i]) syncTile(i, false); } });
+  W.playBloomFx(worldPos, color || '#C8E0E8', { reduced, duration: reduced ? 900 : 2500, onDone: endBloom });
   // The camera never re-centers or moves on its own for this moment.
   W.ctl.target.copy(cam); W.ctl.az = az; W.ctl.pol = pol; W.ctl.zoom = zoom; W.ctl.glide = null; W.updateCamera();
   bloomTimer = setTimeout(() => { if (bloomPlaying) skipBloom(); }, reduced ? 950 : 2600);
   return true;
 }
-function maybeBloomFx(plant, worldPos) {
+function maybeBloomFx(plant, worldPos, loc) {
   if (!plant || !isOtherworldPlant(plant.sp) || stageOf(plant) < 3 || plant.bloomed) return false;
+  if (bloomPlaying) return false;
+  if (!bloomSceneReady() || !bloomLocOk(loc)) return false;
   plant.bloomed = true; save();
   playBloomCinematic(worldPos, SPECIES[plant.sp].color);
   return true;
 }
-function onBloom(i) { tip('bloom'); const p = S.tiles[i]; if (p && maybeBloomFx(p, W.tileWorld(i))) W.setIcon(i, null); if (selected === i) renderSheet(); }
-function onPotBloom(id) { const pot = potById(id); if (pot?.plant && maybeBloomFx(pot.plant, W.potWorld(id))) W.setPotIcon(id, null); if (focus?.kind === 'pot' && focus.id === id) renderFocus(); }
+function onBloom(i) { tip('bloom'); const p = S.tiles[i]; if (p && maybeBloomFx(p, W.tileWorld(i), tileLoc(i))) W.setIcon(i, null); if (selected === i) renderSheet(); }
+function onPotBloom(id) { const pot = potById(id); if (pot?.plant && maybeBloomFx(pot.plant, W.potWorld(id), potLoc(pot))) W.setPotIcon(id, null); if (focus?.kind === 'pot' && focus.id === id) renderFocus(); }
+function flushPendingBlooms() {
+  if (bloomPlaying || !bloomSceneReady()) return false;
+  for (const pot of S.pots || []) {
+    if (pot.plant && maybeBloomFx(pot.plant, W.potWorld(pot.id), lotLoc(lotAt(pot.x, pot.z) || 'home'))) return true;
+  }
+  for (let i = 0; i < (S.tiles || []).length; i++) {
+    const p = S.tiles[i]; if (p && maybeBloomFx(p, W.tileWorld(i), tileLoc(i))) return true;
+  }
+  return false;
+}
 function ripePot(id) {
   const pot = potById(id), p = pot?.plant; if (!p) return false;
   const t = now(); if (!p.wateredAt) startGrowing(p, t); p.bud = true; p.wu = 0; if (p.sp === 'bluelotus') p.fill = 2; p.wateredAt = t - p.growMs - 1; delete p.bloomed; lastPotStage[id] = 2; syncPot(id, false); return true;
@@ -2427,7 +2534,7 @@ function openPanel(name, tab) {
   panelAt = performance.now(); $('#panel').classList.remove('hidden'); $('#panel').dataset.name = name; renderPanel(); $('#panel-body').scrollTop = 0;
   if (name === 'market' && S.marketBuilt) beginMarketWelcome();
 }
-function closePanel() { sprigHide(); panel = null; $('#panel').classList.add('hidden'); document.querySelectorAll('#tabbar button').forEach((b) => b.classList.remove('on')); }
+function closePanel() { sprigHide(); panel = null; $('#panel').classList.add('hidden'); closeSeedPicker(); document.querySelectorAll('#tabbar button').forEach((b) => b.classList.remove('on')); }
 $('#panel-close').addEventListener('click', closePanel);
 $('#panel').addEventListener('click', (e) => { if (e.target.id === 'panel' && performance.now() - panelAt > 450) closePanel(); });
 const tabPanel = (p) => (p === 'stand' && curLoc() === 'orchard' ? 'ostand' : p);   // v0.67.1: the Stand button opens the stand of the location you are in
@@ -4773,7 +4880,7 @@ function travel(loc) {
   if (loc === 'orchard' && !S.lots.orchard) return false;
   if (placing) exitPlace(); if (buildMode) exitBuild(); deselect(); closePanel();
   const f = $('#travel-fade'); f.classList.remove('go'); void f.offsetWidth; f.classList.add('go');
-  setTimeout(() => { setLoc(loc); hud(); closeMap(); toast(loc === 'home' ? 'Back home' : `Welcome to ${LOCATIONS[loc].name}`); if (loc === 'orchard') { tip('orchard'); syncOrchard(); } }, 260);
+  setTimeout(() => { setLoc(loc); hud(); closeMap(); toast(loc === 'home' ? 'Back home' : `Welcome to ${LOCATIONS[loc].name}`); if (loc === 'orchard') { tip('orchard'); syncOrchard(); } try { flushPendingBlooms(); } catch (_) {} }, 260);
   return true;
 }
 // v0.68: a fresh Orchard had no fruit trees and no way to get a sapling except tree cards from Jewel packs (Jewels only come
@@ -5728,8 +5835,9 @@ const endPtr = (e) => {
 };
 canvas.addEventListener('pointerup', endPtr); canvas.addEventListener('pointercancel', endPtr);
 canvas.addEventListener('wheel', (e) => { e.preventDefault(); W.ctl.zoom = THREE.MathUtils.clamp(W.ctl.zoom * Math.exp(e.deltaY * 0.001), 0.5, 1.6); W.updateCamera(); }, { passive: false });
+window.addEventListener('resize', () => { try { layoutSheet(); } catch (_) {} });
 ['gesturestart', 'gesturechange', 'dblclick'].forEach((ev) => document.addEventListener(ev, (e) => e.preventDefault(), { passive: false }));
-document.addEventListener('touchmove', (e) => { if (!e.target.closest('.panel-body')) e.preventDefault(); }, { passive: false });
+document.addEventListener('touchmove', (e) => { if (!e.target.closest('.panel-body, .tile-sheet, .seed-picker, .seed-picker-grid')) e.preventDefault(); }, { passive: false });
 let lastTouchEnd = 0;
 document.addEventListener('touchend', (e) => { const t = performance.now(); if (t - lastTouchEnd < 320 && !e.target.closest('button')) e.preventDefault(); lastTouchEnd = t; }, { passive: false });
 
@@ -5821,6 +5929,7 @@ if (isNative()) { const v = $('#title .version'); if (v) v.textContent = `v${BUI
 $('#btn-start').addEventListener('click', () => {
   $('#title').classList.add('out'); setTimeout(() => $('#title').classList.add('hidden'), 650);
   document.body.classList.remove('on-title');   // v0.68: the HUD and tab bar wait behind the title screen
+  setTimeout(() => { try { layoutSheet(); flushPendingBlooms(); } catch (_) {} }, 700);
   if (migrated) setTimeout(() => toast(`Petalspire v${BUILD} — a fresh start in the woods!`), 900);
   if (upgraded) setTimeout(() => toast(`Welcome to v${BUILD}! Your garden came along · +1 tree sapling (Orchard Bag) · +${STARTER_JEWELS} Jewels`), 900);
   else if (migrated04) setTimeout(() => toast(`Welcome to v${BUILD} — water now only comes from rain barrels, one per plot (4 beds each)${migrated04.moved ? ` · ${migrated04.moved} bag water poured into your home barrel` : ''}${migrated04.lost ? ` · ${migrated04.lost} extra water didn’t fit and was lost` : ''}${migrated04.dropped ? ` · ${migrated04.dropped} irrigated bed${migrated04.dropped === 1 ? ' was' : 's were'} unhooked: give that plot a Rain Barrel (Supply Market), then re-assign` : ''}`), 900);
@@ -5916,7 +6025,8 @@ const TUT_STEPS = [
   { id: 'plant', done: () => S.stats.watered > 0 || S.stats.harvests > 0 || (S.tut.planted0 != null && tutPlanted() >= tutSeedGoal()) || (tutPlanted() > 0 && !tutSeedsLeft()),
     at() { const n = Math.min(tutPlanted(), tutSeedGoal()), tag = `Plant your seeds (${n}/${tutSeedGoal()})`, t = tutSheetTile();
       if (S.tut.planted0 == null) { S.tut.planted0 = 0; save(); }
-      if (t != null && !S.tiles[t] && $('#tile-sheet .seed-chip')) return { text: `${tag} — pick a seed to plant it here.`, el: '#tile-sheet .seed-chip' };
+      if (t != null && !S.tiles[t] && $('#seed-picker') && !$('#seed-picker').classList.contains('hidden') && $('#seed-picker [data-plantbed]')) return { text: `${tag} — pick a seed to plant this bed.`, el: '#seed-picker [data-plantbed]' };
+      if (t != null && !S.tiles[t] && $('#tile-sheet [data-act="plant-bed-pick"]')) return { text: `${tag} — tap Plant this bed, then pick a seed.`, el: '#tile-sheet [data-act="plant-bed-pick"]' };
       if (t != null && S.tiles[t] && tutSeedsLeft()) deselect();   // just planted: fold the sheet away so the next square is free to tap
       const i = tutTiles().find((k) => !S.tiles[k]);
       if (i == null) return tutBedAt(`${tag} — your bed is full. Tap Build to add another raised bed.`, tag);
@@ -6186,7 +6296,7 @@ const V = (x, y, z) => new THREE.Vector3(x, y, z);
 window.__ps = {
   STAND_UNLOCK, coinUnlock, coinUnlockAsk, nextCoinStand, WORKER, hireWorker, payWorker, migWorkerHour, migWorkerSplit, migWorkerLoc, locLots, workerPass, wkKey, wkAll, workerStatus, migBasesHome, shiftTxt, wkTimerText, musicSkip: () => Sound?.skip(), get sound() { return Sound?.state; }, get audioPrefs() { return S.audio; }, setVolume, toggleMute, soundSetHTML, sfxPlay: (n) => Sound?.play(n), workerPass, catchUpWorkers, syncWorkers, workerStatus, workStands, workersOn, workerAt: (l) => W.workerAt(l), workerPose: (l) => W.workerPose(l), camAt: (x, z, zoom = 0.7) => { W.ctl.moved = true; W.glide({ target: V3(x, 0.3, z), zoom }, 0.01); }, wkPath, wkQueue, wkVis, wkGrid, standXZ, get workers() { return S.workers; },
   setClock: (t) => { clockAt = t; },
-  BUILD, adMult, adPicks, standHTML, itemVal, byValue, sortRows, rewardHTML, get fromBuild() { return fromBuild; }, get bags() { return S.bags; }, get migBags() { return migBags; }, inBag, bagOf, sendGoods, tileLoc, standLoc, splitOrchardGoods, buildHTML, marketHTML, satchelHTML, billboardHTML, bbStatusText, bbReadyIn, BILLBOARD, CHARMS, CHARM_IDS, charmV, charmLv, charmText, craftK, shiftH, standPrice, ostandPrice, custGap, harvestCore, setCharmRoll(v) { charmRoll = v; }, freeGFSpot, bulkSell, bulkAll, bulkPrice, bulkItems, bulkHTML, rollWants, STAND_BUY, BULK, GF_IDS, gfOn, gfPlaced, placeGF, storeGF, onMapOnly, charmAt, oGap, TRUCK, orderDelivery, deliverTrip, syncDeliv, inTransit, vanOn, VAN_LOT, rowOfTree, exitPlace, startMove, commitMove, canDemolish, doDemolish, askDemolish, moveSpotOk, buyCopy, mktDest, MKT_ONE_TIME, MKT_STACK, MKT_CONSUMABLE, MKT_REPEAT, tabPanel, get deliv() { return S.deliv; }, get vanOut() { return vanOut.size; }, migGF065, migDecoBag, get mig065() { return mig065; }, regenNow: () => regenS(), SWAP_TIERS, swapPool, get bagTab() { return bagTab; }, setBagTab(t) { bagTab = t; }, shelfMig063, rollIds, rollPackLoot, catTierOdds, drawPlant, drawOther, isPlantCard, PACK_LOOT, OWNED_K, setForcedLoot(L) { forcedLoot = L; }, consLeft, finishCons, hurryCons, startCons, plantTile: plant, syncTile, bloomTargets, instantBloom, askBloom, POT, OTHERWORLD_PLANTS, OTHERWORLD_TREES, isOtherworldPlant, potById, potProblem, buildPot, plantPot, waterPot, harvestPot, syncPot, syncPots, ripePot, ripeTile, skipBloom, playBloomCinematic, maybeBloomFx, reducedMotion, get bloomPlaying() { return bloomPlaying || W.bloomFxActive(); }, get pots() { return S.pots; }, customerRush, askRush, rushLeft, rushReady, syncJewelDock, get rush() { return S.rush; }, get nextCustAt() { return nextCust; }, get nextOCustAt() { return nextOCust; }, swapCard, swapIn, swapPool, swapTierOdds, SWAP, setSwapForced(id) { swapForced = id; }, get revealCards() { return revealCards; }, upgLeft, finishUpg, hurryUpg, deselect, get upg() { return S.upg; }, toolLeft, get cons() { return S.cons; }, dailyStatus, claimDaily, showDaily, maybeDaily, dayKey, watchAd, playRewardAd, DAILY, upgradeBuilding, get standLv() { return S.standLv; }, cardFix063, normalizeCards,
+  BUILD, adMult, adPicks, standHTML, itemVal, byValue, sortRows, rewardHTML, get fromBuild() { return fromBuild; }, get bags() { return S.bags; }, get migBags() { return migBags; }, inBag, bagOf, sendGoods, tileLoc, standLoc, splitOrchardGoods, buildHTML, marketHTML, satchelHTML, billboardHTML, bbStatusText, bbReadyIn, BILLBOARD, CHARMS, CHARM_IDS, charmV, charmLv, charmText, craftK, shiftH, standPrice, ostandPrice, custGap, harvestCore, setCharmRoll(v) { charmRoll = v; }, freeGFSpot, bulkSell, bulkAll, bulkPrice, bulkItems, bulkHTML, rollWants, STAND_BUY, BULK, GF_IDS, gfOn, gfPlaced, placeGF, storeGF, onMapOnly, charmAt, oGap, TRUCK, orderDelivery, deliverTrip, syncDeliv, inTransit, vanOn, VAN_LOT, rowOfTree, exitPlace, startMove, commitMove, canDemolish, doDemolish, askDemolish, moveSpotOk, buyCopy, mktDest, MKT_ONE_TIME, MKT_STACK, MKT_CONSUMABLE, MKT_REPEAT, tabPanel, get deliv() { return S.deliv; }, get vanOut() { return vanOut.size; }, migGF065, migDecoBag, get mig065() { return mig065; }, regenNow: () => regenS(), SWAP_TIERS, swapPool, get bagTab() { return bagTab; }, setBagTab(t) { bagTab = t; }, shelfMig063, rollIds, rollPackLoot, catTierOdds, drawPlant, drawOther, isPlantCard, PACK_LOOT, OWNED_K, setForcedLoot(L) { forcedLoot = L; }, consLeft, finishCons, hurryCons, startCons, plantTile: plant, syncTile, bloomTargets, instantBloom, askBloom, POT, OTHERWORLD_PLANTS, OTHERWORLD_TREES, isOtherworldPlant, potById, potProblem, buildPot, plantPot, waterPot, harvestPot, syncPot, syncPots, ripePot, ripeTile, skipBloom, playBloomCinematic, maybeBloomFx, flushPendingBlooms, reducedMotion, openSeedPicker, closeSeedPicker, layoutSheet, get bloomPlaying() { return bloomPlaying || W.bloomFxActive(); }, get pots() { return S.pots; }, customerRush, askRush, rushLeft, rushReady, syncJewelDock, get rush() { return S.rush; }, get nextCustAt() { return nextCust; }, get nextOCustAt() { return nextOCust; }, swapCard, swapIn, swapPool, swapTierOdds, SWAP, setSwapForced(id) { swapForced = id; }, get revealCards() { return revealCards; }, upgLeft, finishUpg, hurryUpg, deselect, get upg() { return S.upg; }, toolLeft, get cons() { return S.cons; }, dailyStatus, claimDaily, showDaily, maybeDaily, dayKey, watchAd, playRewardAd, DAILY, upgradeBuilding, get standLv() { return S.standLv; }, cardFix063, normalizeCards,
   TIPS, JEWEL_DROP, obsState, PACKS,
   hud, guideOn: () => guideOn(), tutFinish: (k) => tutFinish(k), afterGuideN: () => afterGuideQ.length, handleTap: (x, y, l) => handleTap(x, y, l), dailyGift: (n) => dailyGift(n), syncBarrels, lotRoofs, standsLine, buildBarrelAt: (lot, x, z) => buildBarrel(lot, x, z), openMap, closeMap, mapLocked, syncMapBtn, maybeBoost, showBoost, applyBoost, hideBoost, showStarter, grantStarter, buyStarter, starterLive, grantOffer, buyOffer, beginMarketWelcome, offerValue, offersSorted, maybeStarter, starterReady, maybeStarter, promoMilestone, showPromo, wish, settingsHTML, jewelsHTML, unlockMapIfReady, travel, buyOrchard, claimFollow, SOCIALS, setLoc, loc: () => curLoc(), orchardLocked, mapPlaces: () => MAP_PLACES.map((p) => ({ id: p.id, name: p.name, soon: !!p.soon, state: placeState(p) })), ORCHARD_PRICE, casterIds: () => casters().map((c) => c.id + (c.h != null ? ":box" : ":tree")), checkGoals, regenBarrels, feedLot, reachLots,  get barrelReachTargets() { return W.bedTargets.children.map((g) => ({ b: g.userData.b, ok: g.userData.ok })); }, barrelRoof, lotRoofs, barrelStands, barrelPerTick, get gutterLots() { return [...W.gutters.keys()]; }, gutterPipes(lot) { return W.gutters.get(lot)?.userData.pipes || 0; },
   get tincGrandfathered() { return tincGrandfathered; }, tincProblem, tincSpots, buildTincture, placeTincture, buildStill, placeStill, distill, collectOil, STILL, TEA, teaInfo, teaId, teaSps, registerTea, buildTea, placeTea, brewTea, collectTea, teaAdd, teaRemove, get teaPick() { return [...teaPick]; }, set teaPick(v) { teaPick = [...v]; }, teaHTML, syncTea, DRY_TIER_S,
