@@ -15,7 +15,6 @@ export const LOTS = {
   north:     { name: 'North Woods',    x0: -4.6,  x1: 4.6,  z0: -17.8, z1: -6.6 },
   northwest: { name: 'Hollow Woods',   x0: -13.8, x1: -4.6, z0: -17.8, z1: -6.6 },
   northeast: { name: 'Bramble Woods',  x0: 4.6,   x1: 13.8, z0: -17.8, z1: -6.6 },
-  backwoods: { name: 'Back Woods',     x0: -4.6,  x1: 4.6,  z0: -28.6, z1: -17.8 },   // v0.6: the last wooded plot at Home
   // v0.6: The Orchard is its own place on the Map (far from Home, so it reads as a separate scene). Bought on the Map
   // once every Home plot is yours. Sunny open field: 2 raised-bed patches up front, 16 tree spots behind (v0.68: 4×4).
   // v0.68: every Orchard plot is 16 deep (z0 −12, was −10) so it holds a full 4×4 grid of trees; Hilltop Grove moved back 2 m to match
@@ -30,10 +29,15 @@ export const LOCATIONS = { home: { name: 'Home', target: [-0.3, 0.3, -0.4] }, or
 export const ORCHARD_PRICE = { coins: 9000, wood: 60 };   // v0.7.2: ×3 coins (was 3000)
 // v0.52: the plot directly BEHIND another = the neighbour one row further from the road (the road runs along +z, so
 // "behind" is the plot with the same x-range and the next z-range toward −z). The back row has nothing behind it.
-export const BEHIND = { home: 'north', west: 'northwest', east: 'northeast', north: 'backwoods' };
+// v0.8.7.8: Home is 6 plots (Roadside Lot + 5 neighbours). The 7th plot at the back (Back Woods) was retired.
+// Old saves that planted or built there have their goods moved to the Bag (see retireBackwoods in main.js).
+export const BACKWOODS_RETIRED = { id: 'backwoods', name: 'Back Woods', x0: -4.6, x1: 4.6, z0: -28.6, z1: -17.8, price: 6000 };
+export const inRetiredBackwoods = (x, z) => x >= BACKWOODS_RETIRED.x0 && x < BACKWOODS_RETIRED.x1 && z >= BACKWOODS_RETIRED.z0 && z < BACKWOODS_RETIRED.z1;
+export const BEHIND = { home: 'north', west: 'northwest', east: 'northeast' };
 export const FRONT = Object.fromEntries(Object.entries(BEHIND).map(([f, b]) => [b, f]));
-export const LOT_FOR_SALE = ['west', 'east', 'north', 'northwest', 'northeast', 'backwoods'];   // the Home plots (the Orchard is bought on the Map)
-export const LOT_PRICES = [450, 900, 1800, 3000, 4500, 6000];   // v0.7.2: ×3 (was 150 · 300 · 600 · 1000 · 1500 · 2000)
+export const LOT_FOR_SALE = ['west', 'east', 'north', 'northwest', 'northeast'];   // the Home plots (the Orchard is bought on the Map)
+export const HOME_LOTS = ['home', ...LOT_FOR_SALE];   // 6 plots at Home
+export const LOT_PRICES = [450, 900, 1800, 3000, 4500];   // v0.7.2: ×3 (was 150 · 300 · 600 · 1000 · 1500); v0.8.7.8: dropped the old Back Woods price of 6000
 // v0.61: Orchard plots for sale (in this order of price; any order may be bought): coins + Wood, priced above every Home plot
 export const ORCH_FOR_SALE = ['orchwest', 'orcheast', 'orchnorth'];
 export const ORCH_PLOT_PRICES = [{ coins: 12000, wood: 40 }, { coins: 18000, wood: 60 }, { coins: 27000, wood: 80 }];   // v0.7.2: ×3 coins (was 4000 · 6000 · 9000)
@@ -63,7 +67,7 @@ export const ORCH_ROW_OLD_TO_NEW = { 'orchwest:-4': 'orchwest:-3.2', 'orchwest:-
 // anything placed on Hilltop Grove before v0.68 (old bounds) moves back with it
 export const ORCH_NORTH_OLD = { x0: 293, x1: 307, z0: -24, z1: -10, dz: -2 };
 export const SIGNS = {
-  west: [-5.25, -1.7], east: [5.15, -1.9], north: [1.2, -7.4], northwest: [-5.4, -7.4], northeast: [5.4, -7.4], backwoods: [0, -18.4],
+  west: [-5.25, -1.7], east: [5.15, -1.9], north: [1.2, -7.4], northwest: [-5.4, -7.4], northeast: [5.4, -7.4],
   orchwest: [291.4, 3.0], orcheast: [308.6, 3.0], orchnorth: [300, -13.2],
 };
 
