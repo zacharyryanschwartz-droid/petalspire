@@ -1556,3 +1556,8 @@ body.guide-on #jd-bloom, body.guide-on #jd-rush{display:none!important}
 .ts-head .close-btn{width:40px;height:40px;flex:none}
 #panel-close{width:44px;height:44px;font-size:26px;flex:none;margin:-6px -2px -6px 10px;border-width:2px;box-shadow:0 2px 6px rgba(61,90,64,.18)}
 .panel-head h2{min-width:0}
+
+/* Garden Pot + Other World bloom moment */
+#bloom-skip{position:fixed;left:50%;top:38%;transform:translateX(-50%);z-index:80;pointer-events:none;padding:8px 16px;border-radius:999px;border:1.5px solid #F5D07A;background:rgba(255,249,240,.96);color:#3D5A40;font-family:'Nunito',sans-serif;font-weight:700;font-size:14px;letter-spacing:.02em;box-shadow:0 4px 16px rgba(61,90,64,.22);white-space:nowrap}
+#bloom-skip.hidden{display:none}
+#bloom-skip b{font-family:'Fraunces',serif;font-weight:600;color:#3D5A40}

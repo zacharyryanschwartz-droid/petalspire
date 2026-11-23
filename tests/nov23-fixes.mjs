@@ -84,7 +84,7 @@ try {
         build: ps.BUILD,
       };
     });
-    ok('build is 0.8.7.8', got.build === '0.8.7.8', got.build);
+    ok('build is 0.8.8', got.build === '0.8.8', got.build);
     ok('Home has 6 plots (Roadside + 5 neighbours)', got.homeN === 6 && got.home[0] === 'home', got.home);
     ok('five Home plots are for sale (Back Woods removed)', got.saleN === 5 && !got.saleHasBack, got.sale);
     ok('LOTS has no backwoods entry', !got.lotsHasBack, got.lotsHasBack);

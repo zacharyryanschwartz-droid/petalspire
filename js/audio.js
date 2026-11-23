@@ -84,6 +84,7 @@ export const SFX = {
   pack: (c, o, t) => { burst(c, o, t, { type: 'highpass', f: 3000, v: 0.05, a: 0.15, d: 0.5 }); ['D5', 'E5', 'F#5', 'A5', 'B5', 'D6'].forEach((n, k) => bell(c, o, t + k * 0.06, N(n), 0.05, 0.7)); },
   levelup: (c, o, t) => { ['D5', 'F#5', 'A5', 'D6'].forEach((n, k) => { pluck(c, o, t + k * 0.09, N(n), 0.12, 'harp'); }); whistle(c, o, t + 0.36, N('A5'), 0.35, 0.07); bell(c, o, t + 0.36, N('D6'), 0.04, 0.9); },
   goal: (c, o, t) => { ['G4', 'B4', 'D5', 'G5', 'B5'].forEach((n, k) => pluck(c, o, t + k * 0.08, N(n), 0.11, 'harp')); bell(c, o, t + 0.42, N('G6'), 0.04, 1); },
+  bloom: (c, o, t) => { ['A5', 'C#6', 'E6'].forEach((n, k) => bell(c, o, t + k * 0.14, N(n), 0.08, 1.5)); pluck(c, o, t + 0.1, N('E6'), 0.1, 'harp'); whistle(c, o, t + 0.32, N('A5'), 0.7, 0.045); },
   press: (c, o, t) => { const s = c.createOscillator(), lp = c.createBiquadFilter(), g = c.createGain(); s.type = 'sawtooth'; s.frequency.setValueAtTime(95, t); s.frequency.linearRampToValueAtTime(70, t + 0.25); s.frequency.linearRampToValueAtTime(88, t + 0.4);
     lp.type = 'lowpass'; lp.frequency.value = 420; g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(0.06, t + 0.05); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.45); s.connect(lp).connect(g).connect(o); s.start(t); s.stop(t + 0.5);
     burst(c, o, t + 0.2, { f: 700, v: 0.07, a: 0.03, d: 0.2, f2: 250 }); blip(c, o, t + 0.42, 520, 300, 0.06, 0.05); },

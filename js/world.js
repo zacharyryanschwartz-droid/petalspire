@@ -1832,7 +1832,7 @@ export function createWorld(canvas) {
     raycaster.setFromCamera(ndc, camera);
     if (mode === 'build') { const h = raycaster.intersectObjects(ghostMeshes, false)[0]; return h ? h.object.userData : null; }
     if (mode === 'ground') { const p = raycaster.ray.intersectPlane(groundPlane, new THREE.Vector3()); return p ? { kind: 'ground', point: p } : null; }
-    const targets = [...tiles.map((t) => t.mesh), ...tiles.map((t) => t.holder), woods, lootG, decorG, featG, bpGroup];
+    const targets = [...tiles.map((t) => t.mesh), ...tiles.map((t) => t.holder), ...pots.values(), woods, lootG, decorG, featG, bpGroup];
     if (stand.visible) targets.push(stand); if (rack.visible) targets.push(rack); if (tincture.visible) targets.push(tincture); if (still.visible) targets.push(still); if (teastand.visible) targets.push(teastand); if (press.visible) targets.push(press); if (opress.visible) targets.push(opress); if (fruitstand.visible) targets.push(fruitstand); targets.push(orchardG); if (orchardShed.visible) targets.push(orchardShed);   /* v0.65 fix: the Orchard Stand (and its scaffold while it's being built) was never tappable */ if (parking.visible) targets.push(parking); if (oparking.visible) targets.push(oparking); if (obillboard.visible) targets.push(obillboard); if (windmill.visible) targets.push(windmill); if (billboard.visible) targets.push(billboard); targets.push(market); if (bulkHome.visible) targets.push(bulkHome); if (bulkOrch.visible) targets.push(bulkOrch); for (const g of barrels.values()) if (g.visible) targets.push(g); for (const g of hives.values()) if (g.visible) targets.push(g); for (const g of workers.values()) if (g.visible) targets.push(g);
     for (const id of Object.keys(lotFx)) if (lotFx[id].fx.visible) targets.push(lotFx[id].sign, lotFx[id].tag);
     const hits = raycaster.intersectObjects(targets, true);
@@ -1851,6 +1851,7 @@ export function createWorld(canvas) {
       const o0 = h.object; if (!visibleChain(o0)) continue;
       if (o0.userData?.tag) { consider(h, { kind: 'lot', id: o0.userData.id }); continue; }
       const ti = tiles.findIndex((t) => t.icon === o0); if (ti >= 0 && o0.visible) { consider(h, { kind: 'tile', index: ti }); continue; }
+      { let potHit = false; for (const [pid, pg] of pots) if (pg.userData.icon === o0 && o0.visible) { consider(h, { kind: 'pot', id: pid }); potHit = true; break; } if (potHit) continue; }
       let loot = o0; while (loot && loot !== lootG) { if (loot.userData?.kind === 'loot') { consider(h, loot.userData); break; } loot = loot.parent; }
       if (o0.isSprite && o0.material?.blending === THREE.AdditiveBlending) continue;
       let o = o0;
@@ -1882,13 +1883,119 @@ export function createWorld(canvas) {
   function attachPlant(i, obj, pop = true) { const t = tiles[i]; t.plant = obj; obj.userData.born = pop ? performance.now() : 0; if (pop) obj.scale.setScalar(0.01); t.holder.add(obj); }
   function setShade(i, v) { const t = tiles[i]; if (!t) return; t.shade.visible = v > 0.06; t.shade.material.opacity = Math.min(0.62, v * 0.7); t.shade.userData.v = v; }
   function setIcon(i, kind) { const t = tiles[i]; if (!kind) { t.icon.visible = false; return; } t.icon.material.map = ICON_TEX[kind]; t.icon.material.needsUpdate = true; t.icon.visible = true; }
-  function select(i) {
-    if (i == null) { sel.visible = false; selGlow.visible = false; return; }
-    const c = tileWorld(i); sel.position.set(c.x, 0.34, c.z); sel.visible = true; selGlow.position.set(c.x, 0.5, c.z); selGlow.visible = true;
+  function select(i, at) {
+    if (i == null && !at) { sel.visible = false; selGlow.visible = false; return; }
+    const c = at || tileWorld(i); sel.position.set(c.x, 0.34, c.z); sel.visible = true; selGlow.position.set(c.x, 0.5, c.z); selGlow.visible = true;
   }
+  function selectAt(x, z) { select(null, { x, z }); }
   function splash(i) {
     const c = tileWorld(i);
-    for (let k = 0; k < 14; k++) { const d = new THREE.Mesh(dropGeo, dropM); d.position.set(c.x + (Math.random() - 0.5) * 0.7, 1.6 + Math.random() * 0.8, c.z + (Math.random() - 0.5) * 0.7); d.userData.v = -1.5 - Math.random() * 1.5; d.userData.floor = 0.35; scene.add(d); drops.push(d); }
+    splashAt(c.x, c.z, 0.35);
+  }
+  function splashAt(x, z, floor = 0.42) {
+    for (let k = 0; k < 14; k++) { const d = new THREE.Mesh(dropGeo, dropM); d.position.set(x + (Math.random() - 0.5) * 0.7, 1.6 + Math.random() * 0.8, z + (Math.random() - 0.5) * 0.7); d.userData.v = -1.5 - Math.random() * 1.5; d.userData.floor = floor; scene.add(d); drops.push(d); }
+  }
+
+  // ---------- Garden pots (one-slot planters) + Other World bloom cinematic ----------
+  const pots = new Map();
+  function makePotMesh() {
+    const g = new THREE.Group();
+    const clay = mat('#C9876A', { roughness: 0.88 });
+    const clayD = mat('#A86B52', { roughness: 0.92 });
+    const rimM = mat('#FFF9F0', { roughness: 0.65 });
+    const blush = mat('#E8A090', { roughness: 0.8 });
+    const soilM = new THREE.MeshStandardMaterial({ color: soilDry.clone(), roughness: 1 });
+    const saucer = shadowy(new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.4, 0.06, 16), blush)); saucer.position.y = 0.04; g.add(saucer);
+    const body = shadowy(new THREE.Mesh(new THREE.CylinderGeometry(0.36, 0.26, 0.48, 16), clay)); body.position.y = 0.3; g.add(body);
+    const band = shadowy(new THREE.Mesh(new THREE.TorusGeometry(0.31, 0.022, 6, 20), clayD)); band.rotation.x = Math.PI / 2; band.position.y = 0.28; g.add(band);
+    const rim = shadowy(new THREE.Mesh(new THREE.TorusGeometry(0.38, 0.04, 8, 20), rimM)); rim.rotation.x = Math.PI / 2; rim.position.y = 0.54; g.add(rim);
+    const soil = new THREE.Mesh(new THREE.CircleGeometry(0.32, 16), soilM); soil.rotation.x = -Math.PI / 2; soil.position.y = 0.52; soil.receiveShadow = true; g.add(soil);
+    const holder = new THREE.Group(); holder.position.set(0, 0.55, 0); holder.scale.setScalar(1.25); g.add(holder);
+    const icon = new THREE.Sprite(new THREE.SpriteMaterial({ transparent: true, depthWrite: false, depthTest: false }));
+    icon.scale.setScalar(0.4); icon.visible = false; icon.renderOrder = 10; holder.add(icon);
+    const hit = new THREE.Mesh(new THREE.CylinderGeometry(0.52, 0.52, 1.15, 10), new THREE.MeshBasicMaterial({ visible: false })); hit.position.y = 0.58; g.add(hit);
+    g.userData.holder = holder; g.userData.icon = icon; g.userData.soil = soil; g.userData.plant = null; g.userData.key = '';
+    return g;
+  }
+  function addPot(id, x, z, rot = 0, animate = false) {
+    removePot(id, false);
+    const g = makePotMesh(); g.position.set(x, 0, z); g.rotation.y = rot; g.userData.kind = 'pot'; g.userData.id = id;
+    scene.add(g); pots.set(id, g);
+    if (animate) { g.userData.born = performance.now(); g.scale.setScalar(0.01); poof(new THREE.Vector3(x, 0.4, z), '#C9876A', 16, 1.2); poof(new THREE.Vector3(x, 0.3, z), '#FFF9F0', 8, 1); }
+    return g;
+  }
+  function removePot(id, puff = true) {
+    const g = pots.get(id); if (!g) return;
+    if (puff) poof(g.position.clone().setY(0.4), '#C9876A', 12, 1);
+    scene.remove(g); pots.delete(id);
+  }
+  function movePot(id, x, z) { const g = pots.get(id); if (!g) return; g.position.set(x, 0, z); }
+  function potWorld(id) { const g = pots.get(id); return g ? g.position.clone().setY(0.55) : new THREE.Vector3(); }
+  function setPotPlant(id, species, stage, watered, variant = '') {
+    const g = pots.get(id); if (!g) return false;
+    const key = species ? `${species}:${stage}:${variant}` : '';
+    g.userData.soil.material.color.copy(watered ? soilWet : soilDry);
+    if (g.userData.key === key) return false;
+    if (g.userData.plant) { g.userData.holder.remove(g.userData.plant); g.userData.plant = null; }
+    g.userData.key = key; return true;
+  }
+  function attachPotPlant(id, obj, pop = true) {
+    const g = pots.get(id); if (!g) return;
+    g.userData.plant = obj; obj.userData.born = pop ? performance.now() : 0; if (pop) obj.scale.setScalar(0.01); g.userData.holder.add(obj);
+  }
+  function setPotIcon(id, kind) {
+    const g = pots.get(id); if (!g) return; const ic = g.userData.icon;
+    if (!kind) { ic.visible = false; return; }
+    ic.material.map = ICON_TEX[kind]; ic.material.needsUpdate = true; ic.visible = true;
+  }
+  function potPlant(id) { return pots.get(id)?.userData.plant || null; }
+
+  // In-place Other World bloom: glow + motes + a rising ring. Never moves the camera.
+  let bloomFx = null;
+  function skipBloomFx() {
+    if (!bloomFx) return false;
+    const fx = bloomFx; bloomFx = null;
+    scene.remove(fx.g); for (const m of fx.motes) scene.remove(m);
+    fx.onDone?.(); return true;
+  }
+  function bloomFxActive() { return !!bloomFx; }
+  function playBloomFx(pos, color = '#C8E0E8', opts = {}) {
+    skipBloomFx();
+    const reduced = !!opts.reduced;
+    const dur = reduced ? 900 : (opts.duration || 2500);
+    const g = new THREE.Group(); g.position.copy(pos);
+    const halo = glowSprite(color, reduced ? 1.8 : 3.4, reduced ? 0.4 : 0.85); halo.position.y = 0.7; g.add(halo);
+    const core = glowSprite('#FFF9F0', reduced ? 0.85 : 1.55, 0.7); core.position.y = 0.85; g.add(core);
+    const ring = new THREE.Mesh(new THREE.TorusGeometry(0.22, 0.018, 8, 32), mat('#F5D07A', { emissive: '#F5D07A', emissiveIntensity: 1.35, transparent: true, opacity: 0.9, depthWrite: false }));
+    ring.rotation.x = Math.PI / 2; ring.position.y = 0.2; g.add(ring);
+    scene.add(g);
+    const motes = [];
+    if (!reduced) {
+      const cols = [color, '#FFF9F0', '#C8E0E8', '#F5D07A', '#F7C5C5', '#B7D4B5'];
+      for (let k = 0; k < 36; k++) {
+        const m = new THREE.Mesh(partGeo, mat(cols[k % cols.length], { emissive: '#FFF9F0', emissiveIntensity: 0.45, transparent: true, roughness: 0.4 }));
+        const a = Math.random() * Math.PI * 2, r = 0.15 + Math.random() * 0.4;
+        m.position.copy(pos).add(new THREE.Vector3(Math.cos(a) * r, 0.2 + Math.random() * 0.3, Math.sin(a) * r));
+        m.userData.v = new THREE.Vector3((Math.random() - 0.5) * 0.35, 0.45 + Math.random() * 0.7, (Math.random() - 0.5) * 0.35);
+        m.userData.spin = new THREE.Vector3(Math.random() * 4, Math.random() * 4, Math.random() * 4);
+        m.userData.s0 = 0.45 + Math.random() * 0.55;
+        m.scale.setScalar(m.userData.s0);
+        scene.add(m); motes.push(m);
+      }
+    }
+    bloomFx = { g, halo, core, ring, motes, t0: performance.now(), dur, reduced, onDone: opts.onDone || null, pos: pos.clone() };
+    return bloomFx;
+  }
+  function updateBloomFx(now) {
+    if (!bloomFx) return;
+    const fx = bloomFx, k = Math.min(1, (now - fx.t0) / fx.dur), ease = k < 0.35 ? (k / 0.35) : (1 - (k - 0.35) / 0.65 * 0.15);
+    const fade = k < 0.75 ? 1 : 1 - (k - 0.75) / 0.25;
+    if (fx.halo.material) fx.halo.material.opacity = (fx.reduced ? 0.32 : 0.72) * fade * (0.85 + 0.15 * Math.sin(now / 180));
+    if (fx.core.material) fx.core.material.opacity = 0.55 * fade;
+    const rs = 0.6 + k * 2.2; fx.ring.scale.set(rs, rs, rs); fx.ring.material.opacity = 0.9 * fade; fx.ring.position.y = 0.2 + k * 0.7;
+    const dt = 1 / 60;
+    for (const m of fx.motes) { m.position.addScaledVector(m.userData.v, dt); m.rotation.x += m.userData.spin.x * dt; m.rotation.y += m.userData.spin.y * dt; m.scale.setScalar(m.userData.s0 * Math.max(0.01, fade)); m.material.opacity = fade; }
+    if (k >= 1) skipBloomFx();
   }
 
 
@@ -1956,6 +2063,15 @@ export function createWorld(canvas) {
       p.traverse((o) => { if (o.userData.glow) o.material.opacity = o.userData.baseOpacity * (0.8 + 0.2 * Math.sin(t * 2 + p.userData.phase)); if (o.userData.motes) o.rotation.y = t * 0.3; });
       if (tl.icon.visible) tl.icon.position.y = 1.35 + (tl.key.endsWith(':3') ? 0.2 : -0.5) + Math.sin(t * 2.5 + p.userData.phase) * 0.06;
     }
+    for (const g of pots.values()) {
+      if (g.userData.born) { const k = Math.min(1, (now - g.userData.born) / 600); g.scale.setScalar(Math.max(0.01, elastic(k))); if (k >= 1) g.userData.born = 0; }
+      const p = g.userData.plant; if (!p) continue;
+      if (p.userData.born) { const k = Math.min(1, (now - p.userData.born) / 600); p.scale.setScalar(Math.max(0.01, elastic(k))); if (k >= 1) p.userData.born = 0; }
+      p.rotation.z = Math.sin(t * 1.3 + (p.userData.phase || 0)) * 0.035; p.rotation.x = Math.sin(t * 1.1 + (p.userData.phase || 0) * 2) * 0.025;
+      p.traverse((o) => { if (o.userData.glow) o.material.opacity = o.userData.baseOpacity * (0.8 + 0.2 * Math.sin(t * 2 + (p.userData.phase || 0))); if (o.userData.motes) o.rotation.y = t * 0.3; });
+      const ic = g.userData.icon; if (ic.visible) ic.position.y = 1.05 + (g.userData.key.endsWith(':3') ? 0.2 : -0.35) + Math.sin(t * 2.5 + (p.userData.phase || 0)) * 0.06;
+    }
+    updateBloomFx(now);
     for (const b of beds) if (b.group.userData.born) { const k = Math.min(1, (now - b.group.userData.born) / 700); b.group.scale.set(1, Math.max(0.01, elastic(k)), 1); if (k >= 1) b.group.userData.born = 0; }
     for (const o of appearing) { if (!o.userData.appear) { appearing.delete(o); continue; } if (builds.some((b) => b.obj === o && !b.shown)) continue; const k = Math.min(1, (now - o.userData.appear) / 750); o.scale.setScalar(Math.max(0.01, elastic(k)) * o.userData.baseScale); if (k >= 1) { o.userData.appear = 0; appearing.delete(o); } }
     for (const o of obs.values()) if (o.stump?.userData.born) { const k = Math.min(1, (now - o.stump.userData.born) / 400); o.stump.scale.setScalar(Math.max(0.01, elastic(k)) * o.def.s * 0.95); if (k >= 1) o.stump.userData.born = 0; }
@@ -1984,7 +2100,8 @@ export function createWorld(canvas) {
     renderer, scene, camera, ctl, DEF, tiles, beds, obs, stand, rack, market, barrel, still, setStill, teastand, setTea, press, opress, orchFenceInfo: () => ({ posts: orchFenceG?.children[0]?.count || 0, owned: [...orchOwned] }), fruitstand, setCraft, addOrchardTree, setOrchardTree, removeOrchardTree, orchardTrees, setTreeRows, treeRows, treeRowPulse, makeFruitTree, parking, setParking, oparking, setOParking, obillboard, windmill, billboard, setBillboard, spotGhosts, setSpotGhosts, bedTargets, setBedTargets, barrels, addBarrel, removeBarrel, gutters, setGutter, setBarrelInfo, setBarrelLv, hives, addHive, removeHive, setBeeBeds, tincture, setTincture, cars, frameHooks,
     updateCamera, resize, glide, intro, pick, project, tileWorld, sickleSweep, plowFurrows, fxCount: () => fxs.length,
     setObstacle, chop, clearObstacle, addBed, setGhosts, setLotOwned, setLocation, orchardScene, orchardShed, setOStandStock, setStandShelf, standShelf, setStandStock, setMarketOpen, setRack, appear, spawnCar, spawnTruck, poof,
-    tilePlant: (i) => tiles[i]?.plant || null, addWorker, removeWorker, setWorker, workerAt, workerGo, workerIdle, workerPose, placeWorker, setPlant, attachPlant, setIcon, setShade, bgTrees, setIrrigation, irrigPulse, irrig, select, splash, render, textSprite, relabel, groundAt,
+    tilePlant: (i) => tiles[i]?.plant || null, addWorker, removeWorker, setWorker, workerAt, workerGo, workerIdle, workerPose, placeWorker, setPlant, attachPlant, setIcon, setShade, bgTrees, setIrrigation, irrigPulse, irrig, select, selectAt, splash, splashAt, render, textSprite, relabel, groundAt,
+    pots, addPot, removePot, movePot, potWorld, setPotPlant, attachPotPlant, setPotIcon, potPlant, playBloomFx, skipBloomFx, bloomFxActive,
     buildAnim, setCons, makeBlueprint, setBlueprint, moveBlueprint, setMarketState, addLoot, removeLoot, addDecor, removeDecor, addFeat, removeFeat, feats, setBulk, setBulkPos, bulkAt, bulkPop, bulkHome: () => bulkHome, bulkOrch: () => bulkOrch, setMoveGhost, moveBed, dropBed, setBarrelXZ, spawnVan, dropCrates, vans: vanPool, crates: dropC, addGrown, setGrown, removeGrown, loots, decors,
     iconWorld(i) { const t = tiles[i]; t.icon.updateWorldMatrix(true, false); return new THREE.Vector3().setFromMatrixPosition(t.icon.matrixWorld); },
   };
