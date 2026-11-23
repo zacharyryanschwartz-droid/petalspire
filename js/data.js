@@ -187,7 +187,7 @@ export const FEATURES = {
   press: {
     id: 'press', name: 'Pressed Oil Stand', rarity: 'epic', type: 'Feature · Crafting',
     price: 140, stats: { Growth: 1, Beauty: 3, Yield: 5, Atmosphere: 4 },   // v0.6
-    blurb: 'A wooden screw press. Press Sunflower seeds into Sunflower Oil or Sun Butter, Damask Rose seeds into Rosehip Oil, Spiral Sunpetal seeds into glowing Sunpetal Oil — and, with an Orchard, olives and cacao into Olive Oil and Cocoa Butter. (Almond Oil and Almond Butter are pressed at the Orchard Oil Press.) Buy it and place it on any plot you own (20 Wood).',
+    blurb: 'A wooden screw press. Press Sunflower seeds into Sunflower Oil or Sun Butter, Damask Rose seeds into Rosehip Oil, and Spiral Sunpetal seeds into glowing Sunpetal Oil. Olive Oil, Almond Oil, Almond Butter and Cocoa Butter are pressed at the Orchard Oil Press, where those trees grow. Buy it and place it on any plot you own (20 Wood).',
   },
   fruitstand: {
     id: 'fruitstand', name: 'Fruit Stand', rarity: 'epic', type: 'Feature · Crafting',
@@ -552,7 +552,7 @@ export const PRESS = { slots: 2, mult: (o) => 1.4 + 0.1 * (o - 1),   // v0.7: wa
   R_('sunoil', 'Sunflower Oil', 'sunflower', 'seed_sunflower', 30, 'oil', 'oilbottle', '#F2C53D', { sell: 80, s: 60, only: 'home' }),
   R_('sunbutter', 'Sun Butter', 'sunflower', 'seed_sunflower', 50, 'butter', 'butterjar', '#D9A441', { sell: 135, s: 90, only: 'home' }),   // v0.7.2: sunflower seeds grow at Home — Sunflower Oil & Sun Butter are Home press only
   R_('rosehip', 'Rosehip Oil', 'damaskrose', 'seed_damaskrose', 3, 'oil', 'oilbottle', '#D4553A', { s: 120, only: 'home' }),   // v0.68: rose hips come from Home roses — Home press only
-  R_('olive', 'Olive Oil', 'olive', 'fruit_olive', 6, 'oil', 'oilbottle', '#B5B03A', { s: 120 }),
+  R_('olive', 'Olive Oil', 'olive', 'fruit_olive', 6, 'oil', 'oilbottle', '#B5B03A', { s: 120, only: 'orchard' }),   // v0.8.7.8: olives grow on Orchard trees — Orchard Oil Press only
   R_('almondoil', 'Almond Oil', 'almond', 'fruit_almond', 6, 'oil', 'oilbottle', '#EAD3A8', { s: 120, only: 'orchard' }),   // v0.68: almonds grow on Orchard trees — Orchard Oil Press only
   R_('almondbutter', 'Almond Butter', 'almond', 'fruit_almond', 8, 'butter', 'butterjar', '#B9895A', { s: 150, only: 'orchard' }),
   R_('cocoa', 'Cocoa Butter', 'cacao', 'fruit_cacao', 4, 'butter', 'butterjar', '#F1E0C0', { s: 180 }),
@@ -677,7 +677,7 @@ export const BUILDS = {
 export const BUILD_ANIM_MS = 2450;
 
 // ---------- v0.3: found items (seeded ~22% of trees, stumps, bushes and rocks hide one) ----------
-export const FIND_CHANCE = 0.22, SAPLING_CHANCE = 0.12;   // sapling chance applies to wild trees only
+export const FIND_CHANCE = 0.22, SAPLING_CHANCE = 0.12;   // v0.8.7.8: every chopped tree awards a sapling to the Bag (this chance is unused)
 export const FINDS = {
   watering_can: { name: 'Rusty Watering Can', restore: { wood: 2, coins: 5, s: 30 }, recycle: { scrap: 2 },
     into: { name: 'Brass Watering Can', bonus: 'can', blurb: 'Every rain barrel refills twice as fast (1 water / 30 s) and holds 15' } },
@@ -795,7 +795,7 @@ export const TIPS = {
   plow: 'You own the <b>Hand Plow</b>! Wherever you have raised beds, tap the plow button on the left, pick a seed, then tap a glowing raised bed to plant every empty tile in that bed.',
   oils: 'The <b>Essential Oil Stand</b> is an Epic card: find it in a Card Pack, buy it at the Supply Market (450 coins), then build it (25 Wood) on one of your <b>other plots</b>. It distills <b>seeds</b> into oils worth far more than the seeds.',
   teastand: 'Your <b>Tea Stand</b> is ready! Tap it, pick any <b>three dried herbs</b> (duplicates allowed) and brew a tea — the predicted price shows as you pick. Rarer herbs make far pricier teas; three different herbs add 10%. Teas sell at your Farm Stand.',
-  press: 'Your <b>Pressed Oil Stand</b> is ready! Tap it and pick a recipe — Sunflower seeds become <b>Sunflower Oil</b> or <b>Sun Butter</b>; Damask Rose seeds, olives, cacao and Sunpetal seeds make richer oils.',
+  press: 'Your <b>Pressed Oil Stand</b> is ready! Tap it and pick a recipe — Sunflower seeds become <b>Sunflower Oil</b> or <b>Sun Butter</b>; Damask Rose and Sunpetal seeds make richer oils. Olive Oil is pressed at the <b>Orchard Oil Press</b>.',
   fruitstand: 'Your <b>Fruit Stand</b> is ready! Tap it to cook orchard fruit into <b>jellies, butters, sauces and canned fruit</b> — each sells for well above the raw fruit.',
   orchard: 'Welcome to <b>The Orchard</b>! Fruit-tree cards are in Card Packs now. Buy saplings at the Supply Market and plant them on the tree spots. Build beds and a rain barrel here too (the shed roof feeds it). Tap <b>Map</b> to go home: both places keep growing.',
   still: 'Your <b>Essential Oil Stand</b> is ready! Distill <b>seeds</b> into essential oils (10 seeds each, e.g. 10 Lavender, Calendula or Chamomile seeds) — oils sell for a premium at the Farm Stand, far more than the seeds. Each distillation also leaves a <b>hydrosol</b> (Rose Water from Damask Rose) — a small extra to sell.',
